@@ -17,6 +17,9 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
     private val _todaysPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
     val todaysPicks: StateFlow<List<TrackEntity>> = _todaysPicks.asStateFlow()
 
+    private val _rediscoverPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val rediscoverPicks: StateFlow<List<TrackEntity>> = _rediscoverPicks.asStateFlow()
+
     private val _hasLibrary = MutableStateFlow(true)
     val hasLibrary: StateFlow<Boolean> = _hasLibrary.asStateFlow()
 
@@ -28,6 +31,7 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
         viewModelScope.launch {
             _hasLibrary.value = repository.trackCount() > 0
             _todaysPicks.value = recommendationEngine.topRecommendations(limit = 6)
+            _rediscoverPicks.value = repository.rediscoverTracks(limit = 6)
         }
     }
 }

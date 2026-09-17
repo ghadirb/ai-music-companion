@@ -27,6 +27,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 const val ROUTE_PLAYER = "player"
 const val ROUTE_ARTIST_DETAIL = "artist/{artistName}"
 const val ROUTE_ALBUM_DETAIL = "album/{albumName}"
+const val ROUTE_PLAYLIST_DETAIL = "playlist/{playlistId}/{playlistName}"
 
-fun artistDetailRoute(artistName: String) = "artist/$artistName"
-fun albumDetailRoute(albumName: String) = "album/$albumName"
+fun artistDetailRoute(artistName: String) = "artist/${java.net.URLEncoder.encode(artistName, "UTF-8")}"
+fun albumDetailRoute(albumName: String) = "album/${java.net.URLEncoder.encode(albumName, "UTF-8")}"
+fun playlistDetailRoute(playlistId: Long, playlistName: String) =
+    "playlist/$playlistId/${java.net.URLEncoder.encode(playlistName, "UTF-8")}"
