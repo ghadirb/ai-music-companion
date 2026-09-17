@@ -96,7 +96,7 @@ private fun PermissionRequestScreen(onRequest: () -> Unit) {
     }
 }
 
-@OptIn(UnstableApi::class)
+@OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScaffold(repository: com.ghadirb.aimusic.data.repository.MusicRepository) {
     val navController = rememberNavController()
