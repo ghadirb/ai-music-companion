@@ -1,0 +1,155 @@
+package com.ghadirb.aimusic
+
+import android.Manifest
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.media3.common.util.UnstableApi
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.rememberPermissionState
+import com.ghadirb.aimusic.data.local.entity.TrackEntity
+import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYER
+import com.ghadirb.aimusic.ui.navigation.Screen
+import com.ghadirb.aimusic.ui.navigation.albumDetailRoute
+import com.ghadirb.aimusic.ui.navigation.artistDetailRoute
+import com.ghadirb.aimusic.ui.screens.albums.AlbumsScreen
+import com.ghadirb.aimusic.ui.screens.artists.ArtistsScreen
+import com.ghadirb.aimusic.ui.screens.favorites.FavoritesScreen
+import com.ghadirb.aimusic.ui.screens.home.HomeScreen
+import com.ghadirb.aimusic.ui.screens.library.LibraryScreen
+import com.ghadirb.aimusic.ui.screens.player.PlayerScreen
+import com.ghadirb.aimusic.ui.screens.player.rememberPlayerViewModel
+import com.ghadirb.aimusic.ui.screens.playlists.PlaylistsScreen
+import com.ghadirb.aimusic.ui.screens.settings.SettingsScreen
+import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
+
+class MainActivity : ComponentActivity() {
+
+    @OptIn(UnstableApi::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val app = application as AiMusicApp
+
+        setContent {
+            AiMusicCompanionTheme {
+                Surface {
+                    AppRoot(repository = app.repository)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class, UnstableApi::class)
+@Composable
+private fun AppRoot(repository: com.ghadirb.aimusic.data.repository.MusicRepository) {
+    val audioPermission = rememberPermissionState(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            Manifest.permission.READ_MEDIA_AUDIO
+        else
+            Manifest.permission.READ_EXTERNAL_STORAGE
+    )
+
+    when (audioPermission.status) {
+        is PermissionStatus.Granted -> MainScaffold(repository)
+        is PermissionStatus.Denied -> PermissionRequestScreen(onRequest = { audioPermission.launchPermissionRequest() })
+    }
+}
+
+@Composable
+private fun PermissionRequestScreen(onRequest: () -> Unit) {
+    Column {
+        Text(
+            stringResource(R.string.permission_rationale),
+            modifier = Modifier.padding(24.dp)
+        )
+        Button(onClick = onRequest, modifier = Modifier.padding(horizontal = 24.dp)) {
+            Text(stringResource(R.string.grant_permission))
+        }
+    }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun MainScaffold(repository: com.ghadirb.aimusic.data.repository.MusicRepository) {
+    val navController = rememberNavController()
+    val playerViewModel = rememberPlayerViewModel(repository)
+
+    fun openPlayer(track: TrackEntity, queue: List<TrackEntity>) {
+        playerViewModel.playQueue(queue, track)
+        navController.navigate(ROUTE_PLAYER)
+    }
+
+    Scaffold(
+        bottomBar = { AppBottomBar(navController) }
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Home.route,
+            modifier = Modifier.padding(padding)
+        ) {
+            composable(Screen.Home.route) {
+                HomeScreen(repository = repository, onTrackClick = ::openPlayer)
+            }
+            composable(Screen.Library.route) {
+                LibraryScreen(repository = repository, onTrackClick = ::openPlayer)
+            }
+            composable(Screen.Artists.route) {
+                ArtistsScreen(repository = repository) { artist ->
+                    navController.navigate(artistDetailRoute(artist))
+                }
+            }
+            composable(Screen.Albums.route) {
+                AlbumsScreen(repository = repository) { album ->
+                    navController.navigate(albumDetailRoute(album))
+                }
+            }
+            composable(Screen.Playlists.route) { PlaylistsScreen() }
+            composable(Screen.Favorites.route) {
+                FavoritesScreen(repository = repository, onTrackClick = ::openPlayer)
+            }
+            composable(Screen.Settings.route) { SettingsScreen() }
+            composable(ROUTE_PLAYER) {
+                PlayerScreen(repository = repository, playerViewModel = playerViewModel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppBottomBar(navController: NavHostController) {
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    NavigationBar {
+        Screen.bottomBarScreens.forEach { screen ->
+            NavigationBarItem(
+                selected = currentRoute == screen.route,
+                onClick = {
+                    navController.navigate(screen.route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                label = { Text(screen.label) }
+            )
+        }
+    }
+}

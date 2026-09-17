@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">AI Music Companion</string>
+    <string name="nav_home">خانه</string>
+    <string name="nav_library">کتابخانه</string>
+    <string name="nav_artists">خواننده‌ها</string>
+    <string name="nav_albums">آلبوم‌ها</string>
+    <string name="nav_playlists">پلی‌لیست‌ها</string>
+    <string name="nav_favorites">علاقه‌مندی‌ها</string>
+    <string name="nav_settings">تنظیمات</string>
+    <string name="home_greeting">سلام</string>
+    <string name="home_question">امروز چه چیزی گوش کنیم؟</string>
+    <string name="card_today_pick">پیشنهاد امروز</string>
+    <string name="card_night">مناسب شب</string>
+    <string name="card_driving">مناسب رانندگی</string>
+    <string name="card_rediscover">دوباره کشف کن</string>
+    <string name="permission_rationale">برای اسکن آهنگ‌های دستگاه به اجازه دسترسی به فایل‌های صوتی نیاز است. هیچ فایلی از دستگاه خارج نمی‌شود.</string>
+    <string name="grant_permission">اجازه دسترسی</string>
+    <string name="empty_library">هنوز آهنگی پیدا نشده. کتابخانه را اسکن کنید.</string>
+    <string name="scan_library">اسکن کتابخانه</string>
+</resources>
