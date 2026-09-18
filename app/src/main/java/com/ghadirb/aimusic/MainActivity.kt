@@ -121,7 +121,7 @@ private fun MainScaffold(repository: com.ghadirb.aimusic.data.repository.MusicRe
         currentRoute == ROUTE_ALBUM_DETAIL ->
             backStackEntry?.arguments?.getString("albumName")
                 ?.let { URLDecoder.decode(it, "UTF-8") } ?: "آلبوم"
-        else -> Screen.bottomBarScreens.firstOrNull { it.route == currentRoute }?.label
+        else -> Screen.bottomBarScreens.firstOrNull { it.route == currentRoute }?.let { stringResource(it.labelRes) }
             ?: stringResource(R.string.app_name)
     }
     val showBackButton = currentRoute != null &&
@@ -222,6 +222,7 @@ private fun AppBottomBar(navController: NavHostController) {
 
     NavigationBar {
         Screen.bottomBarScreens.forEach { screen ->
+            val label = stringResource(screen.labelRes)
             NavigationBarItem(
                 selected = currentRoute == screen.route,
                 onClick = {
@@ -231,8 +232,8 @@ private fun AppBottomBar(navController: NavHostController) {
                         restoreState = true
                     }
                 },
-                icon = { Icon(screen.icon, contentDescription = screen.label) },
-                label = { Text(screen.label) }
+                icon = { Icon(screen.icon, contentDescription = label) },
+                label = { Text(label) }
             )
         }
     }

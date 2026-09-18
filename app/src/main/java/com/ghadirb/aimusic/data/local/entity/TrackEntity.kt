@@ -19,5 +19,14 @@ data class TrackEntity(
     val durationMs: Long,
     val albumArtUri: String? = null,
     val dateAdded: Long = System.currentTimeMillis(),
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    // --- v3: on-device audio analysis (see analysis/AudioAnalyzer.kt) ---
+    /** 0f (calm) .. 1f (energetic), derived from decoded-PCM RMS loudness. Null = not analyzed yet. */
+    val energyLevel: Float? = null,
+    /** Estimated tempo in beats-per-minute from the energy envelope autocorrelation. Null = not analyzed / inconclusive. */
+    val bpm: Int? = null,
+    /** One of MoodTag.* (see AudioAnalyzer) — heuristic label combining energy + tempo (+ lyrics if found). */
+    val moodTag: String? = null,
+    /** True once AudioAnalyzer has processed this file (success or inconclusive) — avoids re-analyzing every worker run. */
+    val analyzed: Boolean = false
 )

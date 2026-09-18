@@ -42,4 +42,37 @@ interface TrackDao {
 
     @Query("SELECT COUNT(*) FROM tracks")
     suspend fun count(): Int
+
+    // --- v3: on-device audio analysis (see analysis/AudioAnalyzer.kt) ---
+
+    @Query("SELECT * FROM tracks WHERE analyzed = 0 LIMIT :limit")
+    suspend fun getUnanalyzed(limit: Int): List<TrackEntity>
+
+    @Query(
+        "UPDATE tracks SET energyLevel = :energyLevel, bpm = :bpm, moodTag = :moodTag, analyzed = 1 " +
+        "WHERE id = :trackId"
+    )
+    suspend fun saveAnalysis(trackId: Long, energyLevel: Float?, bpm: Int?, moodTag: String?)
+
+    /** Marks a track as analyzed without a result (decode failed / too short) so the worker doesn't retry it forever. */
+    @Query("UPDATE tracks SET analyzed = 1 WHERE id = :trackId")
+    suspend fun markAnalyzedNoResult(trackId: Long)
+
+    @Query(
+        "SELECT * FROM tracks WHERE moodTag IN (:moodTags) " +
+        "ORDER BY (CASE WHEN isFavorite = 1 THEN 0 ELSE 1 END), energyLevel ASC LIMIT :limit"
+    )
+    suspend fun getByMoodTags(moodTags: List<String>, limit: Int): List<TrackEntity>
+
+    @Query(
+        "SELECT * FROM tracks WHERE energyLevel IS NOT NULL AND energyLevel >= :minEnergy " +
+        "ORDER BY (CASE WHEN isFavorite = 1 THEN 0 ELSE 1 END), energyLevel DESC LIMIT :limit"
+    )
+    suspend fun getHighEnergyTracks(minEnergy: Float, limit: Int): List<TrackEntity>
+
+    @Query(
+        "SELECT * FROM tracks WHERE energyLevel IS NOT NULL AND energyLevel <= :maxEnergy " +
+        "ORDER BY (CASE WHEN isFavorite = 1 THEN 0 ELSE 1 END), energyLevel ASC LIMIT :limit"
+    )
+    suspend fun getLowEnergyTracks(maxEnergy: Float, limit: Int): List<TrackEntity>
 }

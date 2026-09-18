@@ -21,11 +21,12 @@ import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 
 /**
- * The doc's mock-up: greeting + mood cards. "today's pick" and "rediscover"
- * are backed by real data (RecommendationEngine / MusicRepository.rediscoverTracks).
- * "night" and "driving" stay static labels for the MVP — true mood/context
- * detection (time-of-day + motion, needing BPM/energy analysis) isn't built
- * yet; see README "AI Roadmap" and "Known Limitations".
+ * The doc's mock-up: greeting + mood cards. All four cards are backed by real
+ * data: "today's pick" (RecommendationEngine), "rediscover" (MusicRepository.
+ * rediscoverTracks), and "night"/"driving" from AudioAnalyzer's on-device
+ * energy/mood scoring (MusicRepository.nightSuitableTracks/drivingSuitableTracks).
+ * The night/driving rails stay empty with a small note until AudioAnalysisWorker
+ * has processed enough of the library in the background — see README "AI Roadmap".
  */
 @Composable
 fun HomeScreen(
@@ -37,6 +38,8 @@ fun HomeScreen(
     )
     val picks by viewModel.todaysPicks.collectAsState()
     val rediscover by viewModel.rediscoverPicks.collectAsState()
+    val night by viewModel.nightPicks.collectAsState()
+    val driving by viewModel.drivingPicks.collectAsState()
     val hasLibrary by viewModel.hasLibrary.collectAsState()
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
@@ -47,9 +50,16 @@ fun HomeScreen(
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
         )
 
-        if (!hasLibrary) {
-            Text(stringResource(R.string.empty_library), style = MaterialTheme.typography.bodyMedium)
-            return@Column
+        // hasLibrary is null for one instant while the first trackCount() check is
+        // still running — render nothing rather than guessing, so the screen doesn't
+        // flash the full card layout and then immediately collapse to the empty state.
+        when (hasLibrary) {
+            null -> return@Column
+            false -> {
+                Text(stringResource(R.string.empty_library), style = MaterialTheme.typography.bodyMedium)
+                return@Column
+            }
+            true -> Unit
         }
 
         MoodCard(emoji = "🎧", title = stringResource(R.string.card_today_pick))
@@ -59,7 +69,26 @@ fun HomeScreen(
         Spacer(Modifier.height(20.dp))
         MoodCard(emoji = "🌙", title = stringResource(R.string.card_night))
         Spacer(Modifier.height(12.dp))
+        if (night.isNotEmpty()) {
+            TrackRail(tracks = night, onTrackClick = { track -> onTrackClick(track, night) })
+        } else {
+            Text(
+                stringResource(R.string.mood_cards_analyzing),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
         MoodCard(emoji = "🚗", title = stringResource(R.string.card_driving))
+        Spacer(Modifier.height(12.dp))
+        if (driving.isNotEmpty()) {
+            TrackRail(tracks = driving, onTrackClick = { track -> onTrackClick(track, driving) })
+        } else {
+            Text(
+                stringResource(R.string.mood_cards_analyzing),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
 
         Spacer(Modifier.height(20.dp))
         MoodCard(emoji = "🔄", title = stringResource(R.string.card_rediscover))

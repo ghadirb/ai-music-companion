@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.room.migration.Migration
 import com.ghadirb.aimusic.data.local.dao.ListeningHistoryDao
 import com.ghadirb.aimusic.data.local.dao.PlaylistDao
 import com.ghadirb.aimusic.data.local.dao.TrackDao
@@ -18,10 +20,12 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
  * Single Room database for the whole app. Everything here is local-only —
  * no sync, no network backend. See README "Privacy & Security" section.
  *
- * v2 adds PlaylistEntity/PlaylistTrackCrossRef (manual playlists). The app
- * has no released users yet, so we destructively recreate the DB on schema
- * change instead of writing a real Migration — revisit before any public
- * release where clearing local history would be unacceptable.
+ * v2 adds PlaylistEntity/PlaylistTrackCrossRef (manual playlists).
+ * v3 adds on-device audio-analysis columns to `tracks` (energyLevel, bpm,
+ * moodTag, analyzed) — see analysis/AudioAnalyzer.kt. Since this powers the
+ * "night"/"driving" Home cards and real user libraries may already exist on
+ * devices running v2, this is a real Migration (not destructive) so local
+ * history/favorites/playlists are preserved across the upgrade.
  */
 @Database(
     entities = [
@@ -31,7 +35,7 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
         PlaylistEntity::class,
         PlaylistTrackCrossRef::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,13 +49,26 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tracks ADD COLUMN energyLevel REAL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN bpm INTEGER")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN moodTag TEXT")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN analyzed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ai_music_companion.db"
-                ).fallbackToDestructiveMigration()
+                ).addMigrations(MIGRATION_2_3)
+                    // v1 predates any real install (never released), so the only
+                    // gap we can't hand-migrate is v1->v2; destructive fallback
+                    // only kicks in for that very old case.
+                    .fallbackToDestructiveMigrationFrom(1)
                     .build().also { INSTANCE = it }
             }
     }

@@ -17,4 +17,5 @@
     <string name="grant_permission">اجازه دسترسی</string>
     <string name="empty_library">هنوز آهنگی پیدا نشده. کتابخانه را اسکن کنید.</string>
     <string name="scan_library">اسکن کتابخانه</string>
+    <string name="mood_cards_analyzing">در حال تحلیل آهنگ‌ها برای این پیشنهاد… کمی بعد دوباره سر بزنید.</string>
 </resources>

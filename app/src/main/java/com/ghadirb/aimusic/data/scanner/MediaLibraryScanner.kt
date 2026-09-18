@@ -2,8 +2,11 @@ package com.ghadirb.aimusic.data.scanner
 
 import android.content.ContentUris
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,22 +23,41 @@ class MediaLibraryScanner(private val context: Context) {
         val tracks = mutableListOf<TrackEntity>()
 
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-        val projection = arrayOf(
+        val baseProjection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.GENRE,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.IS_MUSIC
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= 15000"
+        val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
-        val cursor = context.contentResolver.query(
-            collection, projection, selection, null,
-            "${MediaStore.Audio.Media.TITLE} ASC"
-        )
+        // MediaStore.Audio.Media.GENRE only exists as a queryable column on API 30+, and even
+        // then some OEM providers reject it — the query itself throws IllegalArgumentException
+        // ("Invalid column genre") rather than just omitting the column, which used to crash the
+        // whole scan. So: try WITH genre first (nice to have for future genre-based filtering),
+        // and transparently fall back to the base projection (no genre) if the provider rejects it.
+        var includesGenre = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+        var cursor: Cursor? = null
+        if (includesGenre) {
+            cursor = try {
+                context.contentResolver.query(
+                    collection,
+                    baseProjection + MediaStore.Audio.Media.GENRE,
+                    selection, null, sortOrder
+                )
+            } catch (e: IllegalArgumentException) {
+                Log.w("MediaLibraryScanner", "GENRE column not supported by this device's provider, scanning without it")
+                includesGenre = false
+                null
+            }
+        }
+        if (cursor == null) {
+            cursor = context.contentResolver.query(collection, baseProjection, selection, null, sortOrder)
+        }
 
         cursor?.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
@@ -44,7 +66,7 @@ class MediaLibraryScanner(private val context: Context) {
             val albumCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val albumIdCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val durationCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-            val genreColIndex = c.getColumnIndex(MediaStore.Audio.Media.GENRE)
+            val genreColIndex = if (includesGenre) c.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
 
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
@@ -77,3 +99,4 @@ class MediaLibraryScanner(private val context: Context) {
     private fun albumArtUriFor(albumId: Long): String =
         Uri.parse("content://media/external/audio/albumart/$albumId").toString()
 }
+

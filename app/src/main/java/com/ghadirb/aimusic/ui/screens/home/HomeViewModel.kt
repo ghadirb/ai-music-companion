@@ -20,8 +20,17 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
     private val _rediscoverPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
     val rediscoverPicks: StateFlow<List<TrackEntity>> = _rediscoverPicks.asStateFlow()
 
-    private val _hasLibrary = MutableStateFlow(true)
-    val hasLibrary: StateFlow<Boolean> = _hasLibrary.asStateFlow()
+    private val _nightPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val nightPicks: StateFlow<List<TrackEntity>> = _nightPicks.asStateFlow()
+
+    private val _drivingPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val drivingPicks: StateFlow<List<TrackEntity>> = _drivingPicks.asStateFlow()
+
+    // Unknown until the first trackCount() check completes — NOT "true", otherwise the
+    // screen briefly renders the full card layout on the very first frame and then
+    // flashes to the empty-library message once the real (often 0) count comes back.
+    private val _hasLibrary = MutableStateFlow<Boolean?>(null)
+    val hasLibrary: StateFlow<Boolean?> = _hasLibrary.asStateFlow()
 
     init {
         refresh()
@@ -29,9 +38,12 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
-            _hasLibrary.value = repository.trackCount() > 0
+            val count = repository.trackCount()
             _todaysPicks.value = recommendationEngine.topRecommendations(limit = 6)
             _rediscoverPicks.value = repository.rediscoverTracks(limit = 6)
+            _nightPicks.value = repository.nightSuitableTracks(limit = 6)
+            _drivingPicks.value = repository.drivingSuitableTracks(limit = 6)
+            _hasLibrary.value = count > 0
         }
     }
 }

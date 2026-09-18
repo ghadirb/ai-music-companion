@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.work.WorkManager
 import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
@@ -29,8 +30,11 @@ fun LibraryScreen(
     repository: MusicRepository,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel: LibraryViewModel = viewModel(
-        factory = viewModelFactory { initializer { LibraryViewModel(repository) } }
+        factory = viewModelFactory {
+            initializer { LibraryViewModel(repository, WorkManager.getInstance(context)) }
+        }
     )
     val tracks by viewModel.tracks.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()

@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
 import com.ghadirb.aimusic.data.local.AppDatabase
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.recommendation.TasteProfileWorker
@@ -34,6 +36,7 @@ class AiMusicApp : Application() {
             context = this
         )
         scheduleTasteProfileRefresh()
+        scheduleAudioAnalysis()
     }
 
     /**
@@ -55,6 +58,31 @@ class AiMusicApp : Application() {
             TasteProfileWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             request
+        )
+    }
+
+    /**
+     * Feeds Home's "night"/"driving" cards (see AudioAnalyzer). One immediate
+     * pass on every app start picks up tracks added since the last run (a
+     * fresh library scan or newly-copied files), plus a daily periodic job
+     * as a safety net. Entirely on-device — no network constraint needed
+     * because this job never uses one.
+     */
+    private fun scheduleAudioAnalysis() {
+        WorkManager.getInstance(this).enqueue(
+            OneTimeWorkRequestBuilder<AudioAnalysisWorker>()
+                .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
+                .build()
+        )
+
+        val periodicRequest = PeriodicWorkRequestBuilder<AudioAnalysisWorker>(1, TimeUnit.DAYS)
+            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            AudioAnalysisWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            periodicRequest
         )
     }
 }

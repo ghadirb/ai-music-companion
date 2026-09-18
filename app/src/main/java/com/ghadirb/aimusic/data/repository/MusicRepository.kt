@@ -114,4 +114,34 @@ class MusicRepository(
             .shuffled()
             .take(limit)
     }
+
+    // ---- On-device audio analysis (see analysis/AudioAnalyzer.kt) ----
+
+    suspend fun getUnanalyzedTracks(limit: Int = 25): List<TrackEntity> = trackDao.getUnanalyzed(limit)
+
+    suspend fun saveTrackAnalysis(trackId: Long, energyLevel: Float?, bpm: Int?, moodTag: String?) =
+        trackDao.saveAnalysis(trackId, energyLevel, bpm, moodTag)
+
+    suspend fun markTrackAnalyzedNoResult(trackId: Long) = trackDao.markAnalyzedNoResult(trackId)
+
+    /**
+     * Backs the "مناسب شب" Home card. Real filter now that AudioAnalyzer exists:
+     * calm-mood tracks first (favorites prioritized), and if not enough tracks
+     * have been analyzed yet, tops up with low-energy tracks so the card isn't
+     * empty during the first day of background analysis.
+     */
+    suspend fun nightSuitableTracks(limit: Int = 6): List<TrackEntity> {
+        val byMood = trackDao.getByMoodTags(listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.CALM), limit)
+        if (byMood.size >= limit) return byMood
+        val topUp = trackDao.getLowEnergyTracks(0.45f, limit)
+        return (byMood + topUp).distinctBy { it.id }.take(limit)
+    }
+
+    /** Backs the "مناسب رانندگی" Home card — same idea as [nightSuitableTracks], inverted. */
+    suspend fun drivingSuitableTracks(limit: Int = 6): List<TrackEntity> {
+        val byMood = trackDao.getByMoodTags(listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.ENERGETIC), limit)
+        if (byMood.size >= limit) return byMood
+        val topUp = trackDao.getHighEnergyTracks(0.55f, limit)
+        return (byMood + topUp).distinctBy { it.id }.take(limit)
+    }
 }
