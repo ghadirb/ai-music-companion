@@ -33,7 +33,8 @@ class AiMusicApp : Application() {
             historyDao = database.listeningHistoryDao(),
             preferenceDao = database.userPreferenceDao(),
             playlistDao = database.playlistDao(),
-            context = this
+            context = this,
+            database = database
         )
         scheduleTasteProfileRefresh()
         scheduleAudioAnalysis()

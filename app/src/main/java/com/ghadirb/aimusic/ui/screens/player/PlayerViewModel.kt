@@ -2,23 +2,29 @@ package com.ghadirb.aimusic.ui.screens.player
 
 import android.app.Application
 import android.net.Uri
+import kotlinx.coroutines.Dispatchers
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
-import com.ghadirb.aimusic.data.local.entity.ListeningHistoryEntity
+import com.ghadirb.aimusic.lyrics.LyricsSource
+import com.ghadirb.aimusic.lyrics.LyricsState
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
-import com.ghadirb.aimusic.analysis.LyricsAnalyzer
 import com.ghadirb.aimusic.data.repository.MusicRepository
-import com.ghadirb.aimusic.playback.PlayerController
-import com.ghadirb.aimusic.recommendation.RecommendationEngine
 import com.ghadirb.aimusic.embedding.OnlineSimilarityRanker
+import com.ghadirb.aimusic.playback.PlaybackStateStore
+import com.ghadirb.aimusic.playback.PlayerController
+import com.ghadirb.aimusic.playback.SleepTimerController
+import com.ghadirb.aimusic.playback.SleepTimerState
+import com.ghadirb.aimusic.recommendation.RecommendationEngine
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 
 data class PlayerUiState(
     val currentTrack: TrackEntity? = null,
@@ -27,14 +33,13 @@ data class PlayerUiState(
     val durationMs: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
-    val sleepTimerEndsAtMs: Long? = null
+    val queueIndex: Int = 0,
+    val isConnected: Boolean = false
 )
 
 /**
- * Bridges Compose UI <-> PlayerController (Media3) <-> MusicRepository.
- * Also owns the "did this play count as a completed listen or a skip"
- * bookkeeping that feeds ListeningHistoryEntity — this is the behavioral
- * data the whole taste-learning system in the doc depends on.
+ * Bridges Compose UI <-> PlayerController (Media3). Listening history is recorded inside the
+ * playback service (ListeningRecorder), not here, so it no longer depends on the UI being alive.
  */
 @UnstableApi
 class PlayerViewModel(
@@ -43,59 +48,88 @@ class PlayerViewModel(
 ) : AndroidViewModel(application) {
 
     private val controller = PlayerController(application)
+    private val stateStore = PlaybackStateStore(application)
     private val recommendationEngine = RecommendationEngine(repository)
+    private val onlineSimilarityRanker = OnlineSimilarityRanker(application)
+    private val trackCache = HashMap<Long, TrackEntity>()
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    private val _queue = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val queue: StateFlow<List<TrackEntity>> = _queue.asStateFlow()
+
     private val _similarTracks = MutableStateFlow<List<TrackEntity>>(emptyList())
     val similarTracks: StateFlow<List<TrackEntity>> = _similarTracks.asStateFlow()
-    private val _lyrics = MutableStateFlow<List<LyricsAnalyzer.LrcLine>>(emptyList())
-    val lyrics: StateFlow<List<LyricsAnalyzer.LrcLine>> = _lyrics.asStateFlow()
-    private val onlineSimilarityRanker = OnlineSimilarityRanker(application)
+
+    private val lyricsSource = LyricsSource(application)
+    private val _lyrics = MutableStateFlow<LyricsState>(LyricsState.NotFound)
+    val lyrics: StateFlow<LyricsState> = _lyrics.asStateFlow()
+    private val _lyricsHasFolder = MutableStateFlow(lyricsSource.hasFolder())
+    val lyricsHasFolder: StateFlow<Boolean> = _lyricsHasFolder.asStateFlow()
+    private var lyricsJob: Job? = null
+
     private val _onlineAiMessage = MutableStateFlow<String?>(null)
     val onlineAiMessage: StateFlow<String?> = _onlineAiMessage.asStateFlow()
 
-    private var currentQueue: List<TrackEntity> = emptyList()
-    private var sessionStartTime: Long = 0L
-    private var sessionTrack: TrackEntity? = null
-    private var maxPositionReachedMs: Long = 0L
-    private var sleepTimerJob: Job? = null
+    val sleepTimer: StateFlow<SleepTimerState> = SleepTimerController.state
 
-    init {
-        controller.connect { mediaController ->
-            mediaController.addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
-                }
+    private var syncJob: Job? = null
+    private var derivedJob: Job? = null
 
-                override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-                    _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
-                }
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _uiState.update { it.copy(isPlaying = isPlaying) }
+        }
 
-                override fun onRepeatModeChanged(repeatMode: Int) {
-                    _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
-                }
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            _uiState.update { it.copy(shuffleEnabled = shuffleModeEnabled) }
+        }
 
-                override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
-                    finalizePreviousSession(reason)
-                    val trackId = mediaItem?.mediaId?.toLongOrNull()
-                    val track = currentQueue.firstOrNull { it.id == trackId }
-                    startNewSession(track)
-                }
-            })
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            _uiState.update { it.copy(repeatMode = repeatMode) }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            onCurrentItemChanged(mediaItem?.mediaId?.toLongOrNull())
+        }
+
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            syncQueue()
         }
     }
 
+    init {
+        controller.connect { mediaController ->
+            mediaController.addListener(playerListener)
+            _uiState.update {
+                it.copy(
+                    isConnected = true,
+                    isPlaying = mediaController.isPlaying,
+                    shuffleEnabled = mediaController.shuffleModeEnabled,
+                    repeatMode = mediaController.repeatMode
+                )
+            }
+            if (mediaController.mediaItemCount > 0) {
+                // The service is already playing (e.g. the Activity was recreated).
+                syncQueue()
+                onCurrentItemChanged(mediaController.currentMediaItem?.mediaId?.toLongOrNull())
+            } else {
+                restoreLastSession()
+            }
+        }
+    }
+
+    // ---- Playback ----
+
     fun playQueue(queue: List<TrackEntity>, startTrack: TrackEntity) {
+        rememberTracks(queue)
         if (controller.currentMediaId() == startTrack.id.toString()) {
-            currentQueue = queue
-            _uiState.value = _uiState.value.copy(currentTrack = startTrack)
             if (!controller.isPlaying()) controller.togglePlayPause()
             return
         }
-        currentQueue = queue
+        _uiState.update { it.copy(currentTrack = startTrack, positionMs = 0L) }
         controller.playTrack(startTrack, queue)
-        startNewSession(startTrack)
     }
 
     fun togglePlayPause() = controller.togglePlayPause()
@@ -105,20 +139,36 @@ class PlayerViewModel(
     fun setShuffle(enabled: Boolean) = controller.setShuffle(enabled)
     fun cycleRepeatMode() = controller.cycleRepeatMode()
 
-    fun setSleepTimer(minutes: Int?) {
-        sleepTimerJob?.cancel()
-        if (minutes == null) {
-            _uiState.value = _uiState.value.copy(sleepTimerEndsAtMs = null)
-            return
-        }
-        val endsAt = System.currentTimeMillis() + minutes * 60_000L
-        _uiState.value = _uiState.value.copy(sleepTimerEndsAtMs = endsAt)
-        sleepTimerJob = viewModelScope.launch {
-            delay(minutes * 60_000L)
-            controller.pause()
-            _uiState.value = _uiState.value.copy(sleepTimerEndsAtMs = null)
-        }
+    // ---- Queue ----
+
+    fun playNext(track: TrackEntity) {
+        rememberTracks(listOf(track))
+        if (controller.hasItems()) controller.addNext(track) else playQueue(listOf(track), track)
     }
+
+    fun addToQueue(track: TrackEntity) {
+        rememberTracks(listOf(track))
+        if (controller.hasItems()) controller.addLast(track) else playQueue(listOf(track), track)
+    }
+
+    fun playQueueItem(index: Int) = controller.seekToQueueItem(index)
+    fun removeFromQueue(index: Int) = controller.removeAt(index)
+    fun moveQueueItem(from: Int, to: Int) = controller.moveItem(from, to)
+    fun clearUpcoming() = controller.clearUpcoming()
+
+    fun clearQueue() {
+        controller.stopAndClear()
+        _uiState.update { it.copy(currentTrack = null, isPlaying = false, positionMs = 0L, durationMs = 0L) }
+        _queue.value = emptyList()
+    }
+
+    // ---- Sleep timer (runs inside the playback service process; survives this ViewModel) ----
+
+    fun startSleepTimer(minutes: Int): Boolean = SleepTimerController.startCountdown(minutes)
+    fun startSleepTimerEndOfTrack(): Boolean = SleepTimerController.startEndOfTrack()
+    fun cancelSleepTimer() = SleepTimerController.cancel()
+
+    // ---- Misc UI actions ----
 
     fun playSimilarTrack(track: TrackEntity) = playQueue(_similarTracks.value, track)
 
@@ -145,63 +195,102 @@ class PlayerViewModel(
         viewModelScope.launch {
             val newValue = !track.isFavorite
             repository.setFavorite(track.id, newValue)
-            _uiState.value = _uiState.value.copy(currentTrack = track.copy(isFavorite = newValue))
+            val updated = track.copy(isFavorite = newValue)
+            trackCache[track.id] = updated
+            _uiState.update { state ->
+                if (state.currentTrack?.id == track.id) state.copy(currentTrack = updated) else state
+            }
         }
     }
 
-    /** Polled by the Player screen (e.g. every second) to update the progress bar. */
+    /** Polled by the Player screen (once a second) to update the progress bar. */
     fun refreshProgress() {
-        val position = controller.currentPosition()
-        maxPositionReachedMs = maxOf(maxPositionReachedMs, position)
-        _uiState.value = _uiState.value.copy(
-            positionMs = position,
-            durationMs = controller.duration(),
-            shuffleEnabled = controller.shuffleEnabled(),
-            repeatMode = controller.repeatMode()
-        )
-    }
-
-    private fun startNewSession(track: TrackEntity?) {
-        sessionTrack = track
-        sessionStartTime = System.currentTimeMillis()
-        maxPositionReachedMs = 0L
-        _uiState.value = _uiState.value.copy(currentTrack = track, positionMs = 0L)
-        viewModelScope.launch {
-            _similarTracks.value = track?.let { recommendationEngine.similarTracks(it, limit = 8) }.orEmpty()
-            _lyrics.value = track?.let {
-                LyricsAnalyzer.loadLrc(getApplication<Application>(), Uri.parse(it.path))
-            }.orEmpty()
-        }
-    }
-
-    /**
-     * MEDIA_ITEM_TRANSITION_REASON_AUTO (0) = the track finished naturally (completed).
-     * Anything else (SEEK/REPEAT/PLAYLIST_CHANGED) while a track was loaded is treated
-     * as a manual skip for the MVP's simple heuristic — good enough to start collecting
-     * signal; refine once real listening patterns are observed.
-     */
-    private fun finalizePreviousSession(transitionReason: Int) {
-        val track = sessionTrack ?: return
-        val duration = track.durationMs.takeIf { it > 0 } ?: return
-        val completedPct = (maxPositionReachedMs.toFloat() / duration).coerceIn(0f, 1f)
-        val wasSkip = transitionReason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && completedPct < 0.8f
-
-        viewModelScope.launch {
-            repository.recordListening(
-                ListeningHistoryEntity(
-                    trackId = track.id,
-                    startTime = sessionStartTime,
-                    listenDurationMs = maxPositionReachedMs,
-                    completedPercentage = completedPct,
-                    skipped = wasSkip
-                )
+        _uiState.update {
+            it.copy(
+                positionMs = controller.currentPosition(),
+                durationMs = controller.duration(),
+                shuffleEnabled = controller.shuffleEnabled(),
+                repeatMode = controller.repeatMode(),
+                isPlaying = controller.isPlaying(),
+                queueIndex = controller.currentIndex()
             )
         }
     }
 
+    // ---- Internals ----
+
+    private fun rememberTracks(tracks: List<TrackEntity>) {
+        tracks.forEach { trackCache[it.id] = it }
+    }
+
+    private suspend fun resolve(id: Long): TrackEntity? =
+        trackCache[id] ?: repository.getTrack(id)?.also { trackCache[id] = it }
+
+    private fun syncQueue() {
+        syncJob?.cancel()
+        syncJob = viewModelScope.launch {
+            val resolved = controller.queueIds().mapNotNull { resolve(it) }
+            _queue.value = resolved
+            _uiState.update { it.copy(queueIndex = controller.currentIndex()) }
+        }
+    }
+
+    private fun onCurrentItemChanged(id: Long?) {
+        derivedJob?.cancel()
+        derivedJob = viewModelScope.launch {
+            val track = id?.let { resolve(it) }
+            _uiState.update { it.copy(currentTrack = track, positionMs = 0L, queueIndex = controller.currentIndex()) }
+            _similarTracks.value = track?.let { recommendationEngine.similarTracks(it, limit = 8) }.orEmpty()
+            loadLyrics(track)
+        }
+    }
+
+    private fun loadLyrics(track: TrackEntity?) {
+        lyricsJob?.cancel()
+        if (track == null) {
+            _lyrics.value = LyricsState.NotFound
+            return
+        }
+        _lyrics.value = LyricsState.Loading
+        // File/SAF access happens off the main thread (the old code read the file on Main).
+        lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+            val parsed = lyricsSource.load(track)
+            _lyrics.value = if (parsed != null) LyricsState.Found(parsed) else LyricsState.NotFound
+        }
+    }
+
+    /** The user picked a .lrc file for the current track. */
+    fun importLyrics(uri: Uri) {
+        val track = _uiState.value.currentTrack ?: return
+        viewModelScope.launch {
+            val ok = lyricsSource.importFor(track, uri)
+            if (ok) loadLyrics(track) else _onlineAiMessage.value = "این فایل متن معتبر LRC نبود."
+        }
+    }
+
+    /** The user granted a music/lyrics folder so .lrc files can be found automatically. */
+    fun addLyricsFolder(uri: Uri) {
+        if (lyricsSource.addFolder(uri)) {
+            _lyricsHasFolder.value = true
+            loadLyrics(_uiState.value.currentTrack)
+        }
+    }
+
+    private fun restoreLastSession() {
+        viewModelScope.launch {
+            val saved = stateStore.load() ?: return@launch
+            val tracks = saved.trackIds.mapNotNull { resolve(it) }
+            if (tracks.isEmpty() || controller.hasItems()) return@launch
+            val savedCurrentId = saved.trackIds.getOrNull(saved.index)
+            val index = tracks.indexOfFirst { it.id == savedCurrentId }.coerceAtLeast(0)
+            controller.restoreQueue(tracks, index, saved.positionMs, saved.shuffle, saved.repeatMode)
+            _uiState.update {
+                it.copy(currentTrack = tracks[index], positionMs = saved.positionMs, queueIndex = index)
+            }
+        }
+    }
+
     override fun onCleared() {
-        sleepTimerJob?.cancel()
-        finalizePreviousSession(Player.MEDIA_ITEM_TRANSITION_REASON_SEEK)
         controller.release()
         super.onCleared()
     }

@@ -32,7 +32,8 @@ class MediaLibraryScanner(private val context: Context) {
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.IS_MUSIC,
             MediaStore.Audio.Media.DATA,
-            MediaStore.Audio.Media.DISPLAY_NAME
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.DATE_ADDED
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= 15000"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -70,30 +71,38 @@ class MediaLibraryScanner(private val context: Context) {
             val durationCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val dataCol = c.getColumnIndex(MediaStore.Audio.Media.DATA)
             val displayNameCol = c.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+            val dateAddedCol = c.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
             val genreColIndex = if (includesGenre) c.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
 
             while (c.moveToNext()) {
-                val id = c.getLong(idCol)
-                val contentUri = ContentUris.withAppendedId(collection, id)
-                val albumId = c.getLong(albumIdCol)
-                val albumArtUri = albumArtUriFor(albumId)
+                // One malformed row (odd metadata, OEM quirks) must never abort the whole scan.
+                try {
+                    val id = c.getLong(idCol)
+                    val contentUri = ContentUris.withAppendedId(collection, id)
+                    val albumId = c.getLong(albumIdCol)
+                    val albumArtUri = albumArtUriFor(albumId)
 
-                val fileName = if (displayNameCol >= 0) c.getString(displayNameCol) else null
-                val title = cleanMetadata(c.getString(titleCol)).ifBlank {
-                    cleanMetadata(fileName?.substringBeforeLast('.'))
-                }.ifBlank { "Unknown title" }
-                tracks.add(
-                    TrackEntity(
-                        path = contentUri.toString(),
-                        title = title,
-                        artist = cleanMetadata(c.getString(artistCol)).ifBlank { "Unknown artist" },
-                        album = cleanMetadata(c.getString(albumCol)).ifBlank { "Unknown album" },
-                        genre = if (genreColIndex >= 0) c.getString(genreColIndex) else null,
-                        durationMs = c.getLong(durationCol),
-                        albumArtUri = albumArtUri,
-                        folderPath = if (dataCol >= 0) c.getString(dataCol)?.substringBeforeLast('/', "") else null
+                    val fileName = if (displayNameCol >= 0) c.getString(displayNameCol) else null
+                    val title = cleanMetadata(c.getString(titleCol)).ifBlank {
+                        cleanMetadata(fileName?.substringBeforeLast('.'))
+                    }.ifBlank { "Unknown title" }
+                    val addedSeconds = if (dateAddedCol >= 0) c.getLong(dateAddedCol) else 0L
+                    tracks.add(
+                        TrackEntity(
+                            path = contentUri.toString(),
+                            title = title,
+                            artist = cleanMetadata(c.getString(artistCol)).ifBlank { "Unknown artist" },
+                            album = cleanMetadata(c.getString(albumCol)).ifBlank { "Unknown album" },
+                            genre = if (genreColIndex >= 0) c.getString(genreColIndex)?.takeIf { it.isNotBlank() } else null,
+                            durationMs = c.getLong(durationCol),
+                            albumArtUri = albumArtUri,
+                            folderPath = if (dataCol >= 0) c.getString(dataCol)?.substringBeforeLast('/', "") else null,
+                            dateAdded = if (addedSeconds > 0) addedSeconds * 1000L else System.currentTimeMillis()
+                        )
                     )
-                )
+                } catch (e: Exception) {
+                    Log.w("MediaLibraryScanner", "Skipping unreadable media row: ${e.message}")
+                }
             }
         }
 

@@ -2,6 +2,8 @@ package com.ghadirb.aimusic.data.repository
 
 import android.content.Context
 import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
+import androidx.room.withTransaction
+import com.ghadirb.aimusic.data.local.AppDatabase
 import com.ghadirb.aimusic.data.local.dao.ListeningHistoryDao
 import com.ghadirb.aimusic.data.local.dao.PlaylistDao
 import com.ghadirb.aimusic.data.local.dao.TrackDao
@@ -13,7 +15,10 @@ import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
 import com.ghadirb.aimusic.data.scanner.MediaLibraryScanner
 import kotlinx.coroutines.flow.Flow
+import com.ghadirb.aimusic.library.TrackStat
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 /**
  * Single source of truth for tracks + listening history. UI/ViewModels only
@@ -25,7 +30,8 @@ class MusicRepository(
     private val historyDao: ListeningHistoryDao,
     private val preferenceDao: UserPreferenceDao,
     private val playlistDao: PlaylistDao,
-    context: Context
+    context: Context,
+    private val database: AppDatabase? = null
 ) {
     private val appContext = context.applicationContext
     private val scanner = MediaLibraryScanner(appContext)
@@ -40,6 +46,13 @@ class MusicRepository(
 
     suspend fun trackCount(): Int = trackDao.count()
 
+    fun observeTrackStats(): Flow<List<TrackStat>> = historyDao.observeTrackStats()
+        .map { rows -> rows.map { TrackStat(it.trackId, it.playCount, it.lastPlayedAt) } }
+
+    /** (analyzed, total) so the UI can show real analysis progress. */
+    fun observeAnalysisProgress(): Flow<Pair<Int, Int>> =
+        combine(trackDao.observeAnalyzedCount(), trackDao.observeCount()) { done, total -> done to total }
+
     /**
      * Re-scans MediaStore and reconciles with what's already in Room:
      * inserts new tracks, removes ones that no longer exist on disk.
@@ -53,18 +66,25 @@ class MusicRepository(
 
         val newTracks = scanned.filter { it.path !in existingPaths }
         val existingTracks = scanned.filter { it.path in existingPaths }
-        val removedPaths = existingPaths.filter { it !in scannedPaths }
+        // An empty scan is treated as a provider glitch: never wipe the library (and favourites) because of it.
+        val removedPaths = if (scanned.isEmpty()) emptyList() else existingPaths.filter { it !in scannedPaths }
 
-        if (newTracks.isNotEmpty()) trackDao.insertAll(newTracks)
-        // A re-scan also repairs legacy labels already saved in the database.
-        existingTracks.forEach { track ->
-            trackDao.updateMetadata(
-                path = track.path, title = track.title, artist = track.artist,
-                album = track.album, genre = track.genre, durationMs = track.durationMs,
-                albumArtUri = track.albumArtUri, folderPath = track.folderPath
-            )
+        val applyChanges: suspend () -> Unit = {
+            if (newTracks.isNotEmpty()) trackDao.insertAll(newTracks)
+            // A re-scan also repairs legacy labels already saved in the database.
+            existingTracks.forEach { track ->
+                trackDao.updateMetadata(
+                    path = track.path, title = track.title, artist = track.artist,
+                    album = track.album, genre = track.genre, durationMs = track.durationMs,
+                    albumArtUri = track.albumArtUri, folderPath = track.folderPath,
+                    dateAdded = track.dateAdded
+                )
+            }
+            // SQLite has a variable limit, so delete in chunks.
+            removedPaths.chunked(500).forEach { trackDao.deleteByPaths(it) }
         }
-        if (removedPaths.isNotEmpty()) trackDao.deleteByPaths(removedPaths)
+        // One transaction: faster on big libraries and never leaves a half-applied scan.
+        if (database != null) database.withTransaction { applyChanges() } else applyChanges()
     }
 
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =

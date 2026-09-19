@@ -31,6 +31,13 @@ interface ListeningHistoryDao {
     @Query("SELECT COUNT(*) FROM listening_history WHERE trackId = :trackId AND skipped = 1")
     suspend fun skipCount(trackId: Long): Int
 
+    /** Per-track aggregate (non-skipped plays + last start time) for library sorting. */
+    @Query(
+        "SELECT trackId, SUM(CASE WHEN skipped = 0 THEN 1 ELSE 0 END) AS playCount, " +
+        "MAX(startTime) AS lastPlayedAt FROM listening_history GROUP BY trackId"
+    )
+    fun observeTrackStats(): Flow<List<TrackStatRow>>
+
     @Query(
         "SELECT trackId, COUNT(*) as playCount FROM listening_history " +
         "GROUP BY trackId ORDER BY playCount DESC LIMIT :limit"
@@ -39,3 +46,5 @@ interface ListeningHistoryDao {
 }
 
 data class TrackPlayCount(val trackId: Long, val playCount: Int)
+
+data class TrackStatRow(val trackId: Long, val playCount: Int, val lastPlayedAt: Long)

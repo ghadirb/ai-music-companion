@@ -3,9 +3,14 @@ package com.ghadirb.aimusic.ui.screens.library
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
@@ -21,35 +26,42 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.work.WorkManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
+import com.ghadirb.aimusic.library.EnergyBand
+import com.ghadirb.aimusic.library.LibraryFilter
+import com.ghadirb.aimusic.library.LibrarySort
+import com.ghadirb.aimusic.ui.components.LocalQueueActions
 import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     repository: MusicRepository,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
-    currentTrackId: Long?
+    currentTrackId: Long?,
+    onArtistClick: (String) -> Unit = {},
+    onAlbumClick: (String) -> Unit = {},
+    onPlaylistClick: (Long, String) -> Unit = { _, _ -> }
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel: LibraryViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { LibraryViewModel(repository, WorkManager.getInstance(context)) }
+            initializer {
+                LibraryViewModel(repository, onLibraryChanged = { AudioAnalysisWorker.enqueueNow(context.applicationContext) })
+            }
         }
     )
-    val tracks by viewModel.tracks.collectAsState()
+    val state by viewModel.uiState.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val scanError by viewModel.scanError.collectAsState()
     var trackForPlaylistPicker by remember { mutableStateOf<TrackEntity?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    val filteredTracks = remember(tracks, searchQuery) {
-        val query = searchQuery.trim()
-        if (query.isBlank()) tracks else tracks.filter { track ->
-            listOf(track.title, track.artist, track.album, track.genre.orEmpty()).any { it.contains(query, ignoreCase = true) }
-        }
-    }
 
     Scaffold(
         floatingActionButton = {
@@ -59,39 +71,106 @@ fun LibraryScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (tracks.isEmpty() && !isScanning) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            when (val current = state) {
+                LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                LibraryUiState.Empty -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.empty_library))
+                        Icon(Icons.Filled.LibraryMusic, contentDescription = null, modifier = Modifier.size(64.dp))
                         Spacer(Modifier.height(12.dp))
-                        Button(onClick = { viewModel.scanLibrary() }) {
+                        Text(stringResource(R.string.empty_library), textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { viewModel.scanLibrary() }, enabled = !isScanning) {
                             Text(stringResource(R.string.scan_library))
                         }
                     }
                 }
-            } else {
-                Column {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        label = { Text("جست‌وجو در آهنگ، خواننده، آلبوم یا سبک") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(filteredTracks, key = { it.id }) { track ->
-                        TrackRow(
-                            track = track,
-                            isCurrentTrack = track.id == currentTrackId,
-                            onClick = { onTrackClick(track, filteredTracks) },
-                            onFavoriteClick = { viewModel.toggleFavorite(track) },
-                            onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                is LibraryUiState.Ready -> Column {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it; viewModel.setQuery(it) },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = ""; viewModel.setQuery("") }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "پاک‌کردن جست‌وجو")
+                                    }
+                                }
+                            },
+                            label = { Text("جست‌وجو: آهنگ، خواننده، آلبوم، سبک، پلی‌لیست") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
                         )
+                        SortMenu(current.sort, onSelect = viewModel::setSort)
                     }
-                    if (filteredTracks.isEmpty()) {
-                        item { Text("نتیجه‌ای پیدا نشد.", modifier = Modifier.padding(24.dp)) }
+                    FilterRow(current, onChange = viewModel::setFilter)
+                    scanError?.let { message ->
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { viewModel.scanLibrary() }) { Text("تلاش دوباره") }
+                        }
                     }
+                    val search = current.search
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        if (search != null) {
+                            if (search.isEmpty) {
+                                item { EmptyResult() }
+                            } else {
+                                if (search.artists.isNotEmpty()) item {
+                                    ChipSection("خواننده‌ها", search.artists) { onArtistClick(it) }
+                                }
+                                if (search.albums.isNotEmpty()) item {
+                                    ChipSection("آلبوم‌ها", search.albums) { onAlbumClick(it) }
+                                }
+                                if (search.genres.isNotEmpty()) item {
+                                    ChipSection("سبک‌ها", search.genres) { genre ->
+                                        searchQuery = ""; viewModel.setQuery("")
+                                        viewModel.setFilter(current.filter.copy(genre = genre))
+                                    }
+                                }
+                                if (search.playlists.isNotEmpty()) item {
+                                    ChipSection("پلی‌لیست‌ها", search.playlists.map { it.name }) { name ->
+                                        search.playlists.firstOrNull { it.name == name }?.let { onPlaylistClick(it.id, it.name) }
+                                    }
+                                }
+                                if (search.tracks.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            "آهنگ‌ها (${search.tracks.size})",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                    items(search.tracks, key = { it.id }) { track ->
+                                        TrackRow(
+                                            track = track,
+                                            isCurrentTrack = track.id == currentTrackId,
+                                            onClick = { onTrackClick(track, search.tracks) },
+                                            onFavoriteClick = { viewModel.toggleFavorite(track) },
+                                            onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            if (current.tracks.isEmpty()) {
+                                item { EmptyResult() }
+                            }
+                            items(current.tracks, key = { it.id }) { track ->
+                                TrackRow(
+                                    track = track,
+                                    isCurrentTrack = track.id == currentTrackId,
+                                    onClick = { onTrackClick(track, current.tracks) },
+                                    onFavoriteClick = { viewModel.toggleFavorite(track) },
+                                    onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -107,6 +186,125 @@ fun LibraryScreen(
             track = track,
             onDismiss = { trackForPlaylistPicker = null }
         )
+    }
+}
+
+@Composable
+private fun EmptyResult() {
+    Text("نتیجه‌ای پیدا نشد.", modifier = Modifier.padding(24.dp))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChipSection(title: String, values: List<String>, onClick: (String) -> Unit) {
+    Column(Modifier.padding(vertical = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
+            items(values, key = { it }) { value ->
+                AssistChip(
+                    onClick = { onClick(value) },
+                    label = { Text(value, maxLines = 1) },
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun sortLabel(sort: LibrarySort) = when (sort) {
+    LibrarySort.RECENTLY_ADDED -> "تازه‌ترین افزوده‌ها"
+    LibrarySort.RECENTLY_PLAYED -> "اخیراً پخش‌شده"
+    LibrarySort.MOST_PLAYED -> "پرپخش‌ترین"
+    LibrarySort.TITLE -> "نام آهنگ"
+    LibrarySort.ARTIST -> "خواننده"
+    LibrarySort.ALBUM -> "آلبوم"
+    LibrarySort.DURATION -> "مدت زمان"
+    LibrarySort.FAVORITE -> "علاقه‌مندی‌ها"
+}
+
+private fun moodLabel(mood: String) = when (mood) {
+    "calm" -> "آرام"
+    "energetic" -> "پرانرژی"
+    "happy" -> "شاد"
+    "sad" -> "غمگین"
+    "neutral" -> "خنثی"
+    else -> mood
+}
+
+private fun energyLabel(band: EnergyBand) = when (band) {
+    EnergyBand.LOW -> "انرژی کم"
+    EnergyBand.MEDIUM -> "انرژی متوسط"
+    EnergyBand.HIGH -> "انرژی بالا"
+}
+
+@Composable
+private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Filled.Sort, contentDescription = "مرتب‌سازی: ${sortLabel(current)}")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            LibrarySort.values().forEach { sort ->
+                DropdownMenuItem(
+                    text = { Text(sortLabel(sort), fontWeight = if (sort == current) FontWeight.Bold else FontWeight.Normal) },
+                    onClick = { onSelect(sort); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterRow(state: LibraryUiState.Ready, onChange: (LibraryFilter) -> Unit) {
+    val filter = state.filter
+    var genreMenu by remember { mutableStateOf(false) }
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
+        item {
+            FilterChip(
+                selected = filter.favoritesOnly,
+                onClick = { onChange(filter.copy(favoritesOnly = !filter.favoritesOnly)) },
+                label = { Text("علاقه‌مندی‌ها") },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+        }
+        items(EnergyBand.values().toList(), key = { it.name }) { band ->
+            FilterChip(
+                selected = filter.energy == band,
+                onClick = { onChange(filter.copy(energy = if (filter.energy == band) null else band)) },
+                label = { Text(energyLabel(band)) },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+        }
+        items(state.moods, key = { "mood-$it" }) { mood ->
+            FilterChip(
+                selected = filter.mood == mood,
+                onClick = { onChange(filter.copy(mood = if (filter.mood == mood) null else mood)) },
+                label = { Text(moodLabel(mood)) },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+        }
+        if (state.genres.isNotEmpty()) {
+            item {
+                Box(Modifier.padding(end = 8.dp)) {
+                    FilterChip(
+                        selected = filter.genre != null,
+                        onClick = { genreMenu = true },
+                        label = { Text(filter.genre ?: "سبک") }
+                    )
+                    DropdownMenu(expanded = genreMenu, onDismissRequest = { genreMenu = false }) {
+                        DropdownMenuItem(text = { Text("همهٔ سبک‌ها") }, onClick = { onChange(filter.copy(genre = null)); genreMenu = false })
+                        state.genres.forEach { genre ->
+                            DropdownMenuItem(text = { Text(genre) }, onClick = { onChange(filter.copy(genre = genre)); genreMenu = false })
+                        }
+                    }
+                }
+            }
+        }
+        if (filter.isActive) {
+            item { TextButton(onClick = { onChange(LibraryFilter()) }) { Text("پاک‌کردن فیلتر") } }
+        }
     }
 }
 
@@ -136,17 +334,39 @@ fun TrackRow(
             }
         },
         trailingContent = {
+            val queueActions = LocalQueueActions.current
+            var menuOpen by remember { mutableStateOf(false) }
             Row {
-                if (onAddToPlaylistClick != null) {
-                    IconButton(onClick = onAddToPlaylistClick) {
-                        Icon(Icons.Filled.PlaylistAdd, contentDescription = "افزودن به پلی‌لیست")
-                    }
-                }
                 IconButton(onClick = onFavoriteClick) {
                     Icon(
                         imageVector = if (track.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = null
+                        contentDescription = if (track.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها"
                     )
+                }
+                if (onAddToPlaylistClick != null || queueActions != null) {
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌های بیشتر")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            if (queueActions != null) {
+                                DropdownMenuItem(
+                                    text = { Text("پخش بعدی") },
+                                    onClick = { queueActions.playNext(track); menuOpen = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("افزودن به صف پخش") },
+                                    onClick = { queueActions.addToQueue(track); menuOpen = false }
+                                )
+                            }
+                            if (onAddToPlaylistClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text("افزودن به پلی‌لیست") },
+                                    onClick = { onAddToPlaylistClick(); menuOpen = false }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         },

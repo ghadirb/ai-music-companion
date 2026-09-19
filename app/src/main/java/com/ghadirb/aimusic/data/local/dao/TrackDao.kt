@@ -32,7 +32,7 @@ interface TrackDao {
     suspend fun insertAll(tracks: List<TrackEntity>): List<Long>
 
     /** Refreshes scanner-provided metadata without changing favorites, ids or analysis. */
-    @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, durationMs = :durationMs, albumArtUri = :albumArtUri, folderPath = :folderPath WHERE path = :path")
+    @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, durationMs = :durationMs, albumArtUri = :albumArtUri, folderPath = :folderPath, dateAdded = :dateAdded WHERE path = :path")
     suspend fun updateMetadata(
         path: String,
         title: String,
@@ -41,7 +41,8 @@ interface TrackDao {
         genre: String?,
         durationMs: Long,
         albumArtUri: String?,
-        folderPath: String?
+        folderPath: String?,
+        dateAdded: Long
     )
 
     @Query("DELETE FROM tracks WHERE path IN (:paths)")
@@ -58,6 +59,12 @@ interface TrackDao {
 
     @Query("SELECT COUNT(*) FROM tracks")
     suspend fun count(): Int
+
+    @Query("SELECT COUNT(*) FROM tracks")
+    fun observeCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE analyzed = 1")
+    fun observeAnalyzedCount(): Flow<Int>
 
     // --- v3: on-device audio analysis (see analysis/AudioAnalyzer.kt) ---
 

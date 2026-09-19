@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -39,6 +41,10 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 import com.ghadirb.aimusic.billing.MyketBillingClient
+import com.ghadirb.aimusic.ui.components.LocalQueueActions
+import com.ghadirb.aimusic.ui.components.MiniPlayerBar
+import com.ghadirb.aimusic.ui.components.QueueActions
+import androidx.compose.runtime.CompositionLocalProvider
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ALBUM_DETAIL
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ARTIST_DETAIL
@@ -189,9 +195,22 @@ private fun MainScaffold(
         }
     }
 
+    fun openPlayerScreen() {
+        if (navController.currentDestination?.route != ROUTE_PLAYER) {
+            navController.navigate(ROUTE_PLAYER) { launchSingleTop = true }
+        }
+    }
+
     fun openPlayer(track: TrackEntity, queue: List<TrackEntity>) {
         playerViewModel.playQueue(queue, track)
-        navController.navigate(ROUTE_PLAYER)
+        openPlayerScreen()
+    }
+
+    val queueActions = remember(playerViewModel) {
+        QueueActions(
+            playNext = { playerViewModel.playNext(it) },
+            addToQueue = { playerViewModel.addToQueue(it) }
+        )
     }
 
     val screenTitle = when {
@@ -237,8 +256,23 @@ private fun MainScaffold(
                 }
             )
         },
-        bottomBar = { AppBottomBar(navController) }
+        bottomBar = {
+            Column {
+                val nowPlaying = playerUiState.currentTrack
+                if (nowPlaying != null && currentRoute != ROUTE_PLAYER) {
+                    MiniPlayerBar(
+                        track = nowPlaying,
+                        isPlaying = playerUiState.isPlaying,
+                        onOpen = ::openPlayerScreen,
+                        onToggle = playerViewModel::togglePlayPause,
+                        onNext = playerViewModel::skipNext
+                    )
+                }
+                AppBottomBar(navController)
+            }
+        }
     ) { padding ->
+        CompositionLocalProvider(LocalQueueActions provides queueActions) {
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
@@ -251,7 +285,10 @@ private fun MainScaffold(
                 LibraryScreen(
                     repository = repository,
                     onTrackClick = ::openPlayer,
-                    currentTrackId = playerUiState.currentTrack?.id
+                    currentTrackId = playerUiState.currentTrack?.id,
+                    onArtistClick = { navController.navigate(artistDetailRoute(it)) },
+                    onAlbumClick = { navController.navigate(albumDetailRoute(it)) },
+                    onPlaylistClick = { id, name -> navController.navigate(playlistDetailRoute(id, name)) }
                 )
             }
             composable(Screen.Artists.route) {
@@ -329,6 +366,7 @@ private fun MainScaffold(
                 )
             }
         }
+        }
     }
 }
 
@@ -345,10 +383,21 @@ private fun AppBottomBar(navController: NavHostController) {
                 modifier = Modifier.width(88.dp),
                 selected = currentRoute == screen.route,
                 onClick = {
-                    navController.navigate(screen.route) {
-                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
+                    // Do NOT combine popUpTo{saveState}+restoreState here: the saved state is keyed by the first
+                    // popped screen, so a tab could "restore" the player/detail screen that was open above it
+                    // instead of showing the tab itself (why tabs, incl. Home, sometimes didn't open directly).
+                    if (screen.route == Screen.Home.route) {
+                        if (!navController.popBackStack(Screen.Home.route, inclusive = false)) {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else if (currentRoute != screen.route) {
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
+                            launchSingleTop = true
+                        }
                     }
                 },
                 icon = { Icon(screen.icon, contentDescription = label) },
