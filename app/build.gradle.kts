@@ -4,6 +4,10 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 val myketPublicKey = providers.gradleProperty("MYKET_IAB_PUBLIC_KEY").orElse("").get()
 val myketPremiumSku = providers.gradleProperty("MYKET_PREMIUM_SKU").orElse("premium_lifetime").get()
 val escapedMyketPublicKey = myketPublicKey.replace("\\", "\\\\").replace("\"", "\\\"")

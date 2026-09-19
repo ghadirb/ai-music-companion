@@ -36,7 +36,7 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
         PlaylistTrackCrossRef::class
     ],
     version = 4,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
