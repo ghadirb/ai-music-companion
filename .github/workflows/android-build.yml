@@ -11,12 +11,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
   android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only used to publish the plain-text CI report branch on pushes
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -26,11 +25,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee unit-tests.log
+      - name: Lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug 2>&1 | tee lint.log
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
       - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+      - name: Upload reports
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: android-reports
           path: |
@@ -38,7 +51,17 @@ jobs:
             app/build/test-results/**
             app/schemas/**
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+      # Plain-text report branch (latest run only) so failures can be read without downloading artifacts.
+      - name: Publish CI report branch
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          rm -rf /tmp/report && mkdir -p /tmp/report
+          for f in unit-tests.log lint.log build-debug.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
+          mkdir -p /tmp/report/test-results /tmp/report/schemas
+          find app/build/test-results -name '*.xml' -exec cp {} /tmp/report/test-results/ \; 2>/dev/null || true
+          [ -d app/schemas ] && cp -r app/schemas/. /tmp/report/schemas/ || true
+          cp app/build/reports/lint-results-debug.txt /tmp/report/ 2>/dev/null || true
+          echo "sha=${GITHUB_SHA} run=${GITHUB_RUN_ID}" > /tmp/report/RUN.txt
+          cd /tmp/report && git init -q && git checkout -q -b ci-report && git add -A \
+            && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "CI report for ${GITHUB_SHA}" \
+            && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-report
