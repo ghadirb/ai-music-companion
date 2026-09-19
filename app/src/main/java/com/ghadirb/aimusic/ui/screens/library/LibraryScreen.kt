@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +42,13 @@ fun LibraryScreen(
     val tracks by viewModel.tracks.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     var trackForPlaylistPicker by remember { mutableStateOf<TrackEntity?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val filteredTracks = remember(tracks, searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) tracks else tracks.filter { track ->
+            listOf(track.title, track.artist, track.album, track.genre.orEmpty()).any { it.contains(query, ignoreCase = true) }
+        }
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -61,15 +69,28 @@ fun LibraryScreen(
                     }
                 }
             } else {
-                LazyColumn {
-                    items(tracks, key = { it.id }) { track ->
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        label = { Text("جست‌وجو در آهنگ، خواننده، آلبوم یا سبک") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(filteredTracks, key = { it.id }) { track ->
                         TrackRow(
                             track = track,
                             isCurrentTrack = track.id == currentTrackId,
-                            onClick = { onTrackClick(track, tracks) },
+                            onClick = { onTrackClick(track, filteredTracks) },
                             onFavoriteClick = { viewModel.toggleFavorite(track) },
                             onAddToPlaylistClick = { trackForPlaylistPicker = track }
                         )
+                    }
+                    if (filteredTracks.isEmpty()) {
+                        item { Text("نتیجه‌ای پیدا نشد.", modifier = Modifier.padding(24.dp)) }
+                    }
                     }
                 }
             }

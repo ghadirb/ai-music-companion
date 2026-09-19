@@ -12,6 +12,9 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists ORDER BY createdAt DESC")
     fun observePlaylists(): Flow<List<PlaylistEntity>>
 
+    @Query("SELECT * FROM playlists ORDER BY createdAt DESC")
+    suspend fun getAllPlaylists(): List<PlaylistEntity>
+
     @Insert
     suspend fun insertPlaylist(playlist: PlaylistEntity): Long
 

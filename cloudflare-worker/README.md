@@ -30,3 +30,12 @@ Before deployment, configure all of the following yourself:
 Do not deploy the Worker until all of these are configured. Myket's current
 documentation says recurring subscriptions are not supported; a future
 recurring plan needs a provider/store that supports subscriptions.
+
+## Online AI quota
+
+After a real authenticated account service is connected, `/v1/music-embedding`
+uses the KV binding to enforce a conservative server-side quota: **8 free
+requests per UTC day** and **120 premium requests per UTC day**. The endpoint
+returns remaining quota headers and never trusts a plan flag supplied by the
+Android app. These values are product defaults and can be changed centrally in
+the Worker without releasing a new APK.

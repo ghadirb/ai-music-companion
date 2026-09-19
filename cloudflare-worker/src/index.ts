@@ -31,23 +31,40 @@ export default {
     const claims = await authenticatedClaims(request, env.JWT_SIGNING_SECRET);
     if (!claims?.sub) return json({ error: "unauthorized" }, 401);
 
-    if (path === "/v1/music-embedding") return createEmbedding(request, env);
+    if (path === "/v1/music-embedding") return createEmbedding(request, env, claims);
     if (path === "/v1/myket/purchase-nonce") return issuePurchaseNonce(request, env, claims);
     if (path === "/v1/myket/verify") return verifyMyketPurchase(request, env, claims);
+    if (path === "/v1/entitlements/me") return getEntitlement(env, claims);
     return json({ error: "not_found" }, 404);
   },
 };
 
-async function createEmbedding(request: Request, env: Env): Promise<Response> {
+async function createEmbedding(request: Request, env: Env, claims: Claims): Promise<Response> {
   const payload = await request.json<EmbeddingRequest>().catch(() => null);
   if (!payload?.input || payload.input.length > 6_000) return json({ error: "invalid_input" }, 400);
+
+  const entitlement = await entitlementFor(env, claims.sub!);
+  const usage = await reserveEmbeddingUsage(env, claims.sub!, entitlement.premium);
+  if (!usage.allowed) {
+    return json({ error: "daily_quota_exhausted", limit: usage.limit, resetsAt: usage.resetsAt }, 429);
+  }
 
   const upstream = await fetch("https://api.gapgpt.app/v1/embeddings", {
     method: "POST",
     headers: { authorization: `Bearer ${env.GAPGPT_API_KEY}`, "content-type": "application/json" },
     body: JSON.stringify({ model: payload.model ?? "text-embedding-3-small", input: payload.input }),
   });
-  return json(await upstream.json(), upstream.status);
+  const response = json(await upstream.json(), upstream.status);
+  response.headers.set("x-ai-daily-limit", usage.limit.toString());
+  response.headers.set("x-ai-daily-remaining", usage.remaining.toString());
+  response.headers.set("x-ai-tier", entitlement.premium ? "premium" : "free");
+  return response;
+}
+
+async function getEntitlement(env: Env, claims: Claims): Promise<Response> {
+  const entitlement = await entitlementFor(env, claims.sub!);
+  const usage = await currentEmbeddingUsage(env, claims.sub!, entitlement.premium);
+  return json({ premium: entitlement.premium, aiDailyLimit: usage.limit, aiDailyRemaining: usage.remaining, resetsAt: usage.resetsAt });
 }
 
 async function issuePurchaseNonce(request: Request, env: Env, claims: Claims): Promise<Response> {
@@ -98,6 +115,35 @@ async function verifyMyketPurchase(request: Request, env: Env, claims: Claims): 
   await env.PURCHASE_ENTITLEMENTS.put(usedTokenKey, claims.sub!);
   await env.PURCHASE_ENTITLEMENTS.put(`entitlement:${claims.sub}:${input.sku}`, JSON.stringify({ tokenId: input.tokenId, grantedAt: Date.now() }));
   return json({ premium: true, sku: input.sku });
+}
+
+const FREE_DAILY_EMBEDDING_LIMIT = 8;
+const PREMIUM_DAILY_EMBEDDING_LIMIT = 120;
+
+async function entitlementFor(env: Env, subject: string): Promise<{ premium: boolean }> {
+  if (!env.PURCHASE_ENTITLEMENTS) return { premium: false };
+  const value = await env.PURCHASE_ENTITLEMENTS.get(`entitlement:${subject}:premium_lifetime`);
+  return { premium: value !== null };
+}
+
+async function reserveEmbeddingUsage(env: Env, subject: string, premium: boolean): Promise<{ allowed: boolean; limit: number; remaining: number; resetsAt: string }> {
+  const current = await currentEmbeddingUsage(env, subject, premium);
+  if (current.remaining <= 0) return { ...current, allowed: false };
+  if (env.PURCHASE_ENTITLEMENTS) {
+    await env.PURCHASE_ENTITLEMENTS.put(current.key, (current.used + 1).toString(), { expiration: current.expiration });
+  }
+  return { allowed: true, limit: current.limit, remaining: current.remaining - 1, resetsAt: current.resetsAt };
+}
+
+async function currentEmbeddingUsage(env: Env, subject: string, premium: boolean): Promise<{ key: string; used: number; limit: number; remaining: number; expiration: number; resetsAt: string }> {
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+  const nextUtcDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const expiration = Math.floor(nextUtcDay.getTime() / 1000) + 86_400;
+  const limit = premium ? PREMIUM_DAILY_EMBEDDING_LIMIT : FREE_DAILY_EMBEDDING_LIMIT;
+  const key = `ai-usage:${day}:${subject}`;
+  const used = Number.parseInt((await env.PURCHASE_ENTITLEMENTS?.get(key)) ?? "0", 10) || 0;
+  return { key, used, limit, remaining: Math.max(0, limit - used), expiration, resetsAt: nextUtcDay.toISOString() };
 }
 
 async function authenticatedClaims(request: Request, secret: string): Promise<Claims | null> {

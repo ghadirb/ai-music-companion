@@ -1,5 +1,7 @@
 package com.ghadirb.aimusic.ui.screens.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,16 +17,24 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ghadirb.aimusic.R
+import com.ghadirb.aimusic.backup.LocalLibraryBackup
 import com.ghadirb.aimusic.billing.MyketBillingClient
 import com.ghadirb.aimusic.billing.MyketBillingState
 import com.ghadirb.aimusic.data.repository.MusicRepository
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -37,6 +47,32 @@ fun SettingsScreen(
 ) {
     val profile by repository.observeUserPreferenceFlow().collectAsState(initial = null)
     val billingState by myketBillingClient.state.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val backup = remember(repository) { LocalLibraryBackup(repository) }
+    var backupMessage by remember { mutableStateOf<String?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            backupMessage = try {
+                backup.exportTo(context.contentResolver, uri)
+                "بکاپ محلی با موفقیت ساخته شد."
+            } catch (_: Exception) {
+                "ساخت بکاپ انجام نشد."
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            backupMessage = try {
+                val result = backup.restoreFrom(context.contentResolver, uri)
+                "بازیابی انجام شد: ${result.favorites} علاقه‌مندی، ${result.playlists} پلی‌لیست و ${result.tracksLinked} آهنگ متصل شد."
+            } catch (error: Exception) {
+                backupMessage = error.message ?: "بازیابی فایل انجام نشد."
+            }
+        }
+    }
 
     Column(
         Modifier
@@ -90,6 +126,21 @@ fun SettingsScreen(
                 )
             }
         )
+        HorizontalDivider()
+
+        ListItem(
+            headlineContent = { Text("بکاپ و بازیابی محلی") },
+            supportingContent = { Text("فقط پلی‌لیست‌ها، علاقه‌مندی‌ها و پروفایل سلیقه ذخیره می‌شود؛ هیچ فایل موسیقی یا سابقهٔ شنیدن صادر نمی‌شود.") },
+            trailingContent = {
+                Column {
+                    TextButton(onClick = { exportLauncher.launch("ai-music-companion-backup.json") }) { Text("بکاپ") }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) { Text("بازیابی") }
+                }
+            }
+        )
+        backupMessage?.let { message ->
+            Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        }
         HorizontalDivider()
 
         profile?.let { preference ->

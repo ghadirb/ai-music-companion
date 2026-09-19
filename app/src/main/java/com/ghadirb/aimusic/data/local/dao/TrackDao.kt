@@ -50,6 +50,9 @@ interface TrackDao {
     @Query("UPDATE tracks SET isFavorite = :isFavorite WHERE id = :trackId")
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean)
 
+    @Query("UPDATE tracks SET isFavorite = 1 WHERE path IN (:paths)")
+    suspend fun markFavoritePaths(paths: List<String>)
+
     @Query("SELECT * FROM tracks WHERE id = :trackId LIMIT 1")
     suspend fun getById(trackId: Long): TrackEntity?
 

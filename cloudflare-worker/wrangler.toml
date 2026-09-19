@@ -7,6 +7,10 @@ workers_dev = true
 [vars]
 MYKET_PACKAGE_NAME = "com.ghadirb.aimusic"
 
+[[kv_namespaces]]
+binding = "PURCHASE_ENTITLEMENTS"
+id = "08ae4a508e3d411d9c353cde59669bcf"
+
 # Set these only through Cloudflare secrets; never put their values in this file.
 # wrangler secret put GAPGPT_API_KEY
 # wrangler secret put JWT_SIGNING_SECRET

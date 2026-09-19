@@ -70,6 +70,10 @@ class MusicRepository(
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =
         trackDao.setFavorite(trackId, isFavorite)
 
+    suspend fun restoreFavoritePaths(paths: List<String>) {
+        if (paths.isNotEmpty()) trackDao.markFavoritePaths(paths)
+    }
+
     suspend fun getTrack(trackId: Long): TrackEntity? = trackDao.getById(trackId)
 
     /** Records one listening session. Called by PlayerViewModel on track change/stop. */
@@ -106,6 +110,13 @@ class MusicRepository(
         playlistDao.removeTrackFromPlaylist(playlistId, trackId)
 
     suspend fun getPlaylist(playlistId: Long): PlaylistEntity? = playlistDao.getPlaylist(playlistId)
+
+    suspend fun getAllPlaylists(): List<PlaylistEntity> = playlistDao.getAllPlaylists()
+
+    suspend fun getTracksInPlaylist(playlistId: Long): List<TrackEntity> =
+        playlistDao.observeTracksInPlaylist(playlistId).first()
+
+    suspend fun allTracksSnapshot(): List<TrackEntity> = observeTracks().first()
 
     /**
      * "آهنگ‌های فراموش‌شده" (doc, smart-playlist list): tracks that were
