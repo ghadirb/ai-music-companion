@@ -50,12 +50,14 @@ object AudioAnalyzer {
         const val CALM = "calm"
         const val ENERGETIC = "energetic"
         const val NEUTRAL = "neutral"
+        const val SAD = "sad"
+        const val HAPPY = "happy"
 
         /** Moods considered suitable for the "مناسب شب" (night) card. */
-        val NIGHT_SUITABLE = listOf(CALM)
+        val NIGHT_SUITABLE = listOf(CALM, SAD)
 
         /** Moods considered suitable for the "مناسب رانندگی" (driving) card. */
-        val DRIVING_SUITABLE = listOf(ENERGETIC)
+        val DRIVING_SUITABLE = listOf(ENERGETIC, HAPPY)
     }
 
     /**

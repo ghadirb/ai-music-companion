@@ -16,12 +16,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 data class PlayerUiState(
     val currentTrack: TrackEntity? = null,
     val isPlaying: Boolean = false,
     val positionMs: Long = 0L,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val shuffleEnabled: Boolean = false,
+    val repeatMode: Int = Player.REPEAT_MODE_OFF,
+    val sleepTimerEndsAtMs: Long? = null
 )
 
 /**
@@ -50,12 +55,21 @@ class PlayerViewModel(
     private var sessionStartTime: Long = 0L
     private var sessionTrack: TrackEntity? = null
     private var maxPositionReachedMs: Long = 0L
+    private var sleepTimerJob: Job? = null
 
     init {
         controller.connect { mediaController ->
             mediaController.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+                }
+
+                override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                    _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
+                }
+
+                override fun onRepeatModeChanged(repeatMode: Int) {
+                    _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
                 }
 
                 override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
@@ -84,6 +98,23 @@ class PlayerViewModel(
     fun skipNext() = controller.skipNext()
     fun skipPrevious() = controller.skipPrevious()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
+    fun setShuffle(enabled: Boolean) = controller.setShuffle(enabled)
+    fun cycleRepeatMode() = controller.cycleRepeatMode()
+
+    fun setSleepTimer(minutes: Int?) {
+        sleepTimerJob?.cancel()
+        if (minutes == null) {
+            _uiState.value = _uiState.value.copy(sleepTimerEndsAtMs = null)
+            return
+        }
+        val endsAt = System.currentTimeMillis() + minutes * 60_000L
+        _uiState.value = _uiState.value.copy(sleepTimerEndsAtMs = endsAt)
+        sleepTimerJob = viewModelScope.launch {
+            delay(minutes * 60_000L)
+            controller.pause()
+            _uiState.value = _uiState.value.copy(sleepTimerEndsAtMs = null)
+        }
+    }
 
     fun playSimilarTrack(track: TrackEntity) = playQueue(_similarTracks.value, track)
 
@@ -101,7 +132,9 @@ class PlayerViewModel(
         maxPositionReachedMs = maxOf(maxPositionReachedMs, position)
         _uiState.value = _uiState.value.copy(
             positionMs = position,
-            durationMs = controller.duration()
+            durationMs = controller.duration(),
+            shuffleEnabled = controller.shuffleEnabled(),
+            repeatMode = controller.repeatMode()
         )
     }
 
@@ -144,6 +177,7 @@ class PlayerViewModel(
     }
 
     override fun onCleared() {
+        sleepTimerJob?.cancel()
         finalizePreviousSession(Player.MEDIA_ITEM_TRANSITION_REASON_SEEK)
         controller.release()
         super.onCleared()

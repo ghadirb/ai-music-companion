@@ -2,7 +2,6 @@ package com.ghadirb.aimusic.ui.screens.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.Constraints
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
@@ -33,11 +32,7 @@ class LibraryViewModel(
                 // Newly-found tracks have no energy/mood yet — kick the analyzer
                 // so Home's "night"/"driving" cards pick them up soon, not just
                 // on the next app start or daily periodic run.
-                workManager?.enqueue(
-                    OneTimeWorkRequestBuilder<AudioAnalysisWorker>()
-                        .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
-                        .build()
-                )
+                workManager?.enqueue(OneTimeWorkRequestBuilder<AudioAnalysisWorker>().build())
             } finally {
                 _isScanning.value = false
             }

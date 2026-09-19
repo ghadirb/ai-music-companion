@@ -3,6 +3,9 @@ package com.ghadirb.aimusic.ui.screens.player
 import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,11 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.common.util.UnstableApi
 import com.ghadirb.aimusic.data.repository.MusicRepository
+import com.ghadirb.aimusic.analysis.LyricsAnalyzer
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
@@ -35,6 +40,8 @@ fun PlayerScreen(
     val uiState by playerViewModel.uiState.collectAsState()
     val similarTracks by playerViewModel.similarTracks.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
+    var showLyrics by rememberSaveable { mutableStateOf(false) }
+    var showSleepTimer by rememberSaveable { mutableStateOf(false) }
     // Keep a stable local reference. `uiState.currentTrack` is read from a
     // StateFlow-backed object and Kotlin cannot smart-cast that expression.
     val currentTrack = uiState.currentTrack
@@ -122,6 +129,38 @@ fun PlayerScreen(
             }
         }
 
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { playerViewModel.setShuffle(!uiState.shuffleEnabled) }) {
+                Icon(
+                    Icons.Filled.Shuffle,
+                    contentDescription = "پخش تصادفی",
+                    tint = if (uiState.shuffleEnabled) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
+            }
+            IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
+                Icon(
+                    if (uiState.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                    contentDescription = "تکرار پخش",
+                    tint = if (uiState.repeatMode != androidx.media3.common.Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
+            }
+            IconButton(onClick = { showLyrics = true }) {
+                Icon(Icons.Filled.Lyrics, contentDescription = "متن همگام آهنگ")
+            }
+            IconButton(onClick = { showSleepTimer = true }) {
+                Icon(Icons.Filled.Timer, contentDescription = "تایمر خواب")
+            }
+        }
+        uiState.sleepTimerEndsAtMs?.let { endsAt ->
+            val remainingMinutes = ((endsAt - System.currentTimeMillis()).coerceAtLeast(0L) + 59_999L) / 60_000L
+            Text("تایمر خواب: حدود $remainingMinutes دقیقه تا توقف", style = MaterialTheme.typography.labelMedium)
+        }
+
         if (similarTracks.isNotEmpty()) {
             Spacer(Modifier.height(28.dp))
             Text("آهنگ‌های مشابه", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
@@ -137,20 +176,88 @@ fun PlayerScreen(
             }
         }
 
-        if (lyrics.isNotEmpty()) {
-            val activeLine = lyrics.lastOrNull { it.timeMs <= uiState.positionMs }
-            Spacer(Modifier.height(28.dp))
-            Text("متن آهنگ", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
-            Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Column(Modifier.padding(16.dp)) {
+    }
+
+    if (showLyrics) {
+        SyncedLyricsDialog(
+            lyrics = lyrics,
+            positionMs = uiState.positionMs,
+            onDismiss = { showLyrics = false },
+            onSeek = playerViewModel::seekTo
+        )
+    }
+    if (showSleepTimer) {
+        AlertDialog(
+            onDismissRequest = { showSleepTimer = false },
+            title = { Text("تایمر خواب") },
+            text = { Text("پس از پایان زمان انتخاب‌شده، پخش متوقف می‌شود.") },
+            confirmButton = {
+                Row {
+                    listOf(15, 30, 45, 60).forEach { minutes ->
+                        TextButton(onClick = { playerViewModel.setSleepTimer(minutes); showSleepTimer = false }) {
+                            Text("$minutes")
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { playerViewModel.setSleepTimer(null); showSleepTimer = false }) {
+                    Text("لغو تایمر")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun SyncedLyricsDialog(
+    lyrics: List<LyricsAnalyzer.LrcLine>,
+    positionMs: Long,
+    onDismiss: () -> Unit,
+    onSeek: (Long) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp)
+        ) {
+            if (lyrics.isEmpty()) {
+                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("متن همگام در دسترس نیست", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        activeLine?.text ?: lyrics.first().text,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        "برای همگام‌سازی، فایل .lrc هم‌نام آهنگ را در همان پوشه قرار دهید. متن محلی اولویت دارد.",
+                        modifier = Modifier.padding(top = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                    val upcoming = lyrics.filter { it.timeMs > uiState.positionMs }.take(3)
-                    upcoming.forEach { line ->
-                        Text(line.text, modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 12.dp)) { Text("بستن") }
+                }
+            } else {
+                val activeIndex = lyrics.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
+                val listState = rememberLazyListState()
+                LaunchedEffect(activeIndex) {
+                    listState.animateScrollToItem((activeIndex - 2).coerceAtLeast(0))
+                }
+                Column(Modifier.fillMaxSize().padding(vertical = 12.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("متن همگام", style = MaterialTheme.typography.titleLarge)
+                        TextButton(onClick = onDismiss) { Text("بستن") }
+                    }
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        itemsIndexed(lyrics, key = { _, line -> "${line.timeMs}-${line.text}" }) { index, line ->
+                            val active = index == activeIndex && line.timeMs <= positionMs
+                            TextButton(
+                                onClick = { onSeek(line.timeMs) },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    line.text,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (active) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                )
+                            }
+                        }
                     }
                 }
             }

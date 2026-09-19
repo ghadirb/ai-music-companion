@@ -44,7 +44,10 @@ fun HomeScreen(
     val driving by viewModel.drivingPicks.collectAsState()
     val focus by viewModel.focusPicks.collectAsState()
     val workout by viewModel.workoutPicks.collectAsState()
+    val happyDance by viewModel.happyDancePicks.collectAsState()
+    val sad by viewModel.sadPicks.collectAsState()
     val hasLibrary by viewModel.hasLibrary.collectAsState()
+    val isReanalyzing by viewModel.isReanalyzing.collectAsState()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text(stringResource(R.string.home_greeting), style = MaterialTheme.typography.headlineMedium)
@@ -94,6 +97,14 @@ fun HomeScreen(
             )
         }
 
+        OutlinedButton(
+            onClick = viewModel::reanalyzeLibrary,
+            enabled = !isReanalyzing,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Text(if (isReanalyzing) "در صف تحلیل…" else "تحلیل دوبارهٔ پیشنهادهای هوشمند")
+        }
+
         Spacer(Modifier.height(20.dp))
         MoodCard(emoji = "🎯", title = "مناسب تمرکز")
         Spacer(Modifier.height(12.dp))
@@ -105,6 +116,18 @@ fun HomeScreen(
         Spacer(Modifier.height(12.dp))
         if (workout.isNotEmpty()) TrackRail(tracks = workout, onTrackClick = { track -> onTrackClick(track, workout) })
         else Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+
+        Spacer(Modifier.height(20.dp))
+        MoodCard(emoji = "💃", title = "شاد و رقص")
+        Spacer(Modifier.height(12.dp))
+        if (happyDance.isNotEmpty()) TrackRail(tracks = happyDance, onTrackClick = { track -> onTrackClick(track, happyDance) })
+        else Text("پس از تحلیل انرژی آهنگ‌ها، پیشنهادهای شاد و رقص اینجا نشان داده می‌شود.", style = MaterialTheme.typography.bodySmall)
+
+        Spacer(Modifier.height(20.dp))
+        MoodCard(emoji = "🌧️", title = "غمگین")
+        Spacer(Modifier.height(12.dp))
+        if (sad.isNotEmpty()) TrackRail(tracks = sad, onTrackClick = { track -> onTrackClick(track, sad) })
+        else Text("برای تشخیص قابل‌اعتماد غمگین، فایل LRC محلیِ آهنگ لازم است.", style = MaterialTheme.typography.bodySmall)
 
         Spacer(Modifier.height(20.dp))
         MoodCard(emoji = "🔄", title = stringResource(R.string.card_rediscover))

@@ -59,11 +59,24 @@ class PlayerController(private val context: Context) {
 
     fun skipNext() = controller?.seekToNextMediaItem()
     fun skipPrevious() = controller?.seekToPreviousMediaItem()
+    fun setShuffle(enabled: Boolean) { controller?.shuffleModeEnabled = enabled }
+    fun cycleRepeatMode() {
+        controller?.let { player ->
+            player.repeatMode = when (player.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                else -> Player.REPEAT_MODE_OFF
+            }
+        }
+    }
+    fun pause() = controller?.pause()
 
     fun currentPosition(): Long = controller?.currentPosition ?: 0L
     fun duration(): Long = controller?.duration?.coerceAtLeast(0) ?: 0L
     fun isPlaying(): Boolean = controller?.isPlaying ?: false
     fun currentMediaId(): String? = controller?.currentMediaItem?.mediaId
+    fun shuffleEnabled(): Boolean = controller?.shuffleModeEnabled ?: false
+    fun repeatMode(): Int = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
 
     fun release() {
         controller?.release()

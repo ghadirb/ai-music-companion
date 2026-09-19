@@ -71,6 +71,9 @@ interface TrackDao {
     @Query("UPDATE tracks SET analyzed = 1 WHERE id = :trackId")
     suspend fun markAnalyzedNoResult(trackId: Long)
 
+    @Query("UPDATE tracks SET analyzed = 0, energyLevel = NULL, bpm = NULL, moodTag = NULL")
+    suspend fun resetAudioAnalysis()
+
     @Query(
         "SELECT * FROM tracks WHERE moodTag IN (:moodTags) " +
         "ORDER BY (CASE WHEN isFavorite = 1 THEN 0 ELSE 1 END), energyLevel ASC LIMIT :limit"

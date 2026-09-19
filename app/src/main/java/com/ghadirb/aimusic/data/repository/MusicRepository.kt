@@ -1,6 +1,7 @@
 package com.ghadirb.aimusic.data.repository
 
 import android.content.Context
+import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
 import com.ghadirb.aimusic.data.local.dao.ListeningHistoryDao
 import com.ghadirb.aimusic.data.local.dao.PlaylistDao
 import com.ghadirb.aimusic.data.local.dao.TrackDao
@@ -26,7 +27,8 @@ class MusicRepository(
     private val playlistDao: PlaylistDao,
     context: Context
 ) {
-    private val scanner = MediaLibraryScanner(context)
+    private val appContext = context.applicationContext
+    private val scanner = MediaLibraryScanner(appContext)
 
     fun observeTracks(): Flow<List<TrackEntity>> = trackDao.observeAll()
     fun observeFavorites(): Flow<List<TrackEntity>> = trackDao.observeFavorites()
@@ -133,6 +135,12 @@ class MusicRepository(
 
     suspend fun markTrackAnalyzedNoResult(trackId: Long) = trackDao.markAnalyzedNoResult(trackId)
 
+    /** Rebuilds only derived energy/BPM/mood labels; user library data is untouched. */
+    suspend fun reanalyzeLibrary() {
+        trackDao.resetAudioAnalysis()
+        AudioAnalysisWorker.enqueueNow(appContext)
+    }
+
     /**
      * Backs the "مناسب شب" Home card. Real filter now that AudioAnalyzer exists:
      * calm-mood tracks first (favorites prioritized), and if not enough tracks
@@ -161,4 +169,18 @@ class MusicRepository(
     /** Higher-energy mix for exercise. */
     suspend fun workoutSuitableTracks(limit: Int = 6): List<TrackEntity> =
         trackDao.getHighEnergyTracks(0.65f, limit)
+
+    /** Local LRC sentiment (when available) plus audio energy for a happy/dance rail. */
+    suspend fun happyDanceTracks(limit: Int = 6): List<TrackEntity> {
+        val byMood = trackDao.getByMoodTags(
+            listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.HAPPY, com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.ENERGETIC),
+            limit
+        )
+        if (byMood.size >= limit) return byMood
+        return (byMood + trackDao.getHighEnergyTracks(0.65f, limit)).distinctBy { it.id }.take(limit)
+    }
+
+    /** Only appears when a local LRC file supplied a clear sad signal. */
+    suspend fun sadTracks(limit: Int = 6): List<TrackEntity> =
+        trackDao.getByMoodTags(listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.SAD), limit)
 }

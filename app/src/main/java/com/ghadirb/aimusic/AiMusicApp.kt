@@ -69,15 +69,9 @@ class AiMusicApp : Application() {
      * because this job never uses one.
      */
     private fun scheduleAudioAnalysis() {
-        WorkManager.getInstance(this).enqueue(
-            OneTimeWorkRequestBuilder<AudioAnalysisWorker>()
-                .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
-                .build()
-        )
+        AudioAnalysisWorker.enqueueNow(this)
 
-        val periodicRequest = PeriodicWorkRequestBuilder<AudioAnalysisWorker>(1, TimeUnit.DAYS)
-            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
-            .build()
+        val periodicRequest = PeriodicWorkRequestBuilder<AudioAnalysisWorker>(1, TimeUnit.DAYS).build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             AudioAnalysisWorker.WORK_NAME,
