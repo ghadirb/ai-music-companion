@@ -38,6 +38,7 @@ import androidx.navigation.navArgument
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
+import com.ghadirb.aimusic.billing.MyketBillingClient
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ALBUM_DETAIL
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ARTIST_DETAIL
@@ -65,11 +66,13 @@ import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
     private var openPlayerRequest by mutableStateOf(false)
+    private lateinit var myketBillingClient: MyketBillingClient
 
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as AiMusicApp
+        myketBillingClient = MyketBillingClient(this)
         openPlayerRequest = intent.getBooleanExtra("open_player", false)
         val uiPreferences = getSharedPreferences("ui_preferences", MODE_PRIVATE)
 
@@ -82,6 +85,7 @@ class MainActivity : ComponentActivity() {
                         openPlayerOnLaunch = openPlayerRequest,
                         onPlayerOpened = { openPlayerRequest = false },
                         darkTheme = darkTheme,
+                        myketBillingClient = myketBillingClient,
                         onThemeChange = { enabled ->
                             darkTheme = enabled
                             uiPreferences.edit().putBoolean("dark_theme", enabled).apply()
@@ -97,6 +101,11 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         if (intent.getBooleanExtra("open_player", false)) openPlayerRequest = true
     }
+
+    override fun onDestroy() {
+        if (::myketBillingClient.isInitialized) myketBillingClient.dispose()
+        super.onDestroy()
+    }
 }
 
 @OptIn(ExperimentalPermissionsApi::class, UnstableApi::class)
@@ -106,7 +115,8 @@ private fun AppRoot(
     openPlayerOnLaunch: Boolean = false,
     onPlayerOpened: () -> Unit,
     darkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit
+    onThemeChange: (Boolean) -> Unit,
+    myketBillingClient: MyketBillingClient
 ) {
     val audioPermission = rememberPermissionState(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -115,21 +125,39 @@ private fun AppRoot(
             Manifest.permission.READ_EXTERNAL_STORAGE
     )
 
+    val notificationPermission = rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
+    val notificationsNeedPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        notificationPermission.status !is PermissionStatus.Granted
+
     when (audioPermission.status) {
-        is PermissionStatus.Granted -> MainScaffold(repository, openPlayerOnLaunch, onPlayerOpened, darkTheme, onThemeChange)
+        is PermissionStatus.Granted -> MainScaffold(
+            repository = repository,
+            openPlayerOnLaunch = openPlayerOnLaunch,
+            onPlayerOpened = onPlayerOpened,
+            darkTheme = darkTheme,
+            onThemeChange = onThemeChange,
+            myketBillingClient = myketBillingClient,
+            notificationsNeedPermission = notificationsNeedPermission,
+            onRequestNotificationPermission = { notificationPermission.launchPermissionRequest() }
+        )
         is PermissionStatus.Denied -> PermissionRequestScreen(onRequest = { audioPermission.launchPermissionRequest() })
     }
 }
 
 @Composable
 private fun PermissionRequestScreen(onRequest: () -> Unit) {
-    Column {
+    Column(Modifier.padding(24.dp)) {
         Text(
-            stringResource(R.string.permission_rationale),
-            modifier = Modifier.padding(24.dp)
+            stringResource(R.string.permission_title),
+            style = MaterialTheme.typography.headlineSmall
         )
-        Button(onClick = onRequest, modifier = Modifier.padding(horizontal = 24.dp)) {
-            Text(stringResource(R.string.grant_permission))
+        Text(
+            stringResource(R.string.permission_detail),
+            modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Button(onClick = onRequest) {
+            Text(stringResource(R.string.permission_continue))
         }
     }
 }
@@ -141,7 +169,10 @@ private fun MainScaffold(
     openPlayerOnLaunch: Boolean = false,
     onPlayerOpened: () -> Unit,
     darkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit
+    onThemeChange: (Boolean) -> Unit,
+    myketBillingClient: MyketBillingClient,
+    notificationsNeedPermission: Boolean,
+    onRequestNotificationPermission: () -> Unit
 ) {
     val navController = rememberNavController()
     val playerViewModel = rememberPlayerViewModel(repository)
@@ -249,7 +280,14 @@ private fun MainScaffold(
                 )
             }
             composable(Screen.Settings.route) {
-                SettingsScreen(repository = repository, darkTheme = darkTheme, onThemeChange = onThemeChange)
+                SettingsScreen(
+                    repository = repository,
+                    darkTheme = darkTheme,
+                    onThemeChange = onThemeChange,
+                    notificationsNeedPermission = notificationsNeedPermission,
+                    onRequestNotificationPermission = onRequestNotificationPermission,
+                    myketBillingClient = myketBillingClient
+                )
             }
             composable(ROUTE_PLAYER) {
                 PlayerScreen(repository = repository, playerViewModel = playerViewModel)

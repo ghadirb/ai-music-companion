@@ -4,6 +4,11 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val myketPublicKey = providers.gradleProperty("MYKET_IAB_PUBLIC_KEY").orElse("").get()
+val myketPremiumSku = providers.gradleProperty("MYKET_PREMIUM_SKU").orElse("premium_lifetime").get()
+val escapedMyketPublicKey = myketPublicKey.replace("\\", "\\\\").replace("\"", "\\\"")
+val escapedMyketPremiumSku = myketPremiumSku.replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     namespace = "com.ghadirb.aimusic"
     compileSdk = 34
@@ -16,6 +21,16 @@ android {
         versionName = "0.1.0-mvp"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val marketApplicationId = "ir.mservices.market"
+        val marketBindAddress = "ir.mservices.market.InAppBillingService.BIND"
+        manifestPlaceholders.apply {
+            this["marketApplicationId"] = marketApplicationId
+            this["marketBindAddress"] = marketBindAddress
+            this["marketPermission"] = "$marketApplicationId.BILLING"
+        }
+        buildConfigField("String", "IAB_PUBLIC_KEY", "\"$escapedMyketPublicKey\"")
+        buildConfigField("String", "MYKET_PREMIUM_SKU", "\"$escapedMyketPremiumSku\"")
     }
 
     buildTypes {
@@ -37,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
@@ -84,6 +100,9 @@ dependencies {
 
     // Permissions helper (Accompanist)
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
+    // Myket in-app billing. The merchant key is supplied locally as a Gradle property.
+    implementation("com.github.myketstore:myket-billing-client:1.6")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

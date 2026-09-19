@@ -19,4 +19,15 @@
     <string name="scan_library">اسکن کتابخانه</string>
     <string name="mood_cards_analyzing">در حال تحلیل آهنگ‌ها برای این پیشنهاد… کمی بعد دوباره سر بزنید.</string>
     <string name="nav_folders">پوشه‌ها</string>
+    <string name="permission_title">دسترسی به موسیقی</string>
+    <string name="permission_detail">برای ساخت کتابخانه، فقط به فایل‌های صوتی دستگاه دسترسی می‌خواهیم. فایل‌ها، متن آهنگ و سابقهٔ شنیدن بدون انتخاب شما ارسال نمی‌شوند.</string>
+    <string name="permission_continue">ادامه و انتخاب مجوز</string>
+    <string name="notifications_title">کنترل پخش در اعلان</string>
+    <string name="notifications_detail">برای نمایش کنترل پخش در نوار اعلان، این مجوز را فقط هنگام انتخاب شما درخواست می‌کنیم.</string>
+    <string name="enable_notifications">فعال‌کردن اعلان پخش</string>
+    <string name="online_lyrics_title">متن آهنگ آنلاین</string>
+    <string name="online_lyrics_detail">فایل‌های LRC محلی اولویت دارند. دریافت متن از اینترنت فقط با منبع دارای مجوز و رضایت صریح شما فعال خواهد شد؛ برنامه از سایت‌ها به‌صورت خودکار استخراج نمی‌کند.</string>
+    <string name="premium_title">پریمیوم دائمی</string>
+    <string name="premium_detail">خرید درون‌برنامه‌ای مایکت با اعتبارسنجی امن سمت سرور. محصول مصرف‌شدنی نیست و اشتراک دوره‌ای مایکت پشتیبانی نمی‌شود.</string>
+    <string name="premium_setup_needed">برای فعال‌شدن فروش، کلید عمومی، شناسهٔ محصول و سرویس اعتبارسنجی مایکت باید توسط صاحب پنل تنظیم شوند.</string>
 </resources>

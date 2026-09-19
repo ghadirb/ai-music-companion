@@ -1,7 +1,16 @@
 name = "ai-music-companion-embedding"
+account_id = "1609c905e10f5c9a6cf1a0cb240f356f"
 main = "src/index.ts"
 compatibility_date = "2026-09-19"
+workers_dev = true
+
+[vars]
+MYKET_PACKAGE_NAME = "com.ghadirb.aimusic"
 
 # Set these only through Cloudflare secrets; never put their values in this file.
 # wrangler secret put GAPGPT_API_KEY
 # wrangler secret put JWT_SIGNING_SECRET
+# wrangler secret put MYKET_ACCESS_TOKEN
+# Set MYKET_PACKAGE_NAME as a non-secret environment variable and bind a KV
+# namespace named PURCHASE_ENTITLEMENTS before deployment. Do not put access
+# tokens or a Cloudflare API token in this repository or the Android app.
