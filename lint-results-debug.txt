@@ -1,0 +1,268 @@
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:128: Warning: Field requires API level 33 (current min is 26): android.Manifest.permission#POST_NOTIFICATIONS [InlinedApi]
+    val notificationPermission = rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
+                                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/data/scanner/MediaLibraryScanner.kt:25: Warning: Field requires API level 29 (current min is 26): android.provider.MediaStore#VOLUME_EXTERNAL [InlinedApi]
+        val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "InlinedApi":
+   This check scans through all the Android API field references in the
+   application and flags certain constants, such as static final integers and
+   Strings, which were introduced in later versions. These will actually be
+   copied into the class files rather than being referenced, which means that
+   the value is available even when running on older devices. In some cases
+   that's fine, and in other cases it can result in a runtime crash or
+   incorrect behavior. It depends on the context, so consider the code
+   carefully and decide whether it's safe and can be suppressed or whether the
+   code needs to be guarded.
+
+   If you really want to use this API and don't need to support older devices
+   just set the minSdkVersion in your build.gradle or AndroidManifest.xml
+   files.
+
+   If your code is deliberately accessing newer APIs, and you have ensured
+   (e.g. with conditional execution) that this code will only ever be called
+   on a supported platform, then you can annotate your class or method with
+   the @TargetApi annotation specifying the local minimum SDK to apply, such
+   as @TargetApi(11), such that this check considers 11 rather than your
+   manifest file's minimum SDK as the required API level.
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:26: Warning: Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the android.os.Build.VERSION_CODES javadoc for details. [OldTargetApi]
+        targetSdk = 34
+        ~~~~~~~~~~~~~~
+
+   Explanation for issues of type "OldTargetApi":
+   When your application runs on a version of Android that is more recent than
+   your targetSdkVersion specifies that it has been tested with, various
+   compatibility modes kick in. This ensures that your application continues
+   to work, but it may look out of place. For example, if the targetSdkVersion
+   is less than 14, your app may get an option button in the UI.
+
+   To fix this issue, set the targetSdkVersion to the highest available value.
+   Then test your app to make sure everything works correctly. You may want to
+   consult the compatibility notes to see what changes apply to each version
+   you are adding support for:
+   https://developer.android.com/reference/android/os/Build.VERSION_CODES.html
+   as well as follow this guide:
+   https://developer.android.com/distribute/best-practices/develop/target-sdk.
+   html
+
+   https://developer.android.com/distribute/best-practices/develop/target-sdk.html
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:77: Warning: A newer version of androidx.core:core-ktx than 1.13.1 is available: 1.19.0 [GradleDependency]
+    implementation("androidx.core:core-ktx:1.13.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:78: Warning: A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.8.4 is available: 2.11.0 [GradleDependency]
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:79: Warning: A newer version of androidx.lifecycle:lifecycle-viewmodel-compose than 2.8.4 is available: 2.11.0 [GradleDependency]
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:80: Warning: A newer version of androidx.activity:activity-compose than 1.9.1 is available: 1.13.0 [GradleDependency]
+    implementation("androidx.activity:activity-compose:1.9.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:81: Warning: A newer version of androidx.compose:compose-bom than 2024.06.00 is available: 2026.09.00 [GradleDependency]
+    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:87: Warning: A newer version of androidx.navigation:navigation-compose than 2.7.7 is available: 2.10.1 [GradleDependency]
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:90: Warning: A newer version of androidx.media3:media3-exoplayer than 1.4.1 is available: 1.11.1 [GradleDependency]
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:91: Warning: A newer version of androidx.media3:media3-session than 1.4.1 is available: 1.11.1 [GradleDependency]
+    implementation("androidx.media3:media3-session:1.4.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:92: Warning: A newer version of androidx.media3:media3-ui than 1.4.1 is available: 1.11.1 [GradleDependency]
+    implementation("androidx.media3:media3-ui:1.4.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:93: Warning: A newer version of androidx.media3:media3-common than 1.4.1 is available: 1.11.1 [GradleDependency]
+    implementation("androidx.media3:media3-common:1.4.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:96: Warning: A newer version of androidx.room:room-runtime than 2.6.1 is available: 2.8.5 [GradleDependency]
+    implementation("androidx.room:room-runtime:2.6.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:97: Warning: A newer version of androidx.room:room-ktx than 2.6.1 is available: 2.8.5 [GradleDependency]
+    implementation("androidx.room:room-ktx:2.6.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:98: Warning: A newer version of androidx.room:room-compiler than 2.6.1 is available: 2.8.5 [GradleDependency]
+    ksp("androidx.room:room-compiler:2.6.1")
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:101: Warning: A newer version of androidx.work:work-runtime-ktx than 2.9.1 is available: 2.11.2 [GradleDependency]
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:117: Warning: A newer version of androidx.test.ext:junit than 1.2.1 is available: 1.3.0 [GradleDependency]
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:118: Warning: A newer version of androidx.test.espresso:espresso-core than 3.6.1 is available: 3.7.0 [GradleDependency]
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/build.gradle.kts:119: Warning: A newer version of androidx.compose:compose-bom than 2024.06.00 is available: 2026.09.00 [GradleDependency]
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "GradleDependency":
+   This detector looks for usages of libraries where the version you are using
+   is not the current stable release. Using older versions is fine, and there
+   are cases where you deliberately want to stick with an older version.
+   However, you may simply not be aware that a more recent version is
+   available, and that is what this lint check helps find.
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:178: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+    val playerViewModel = rememberPlayerViewModel(repository)
+        ~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:178: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+    val playerViewModel = rememberPlayerViewModel(repository)
+                          ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:193: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+        playerViewModel.playQueue(queue, track)
+                        ~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:39: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+    playerViewModel: PlayerViewModel
+                     ~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:54: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            playerViewModel.refreshProgress()
+                            ~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:95: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            onValueChange = { playerViewModel.seekTo(it.toLong()) },
+                                              ~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:105: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            IconButton(onClick = { playerViewModel.skipPrevious() }) {
+                                                   ~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:109: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            FilledIconButton(onClick = { playerViewModel.togglePlayPause() }, modifier = Modifier.size(64.dp)) {
+                                                         ~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:117: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            IconButton(onClick = { playerViewModel.skipNext() }) {
+                                                   ~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:124: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            OutlinedButton(onClick = { playerViewModel.toggleFavorite(track) }) {
+                                                       ~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:140: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            IconButton(onClick = { playerViewModel.setShuffle(!uiState.shuffleEnabled) }) {
+                                                   ~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:147: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
+                                                   ~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:170: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+                TextButton(onClick = playerViewModel::improveSimilarWithAi) { Text("بهبود با AI") }
+                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:176: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+                        onClick = { playerViewModel.playSimilarTrack(track) },
+                                                    ~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:192: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+            onSeek = playerViewModel::seekTo
+                     ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:203: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+                        TextButton(onClick = { playerViewModel.setSleepTimer(minutes); showSleepTimer = false }) {
+                                                               ~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:210: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+                TextButton(onClick = { playerViewModel.setSleepTimer(null); showSleepTimer = false }) {
+                                                       ~~~~~~~~~~~~~
+
+   Explanation for issues of type "UnsafeOptInUsageError":
+   This API has been flagged as opt-in with error-level severity.
+
+   Any declaration annotated with this marker is considered part of an
+   unstable or
+   otherwise non-standard API surface and its call sites should accept the
+   opt-in
+   aspect of it by using the @OptIn annotation, using the marker annotation
+   --
+   effectively causing further propagation of the opt-in aspect -- or
+   configuring
+   the UnsafeOptInUsageError check's options for project-wide opt-in.
+
+   To configure project-wide opt-in, specify the opt-in option value in
+   lint.xml
+   as a comma-delimited list of opted-in annotations:
+
+   <lint>
+       <issue id="UnsafeOptInUsageError">
+           <option name="opt-in" value="com.foo.ExperimentalBarAnnotation" />
+       </issue>
+   </lint>
+
+   Vendor: Android Open Source Project
+   Identifier: androidx.annotation.experimental
+   Feedback: https://issuetracker.google.com/issues/new?component=459778
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/AndroidManifest.xml:37: Warning: Exported service does not require permission [ExportedService]
+        <service
+         ~~~~~~~
+
+   Explanation for issues of type "ExportedService":
+   Exported services (services which either set exported=true or contain an
+   intent-filter and do not specify exported=false) should define a permission
+   that an entity must have in order to launch the service or bind to it.
+   Without this, any application can use this service.
+
+   https://goo.gle/ExportedService
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/mipmap-anydpi-v26: Warning: This folder configuration (v26) is unnecessary; minSdkVersion is 26. Merge all the resources in this folder into mipmap-anydpi. [ObsoleteSdkInt]
+
+   Explanation for issues of type "ObsoleteSdkInt":
+   This check flags version checks that are not necessary, because the
+   minSdkVersion (or surrounding known API level) is already at least as high
+   as the version checked for.
+
+   Similarly, it also looks for resources in -vNN folders, such as values-v14
+   where the version qualifier is less than or equal to the minSdkVersion,
+   where the contents should be merged into the best folder.
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/colors.xml:2: Warning: The resource R.color.md_theme_primary appears to be unused [UnusedResources]
+    <color name="md_theme_primary">#7C5CFC</color>
+           ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/colors.xml:3: Warning: The resource R.color.md_theme_secondary appears to be unused [UnusedResources]
+    <color name="md_theme_secondary">#4ECDC4</color>
+           ~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/colors.xml:4: Warning: The resource R.color.md_theme_background_dark appears to be unused [UnusedResources]
+    <color name="md_theme_background_dark">#121016</color>
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/colors.xml:5: Warning: The resource R.color.md_theme_surface_dark appears to be unused [UnusedResources]
+    <color name="md_theme_surface_dark">#1C1A22</color>
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml:2: Warning: The resource R.mipmap.ic_launcher_round appears to be unused [UnusedResources]
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+^
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/strings.xml:16: Warning: The resource R.string.permission_rationale appears to be unused [UnusedResources]
+    <string name="permission_rationale">برای اسکن آهنگ‌های دستگاه به اجازه دسترسی به فایل‌های صوتی نیاز است. هیچ فایلی از دستگاه خارج نمی‌شود.</string>
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/strings.xml:17: Warning: The resource R.string.grant_permission appears to be unused [UnusedResources]
+    <string name="grant_permission">اجازه دسترسی</string>
+            ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/values/strings.xml:31: Warning: The resource R.string.premium_detail appears to be unused [UnusedResources]
+    <string name="premium_detail">خرید درون‌برنامه‌ای مایکت با اعتبارسنجی امن سمت سرور. محصول مصرف‌شدنی نیست و اشتراک دوره‌ای مایکت پشتیبانی نمی‌شود.</string>
+            ~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "UnusedResources":
+   Unused resources make applications larger and slow down builds.
+
+
+   The unused resource check can ignore tests. If you want to include
+   resources that are only referenced from tests, consider packaging them in a
+   test source set instead.
+
+   You can include test sources in the unused resource check by setting the
+   system property lint.unused-resources.include-tests =true, and to exclude
+   them (usually for performance reasons), use
+   lint.unused-resources.exclude-tests =true.
+   ,
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml:2: Warning: The application adaptive icon is missing a monochrome tag [MonochromeLauncherIcon]
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+^
+
+   Explanation for issues of type "MonochromeLauncherIcon":
+   If android:roundIcon and android:icon are both in your manifest, you must
+   either remove the reference to android:roundIcon if it is not needed; or,
+   supply the monochrome icon in the drawable defined by the android:roundIcon
+   and android:icon attribute.
+
+   For example, if android:roundIcon and android:icon are both in the
+   manifest, a launcher might choose to use android:roundIcon over
+   android:icon to display the adaptive app icon. Therefore, your themed
+   application iconwill not show if your monochrome attribute is not also
+   specified in android:roundIcon.
+
+17 errors, 31 warnings

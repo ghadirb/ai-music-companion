@@ -1,0 +1,81 @@
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:generateDebugAndroidTestResValues
+> Task :app:generateDebugAndroidTestLintModel
+> Task :app:extractProguardFiles
+> Task :app:generateDebugLintReportModel
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:generateDebugUnitTestLintModel
+> Task :app:lintAnalyzeDebugUnitTest
+> Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:lintAnalyzeDebug
+
+> Task :app:lintReportDebug
+Wrote HTML report to file:///home/runner/work/ai-music-companion/ai-music-companion/app/build/reports/lint-results-debug.html
+
+> Task :app:lintDebug FAILED
+Lint found 17 errors, 31 warnings. First failure:
+
+/home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:178: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+    val playerViewModel = rememberPlayerViewModel(repository)
+        ~~~~~~~~~~~~~~~
+
+The full lint text report is located at:
+  /home/runner/work/ai-music-companion/ai-music-companion/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_3-1789837123585.json
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:lintDebug'.
+> Lint found errors in the project; aborting build.
+  
+  Fix the issues identified by lint, or create a baseline to see only new errors.
+  To create a baseline, run `gradlew updateLintBaseline` after adding the following to the module's build.gradle file:
+  ```
+  android {
+      lint {
+          baseline = file("lint-baseline.xml")
+      }
+  }
+  ```
+  For more details, see https://developer.android.com/studio/write/lint#snapshot
+  
+  Lint found 17 errors, 31 warnings. First failure:
+  
+  /home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:178: Error: This declaration is opt-in and its usage should be marked with @androidx.media3.common.util.UnstableApi or @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class) [UnsafeOptInUsageError from androidx.annotation.experimental]
+      val playerViewModel = rememberPlayerViewModel(repository)
+          ~~~~~~~~~~~~~~~
+  
+  The full lint text report is located at:
+    /home/runner/work/ai-music-companion/ai-music-companion/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 39s
+30 actionable tasks: 11 executed, 19 up-to-date

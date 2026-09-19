@@ -1,0 +1,59 @@
+Downloading https://services.gradle.org/distributions/gradle-8.7-bin.zip
+............10%.............20%.............30%.............40%............50%.............60%.............70%.............80%.............90%............100%
+
+Welcome to Gradle 8.7!
+
+Here are the highlights of this release:
+ - Compiling and testing with Java 22
+ - Cacheable Groovy script compilation
+ - New methods in lazy collection properties
+
+For more details see https://docs.gradle.org/8.7/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:processDebugResources
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:71:5 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:111:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:165:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/navigation/NavGraph.kt:19:86 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:142:43 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:210:43 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:35:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:38:5 Parameter 'repository' is never used
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:94:46 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:processDebugJavaRes
+> Task :app:kspDebugUnitTestKotlin NO-SOURCE
+> Task :app:compileDebugUnitTestKotlin NO-SOURCE
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes NO-SOURCE
+> Task :app:testDebugUnitTest NO-SOURCE
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1789837005080.json
+
+BUILD SUCCESSFUL in 2m 5s
+23 actionable tasks: 23 executed
