@@ -6,7 +6,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -21,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
@@ -295,9 +300,11 @@ private fun AppBottomBar(navController: NavHostController) {
     val currentRoute = backStackEntry?.destination?.route
 
     NavigationBar {
-        Screen.bottomBarScreens.forEach { screen ->
+        LazyRow(modifier = Modifier.fillMaxWidth()) {
+            items(Screen.bottomBarScreens, key = { it.route }) { screen ->
             val label = stringResource(screen.labelRes)
             NavigationBarItem(
+                modifier = Modifier.width(88.dp),
                 selected = currentRoute == screen.route,
                 onClick = {
                     navController.navigate(screen.route) {
@@ -307,8 +314,10 @@ private fun AppBottomBar(navController: NavHostController) {
                     }
                 },
                 icon = { Icon(screen.icon, contentDescription = label) },
-                label = { Text(label) }
+                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                alwaysShowLabel = true
             )
+            }
         }
     }
 }
