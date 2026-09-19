@@ -153,4 +153,12 @@ class MusicRepository(
         val topUp = trackDao.getHighEnergyTracks(0.55f, limit)
         return (byMood + topUp).distinctBy { it.id }.take(limit)
     }
+
+    /** Calm, low-energy mix for reading or focused work. */
+    suspend fun focusSuitableTracks(limit: Int = 6): List<TrackEntity> =
+        trackDao.getLowEnergyTracks(0.55f, limit)
+
+    /** Higher-energy mix for exercise. */
+    suspend fun workoutSuitableTracks(limit: Int = 6): List<TrackEntity> =
+        trackDao.getHighEnergyTracks(0.65f, limit)
 }

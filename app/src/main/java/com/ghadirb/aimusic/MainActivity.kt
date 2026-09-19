@@ -249,7 +249,7 @@ private fun MainScaffold(
                 )
             }
             composable(Screen.Settings.route) {
-                SettingsScreen(darkTheme = darkTheme, onThemeChange = onThemeChange)
+                SettingsScreen(repository = repository, darkTheme = darkTheme, onThemeChange = onThemeChange)
             }
             composable(ROUTE_PLAYER) {
                 PlayerScreen(repository = repository, playerViewModel = playerViewModel)

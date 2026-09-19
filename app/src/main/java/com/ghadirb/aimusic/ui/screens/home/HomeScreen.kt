@@ -42,6 +42,8 @@ fun HomeScreen(
     val rediscover by viewModel.rediscoverPicks.collectAsState()
     val night by viewModel.nightPicks.collectAsState()
     val driving by viewModel.drivingPicks.collectAsState()
+    val focus by viewModel.focusPicks.collectAsState()
+    val workout by viewModel.workoutPicks.collectAsState()
     val hasLibrary by viewModel.hasLibrary.collectAsState()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
@@ -91,6 +93,18 @@ fun HomeScreen(
                 style = MaterialTheme.typography.bodySmall
             )
         }
+
+        Spacer(Modifier.height(20.dp))
+        MoodCard(emoji = "🎯", title = "مناسب تمرکز")
+        Spacer(Modifier.height(12.dp))
+        if (focus.isNotEmpty()) TrackRail(tracks = focus, onTrackClick = { track -> onTrackClick(track, focus) })
+        else Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+
+        Spacer(Modifier.height(20.dp))
+        MoodCard(emoji = "🏃", title = "مناسب ورزش")
+        Spacer(Modifier.height(12.dp))
+        if (workout.isNotEmpty()) TrackRail(tracks = workout, onTrackClick = { track -> onTrackClick(track, workout) })
+        else Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
 
         Spacer(Modifier.height(20.dp))
         MoodCard(emoji = "🔄", title = stringResource(R.string.card_rediscover))

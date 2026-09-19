@@ -9,6 +9,7 @@ import com.ghadirb.aimusic.data.local.entity.ListeningHistoryEntity
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.playback.PlayerController
+import com.ghadirb.aimusic.recommendation.RecommendationEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,9 +35,12 @@ class PlayerViewModel(
 ) : AndroidViewModel(application) {
 
     private val controller = PlayerController(application)
+    private val recommendationEngine = RecommendationEngine(repository)
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+    private val _similarTracks = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val similarTracks: StateFlow<List<TrackEntity>> = _similarTracks.asStateFlow()
 
     private var currentQueue: List<TrackEntity> = emptyList()
     private var sessionStartTime: Long = 0L
@@ -77,6 +81,8 @@ class PlayerViewModel(
     fun skipPrevious() = controller.skipPrevious()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
 
+    fun playSimilarTrack(track: TrackEntity) = playQueue(_similarTracks.value, track)
+
     fun toggleFavorite(track: TrackEntity) {
         viewModelScope.launch {
             val newValue = !track.isFavorite
@@ -100,6 +106,9 @@ class PlayerViewModel(
         sessionStartTime = System.currentTimeMillis()
         maxPositionReachedMs = 0L
         _uiState.value = _uiState.value.copy(currentTrack = track, positionMs = 0L)
+        viewModelScope.launch {
+            _similarTracks.value = track?.let { recommendationEngine.similarTracks(it, limit = 8) }.orEmpty()
+        }
     }
 
     /**

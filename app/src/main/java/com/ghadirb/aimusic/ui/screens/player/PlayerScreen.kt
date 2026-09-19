@@ -2,6 +2,8 @@ package com.ghadirb.aimusic.ui.screens.player
 
 import android.app.Application
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +33,7 @@ fun PlayerScreen(
     playerViewModel: PlayerViewModel
 ) {
     val uiState by playerViewModel.uiState.collectAsState()
+    val similarTracks by playerViewModel.similarTracks.collectAsState()
     // Keep a stable local reference. `uiState.currentTrack` is read from a
     // StateFlow-backed object and Kotlin cannot smart-cast that expression.
     val currentTrack = uiState.currentTrack
@@ -115,6 +118,21 @@ fun PlayerScreen(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(if (track.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
+            }
+        }
+
+        if (similarTracks.isNotEmpty()) {
+            Spacer(Modifier.height(28.dp))
+            Text("آهنگ‌های مشابه", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            LazyRow {
+                items(similarTracks, key = { it.id }) { track ->
+                    AssistChip(
+                        onClick = { playerViewModel.playSimilarTrack(track) },
+                        label = { Text(track.title, maxLines = 1) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
             }
         }
     }

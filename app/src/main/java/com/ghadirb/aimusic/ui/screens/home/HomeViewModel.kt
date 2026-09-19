@@ -26,6 +26,12 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
     private val _drivingPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
     val drivingPicks: StateFlow<List<TrackEntity>> = _drivingPicks.asStateFlow()
 
+    private val _focusPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val focusPicks: StateFlow<List<TrackEntity>> = _focusPicks.asStateFlow()
+
+    private val _workoutPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val workoutPicks: StateFlow<List<TrackEntity>> = _workoutPicks.asStateFlow()
+
     // Unknown until the first trackCount() check completes — NOT "true", otherwise the
     // screen briefly renders the full card layout on the very first frame and then
     // flashes to the empty-library message once the real (often 0) count comes back.
@@ -43,6 +49,8 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
             _rediscoverPicks.value = repository.rediscoverTracks(limit = 6)
             _nightPicks.value = repository.nightSuitableTracks(limit = 6)
             _drivingPicks.value = repository.drivingSuitableTracks(limit = 6)
+            _focusPicks.value = repository.focusSuitableTracks(limit = 6)
+            _workoutPicks.value = repository.workoutSuitableTracks(limit = 6)
             _hasLibrary.value = count > 0
         }
     }
