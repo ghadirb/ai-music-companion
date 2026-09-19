@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 /**
  * The doc explicitly asks for Material 3 + Dark Mode as the primary look, so
@@ -16,13 +17,16 @@ private val DarkScheme = darkColorScheme(
     secondary = Teal,
     background = BackgroundDark,
     surface = SurfaceDark,
+    surfaceVariant = SurfaceDark,
+    secondaryContainer = Color(0xFF4A4232),
     onBackground = OnDark,
     onSurface = OnDark
 )
 
 private val LightScheme = lightColorScheme(
     primary = PurplePrimary,
-    secondary = Teal
+    secondary = Teal,
+    surfaceVariant = Color(0xFFF1E9DD)
 )
 
 @Composable

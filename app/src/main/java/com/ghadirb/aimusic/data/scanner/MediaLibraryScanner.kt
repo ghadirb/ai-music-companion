@@ -30,8 +30,9 @@ class MediaLibraryScanner(private val context: Context) {
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.IS_MUSIC
-            ,MediaStore.Audio.Media.DATA
+            MediaStore.Audio.Media.IS_MUSIC,
+            MediaStore.Audio.Media.DATA,
+            MediaStore.Audio.Media.DISPLAY_NAME
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= 15000"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -68,6 +69,7 @@ class MediaLibraryScanner(private val context: Context) {
             val albumIdCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val durationCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val dataCol = c.getColumnIndex(MediaStore.Audio.Media.DATA)
+            val displayNameCol = c.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
             val genreColIndex = if (includesGenre) c.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
 
             while (c.moveToNext()) {
@@ -76,12 +78,16 @@ class MediaLibraryScanner(private val context: Context) {
                 val albumId = c.getLong(albumIdCol)
                 val albumArtUri = albumArtUriFor(albumId)
 
+                val fileName = if (displayNameCol >= 0) c.getString(displayNameCol) else null
+                val title = cleanMetadata(c.getString(titleCol)).ifBlank {
+                    cleanMetadata(fileName?.substringBeforeLast('.'))
+                }.ifBlank { "Unknown title" }
                 tracks.add(
                     TrackEntity(
                         path = contentUri.toString(),
-                        title = c.getString(titleCol) ?: "Unknown",
-                        artist = c.getString(artistCol) ?: "Unknown Artist",
-                        album = c.getString(albumCol) ?: "Unknown Album",
+                        title = title,
+                        artist = cleanMetadata(c.getString(artistCol)).ifBlank { "Unknown artist" },
+                        album = cleanMetadata(c.getString(albumCol)).ifBlank { "Unknown album" },
                         genre = if (genreColIndex >= 0) c.getString(genreColIndex) else null,
                         durationMs = c.getLong(durationCol),
                         albumArtUri = albumArtUri,
@@ -101,4 +107,16 @@ class MediaLibraryScanner(private val context: Context) {
      */
     private fun albumArtUriFor(albumId: Long): String =
         Uri.parse("content://media/external/audio/albumart/$albumId").toString()
+
+    /** Removes download-site watermarks commonly embedded in Persian music tags. */
+    private fun cleanMetadata(value: String?): String {
+        if (value.isNullOrBlank()) return ""
+        return value
+            .replace(Regex("(?i)https?://[^\\s)]+"), "")
+            .replace(Regex("(?i)(?:www\\.)?[a-z0-9_-]+\\.(?:com|ir|net|org)(?:/[^\\s)]*)?"), "")
+            .replace(Regex("(?i)\\b(?:download|music|song)\\b\\s*(?:by|from)?\\s*"), "")
+            .replace(Regex("[()\\[\\]{}]"), " ")
+            .replace(Regex("\\s{2,}"), " ")
+            .trim(' ', '-', '_', '.', '•')
+    }
 }

@@ -9,10 +9,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -53,19 +59,38 @@ import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
 import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
+    private var openPlayerRequest by mutableStateOf(false)
 
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as AiMusicApp
+        openPlayerRequest = intent.getBooleanExtra("open_player", false)
+        val uiPreferences = getSharedPreferences("ui_preferences", MODE_PRIVATE)
 
         setContent {
-            AiMusicCompanionTheme {
+            var darkTheme by rememberSaveable { mutableStateOf(uiPreferences.getBoolean("dark_theme", true)) }
+            AiMusicCompanionTheme(darkTheme = darkTheme) {
                 Surface {
-                    AppRoot(repository = app.repository, openPlayerOnLaunch = intent.getBooleanExtra("open_player", false))
+                    AppRoot(
+                        repository = app.repository,
+                        openPlayerOnLaunch = openPlayerRequest,
+                        onPlayerOpened = { openPlayerRequest = false },
+                        darkTheme = darkTheme,
+                        onThemeChange = { enabled ->
+                            darkTheme = enabled
+                            uiPreferences.edit().putBoolean("dark_theme", enabled).apply()
+                        }
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("open_player", false)) openPlayerRequest = true
     }
 }
 
@@ -73,7 +98,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot(
     repository: com.ghadirb.aimusic.data.repository.MusicRepository,
-    openPlayerOnLaunch: Boolean = false
+    openPlayerOnLaunch: Boolean = false,
+    onPlayerOpened: () -> Unit,
+    darkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit
 ) {
     val audioPermission = rememberPermissionState(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -83,7 +111,7 @@ private fun AppRoot(
     )
 
     when (audioPermission.status) {
-        is PermissionStatus.Granted -> MainScaffold(repository, openPlayerOnLaunch)
+        is PermissionStatus.Granted -> MainScaffold(repository, openPlayerOnLaunch, onPlayerOpened, darkTheme, onThemeChange)
         is PermissionStatus.Denied -> PermissionRequestScreen(onRequest = { audioPermission.launchPermissionRequest() })
     }
 }
@@ -105,16 +133,23 @@ private fun PermissionRequestScreen(onRequest: () -> Unit) {
 @Composable
 private fun MainScaffold(
     repository: com.ghadirb.aimusic.data.repository.MusicRepository,
-    openPlayerOnLaunch: Boolean = false
+    openPlayerOnLaunch: Boolean = false,
+    onPlayerOpened: () -> Unit,
+    darkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val playerViewModel = rememberPlayerViewModel(repository)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val playerUiState by playerViewModel.uiState.collectAsState()
 
     LaunchedEffect(openPlayerOnLaunch) {
-        if (openPlayerOnLaunch && currentRoute != ROUTE_PLAYER) {
-            navController.navigate(ROUTE_PLAYER) { launchSingleTop = true }
+        if (openPlayerOnLaunch) {
+            if (currentRoute != ROUTE_PLAYER) {
+                navController.navigate(ROUTE_PLAYER) { launchSingleTop = true }
+            }
+            onPlayerOpened()
         }
     }
 
@@ -151,6 +186,18 @@ private fun MainScaffold(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
                         }
                     }
+                },
+                actions = {
+                    if (currentRoute != Screen.Favorites.route) {
+                        IconButton(onClick = { navController.navigate(Screen.Favorites.route) }) {
+                            Icon(Icons.Filled.Favorite, contentDescription = "علاقه‌مندی‌ها")
+                        }
+                    }
+                    if (currentRoute != Screen.Settings.route) {
+                        IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "تنظیمات")
+                        }
+                    }
                 }
             )
         },
@@ -165,7 +212,11 @@ private fun MainScaffold(
                 HomeScreen(repository = repository, onTrackClick = ::openPlayer)
             }
             composable(Screen.Library.route) {
-                LibraryScreen(repository = repository, onTrackClick = ::openPlayer)
+                LibraryScreen(
+                    repository = repository,
+                    onTrackClick = ::openPlayer,
+                    currentTrackId = playerUiState.currentTrack?.id
+                )
             }
             composable(Screen.Artists.route) {
                 ArtistsScreen(repository = repository) { artist ->
@@ -185,8 +236,16 @@ private fun MainScaffold(
             composable(Screen.Favorites.route) {
                 FavoritesScreen(repository = repository, onTrackClick = ::openPlayer)
             }
-            composable(Screen.Folders.route) { FoldersScreen(repository = repository) }
-            composable(Screen.Settings.route) { SettingsScreen() }
+            composable(Screen.Folders.route) {
+                FoldersScreen(
+                    repository = repository,
+                    currentTrackId = playerUiState.currentTrack?.id,
+                    onTrackClick = ::openPlayer
+                )
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(darkTheme = darkTheme, onThemeChange = onThemeChange)
+            }
             composable(ROUTE_PLAYER) {
                 PlayerScreen(repository = repository, playerViewModel = playerViewModel)
             }

@@ -3,8 +3,8 @@ package com.ghadirb.aimusic.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val Purple80 = Color(0xFFD0BCFF)
-val PurplePrimary = Color(0xFF7C5CFC)
-val Teal = Color(0xFF4ECDC4)
-val BackgroundDark = Color(0xFF121016)
-val SurfaceDark = Color(0xFF1C1A22)
-val OnDark = Color(0xFFEDEAF5)
+val PurplePrimary = Color(0xFFD9B66F)
+val Teal = Color(0xFFB9D7C8)
+val BackgroundDark = Color(0xFF211D16)
+val SurfaceDark = Color(0xFF2F291F)
+val OnDark = Color(0xFFFFF7E5)

@@ -29,7 +29,8 @@ import coil.compose.AsyncImage
 @Composable
 fun LibraryScreen(
     repository: MusicRepository,
-    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
+    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
+    currentTrackId: Long?
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel: LibraryViewModel = viewModel(
@@ -64,6 +65,7 @@ fun LibraryScreen(
                     items(tracks, key = { it.id }) { track ->
                         TrackRow(
                             track = track,
+                            isCurrentTrack = track.id == currentTrackId,
                             onClick = { onTrackClick(track, tracks) },
                             onFavoriteClick = { viewModel.toggleFavorite(track) },
                             onAddToPlaylistClick = { trackForPlaylistPicker = track }
@@ -91,11 +93,19 @@ fun TrackRow(
     track: TrackEntity,
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit,
-    onAddToPlaylistClick: (() -> Unit)? = null
+    onAddToPlaylistClick: (() -> Unit)? = null,
+    isCurrentTrack: Boolean = false
 ) {
     ListItem(
-        headlineContent = { Text(track.title) },
-        supportingContent = { Text("${track.artist} • ${track.album}") },
+        headlineContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(track.title, maxLines = 1, modifier = Modifier.weight(1f))
+                if (isCurrentTrack) Icon(Icons.Filled.PlayArrow, contentDescription = "در حال پخش")
+            }
+        },
+        supportingContent = {
+            if (track.artist != "Unknown artist") Text(track.artist, maxLines = 1)
+        },
         leadingContent = {
             if (track.albumArtUri != null) {
                 AsyncImage(track.albumArtUri, contentDescription = track.album, modifier = Modifier.size(56.dp))

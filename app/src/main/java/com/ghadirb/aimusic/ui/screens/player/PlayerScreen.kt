@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -46,14 +49,15 @@ fun PlayerScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Box(
-            modifier = Modifier.size(260.dp),
+            modifier = Modifier.size(280.dp).clip(RoundedCornerShape(30.dp)),
             contentAlignment = Alignment.Center
         ) {
             if (currentTrack?.albumArtUri != null) {
                 AsyncImage(
                     model = currentTrack.albumArtUri,
                     contentDescription = currentTrack.album,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
             } else {
                 Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(96.dp))

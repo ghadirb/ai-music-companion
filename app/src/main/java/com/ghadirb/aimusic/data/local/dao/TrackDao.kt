@@ -31,6 +31,19 @@ interface TrackDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(tracks: List<TrackEntity>): List<Long>
 
+    /** Refreshes scanner-provided metadata without changing favorites, ids or analysis. */
+    @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, durationMs = :durationMs, albumArtUri = :albumArtUri, folderPath = :folderPath WHERE path = :path")
+    suspend fun updateMetadata(
+        path: String,
+        title: String,
+        artist: String,
+        album: String,
+        genre: String?,
+        durationMs: Long,
+        albumArtUri: String?,
+        folderPath: String?
+    )
+
     @Query("DELETE FROM tracks WHERE path IN (:paths)")
     suspend fun deleteByPaths(paths: List<String>)
 

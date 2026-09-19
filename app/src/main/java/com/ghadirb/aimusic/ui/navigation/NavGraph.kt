@@ -22,7 +22,7 @@ sealed class Screen(val route: String, val labelRes: Int, val icon: ImageVector)
     data object Settings : Screen("settings", R.string.nav_settings, Icons.Filled.Settings)
 
     companion object {
-        val bottomBarScreens = listOf(Home, Library, Playlists, Favorites, Folders, Settings)
+        val bottomBarScreens = listOf(Home, Library, Artists, Folders, Playlists)
     }
 }
 

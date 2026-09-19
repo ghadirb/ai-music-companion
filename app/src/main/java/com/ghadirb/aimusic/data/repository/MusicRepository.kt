@@ -50,9 +50,18 @@ class MusicRepository(
         val scannedPaths = scanned.map { it.path }.toSet()
 
         val newTracks = scanned.filter { it.path !in existingPaths }
+        val existingTracks = scanned.filter { it.path in existingPaths }
         val removedPaths = existingPaths.filter { it !in scannedPaths }
 
         if (newTracks.isNotEmpty()) trackDao.insertAll(newTracks)
+        // A re-scan also repairs legacy labels already saved in the database.
+        existingTracks.forEach { track ->
+            trackDao.updateMetadata(
+                path = track.path, title = track.title, artist = track.artist,
+                album = track.album, genre = track.genre, durationMs = track.durationMs,
+                albumArtUri = track.albumArtUri, folderPath = track.folderPath
+            )
+        }
         if (removedPaths.isNotEmpty()) trackDao.deleteByPaths(removedPaths)
     }
 
