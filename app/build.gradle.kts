@@ -8,6 +8,9 @@ val myketPublicKey = providers.gradleProperty("MYKET_IAB_PUBLIC_KEY").orElse("")
 val myketPremiumSku = providers.gradleProperty("MYKET_PREMIUM_SKU").orElse("premium_lifetime").get()
 val escapedMyketPublicKey = myketPublicKey.replace("\\", "\\\\").replace("\"", "\\\"")
 val escapedMyketPremiumSku = myketPremiumSku.replace("\\", "\\\\").replace("\"", "\\\"")
+val cloudAiBaseUrl = providers.gradleProperty("CLOUD_AI_BASE_URL")
+    .orElse("https://ai-music-companion-embedding.ghadir-baraty.workers.dev")
+    .get().trimEnd('/').replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "com.ghadirb.aimusic"
@@ -31,6 +34,7 @@ android {
         }
         buildConfigField("String", "IAB_PUBLIC_KEY", "\"$escapedMyketPublicKey\"")
         buildConfigField("String", "MYKET_PREMIUM_SKU", "\"$escapedMyketPremiumSku\"")
+        buildConfigField("String", "CLOUD_AI_BASE_URL", "\"$cloudAiBaseUrl\"")
     }
 
     buildTypes {

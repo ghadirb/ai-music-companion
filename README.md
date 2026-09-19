@@ -1,94 +1,76 @@
 # AI Music Companion
 
-اپلیکیشن اندروید پلیر موسیقی آفلاین هوشمند — Kotlin + Jetpack Compose + Media3 + Room.
-بدون استریم، بدون سرور، بدون خروج داده از دستگاه. طبق سند پروژه («سند برنامه موسیقی آفلاین هوشمند اندروید.txt»).
+Offline, private and personalized Android music player. The app plays music stored on the device and learns from local listening behaviour to build useful recommendations without uploading audio files.
 
-## BUILD STATUS
+## What works today
 
-- کل فاز MVP (طبق تعریف خودِ سند) نوشته و به این ریپو پوش شده است، از جمله Playlist دستی و پروفایل‌سازی دوره‌ای.
-- **این پروژه در محیط ساخت این چت کامپایل/بیلد نشده** — سندباکس این محیط به `google()`/`mavenCentral()` و Android SDK دسترسی ندارد، پس نمی‌توان Gradle را همین‌جا اجرا کرد. کدها با دقت و طبق APIهای رسمی Media3/Room/Compose نوشته شده‌اند، اما تنها راه تایید قطعی، Build واقعی در Android Studio است.
-- برای ساخت: پروژه را با **Android Studio (Koala/2024.1 یا جدیدتر)** باز کنید؛ Studio وابستگی‌ها را دانلود و Gradle Wrapper را خودکار همگام می‌کند (`gradle-wrapper.jar` عمداً در ریپو نیست چون در سندباکس قابل دانلود نبود).
-- `minSdk = 26`, `compileSdk = targetSdk = 34`, Kotlin `1.9.24`, AGP `8.5.2`.
+- Local MediaStore library: songs, artists, albums, folders, favourites and manual playlists.
+- Media3 playback with background service, notification and lock-screen controls, resume behaviour, shuffle, repeat and sleep timer.
+- Full player with cover art, queue playback, similar tracks and synchronized local `.lrc` lyrics. The active lyric line is highlighted and can be tapped to seek.
+- Local search across song title, artist, album and genre.
+- Smart recommendations based on favourites, completions, replays, skips, artist/genre affinity and rediscovery.
+- On-device audio analysis for energy and approximate BPM. This powers Focus, Night, Driving, Workout and Happy/Dance mixes. A local LRC file can additionally label a track as happy or sad.
+- Light/dark theme, Persian RTL interface, contextual media and notification permissions.
+- Local JSON backup/restore of favourites, playlists and taste profile. Audio files and listening history are never copied into a backup.
 
-## FEATURE STATUS
+## Privacy-first design
 
-پیاده‌سازی‌شده (واقعی، نه اسکلت خالی):
-- اسکن کتابخانه از `MediaStore` (MP3/FLAC/WAV/M4A/OGG)
-- پخش با Media3 ExoPlayer + `MediaSessionService` (کنترل نوتیفیکیشن/صفحه قفل)
-- ناوبری کامل Compose با BottomBar + TopAppBar (عنوان و دکمه بازگشت پویا) برای همه صفحات سند: Home، Library، Artists (+ جزئیات خواننده)، Albums (+ جزئیات آلبوم)، Playlists (+ جزئیات پلی‌لیست)، Favorites، Settings، Player — همه‌جا فارسی (برچسب تب‌ها هم‌اکنون از `strings.xml` می‌آید؛ قبلاً هاردکد انگلیسی بود)
-- Room: Track / ListeningHistory / UserPreference / Playlist / PlaylistTrackCrossRef (v3)
-- ثبت خودکار تاریخچه گوش‌دادن (شروع/پایان، درصد تکمیل، Skip، Replay) روی هر تغییر آهنگ
-- Favorite (toggle از Library و Favorites)
-- Playlist دستی کامل: ساخت، حذف، نمایش تعداد آهنگ، افزودن آهنگ از Library، حذف آهنگ از پلی‌لیست، پخش از داخل پلی‌لیست
-- Recommendation Engine (فاز اول سند): امتیازدهی بر اساس Favorite + گوش کامل + Replay − Skip → کارت «پیشنهاد امروز»
-- «آهنگ‌های فراموش‌شده» واقعی → کارت «دوباره کشف کن» در Home
-- پروفایل‌سازی خودکار دوره‌ای: `TasteProfileWorker` (WorkManager، هر ۲۴ ساعت، کاملاً آفلاین)
-- RTL و Material 3 Dark پیش‌فرض
-- **AudioAnalyzer (جدید)**: `analysis/AudioAnalyzer.kt` فایل صوتی را با `MediaExtractor`+`MediaCodec` روی خود دستگاه دیکد می‌کند (بدون TensorFlow Lite/ONNX — یک روش سبک DSP)، بلندی صدا (RMS) را برای امتیاز انرژی ۰..۱ و ضرب‌آهنگ (BPM) را با autocorrelation روی envelope انرژی تخمین می‌زند، و یک برچسب حس (calm/energetic/neutral) می‌سازد. `AudioAnalysisWorker` (WorkManager) این را روی آهنگ‌های تحلیل‌نشده به‌صورت دسته‌ای و کاملاً آفلاین اجرا می‌کند — بعد از هر اسکن و همچنین دوره‌ای.
-- **کارت‌های «مناسب شب» و «مناسب رانندگی» اکنون واقعی هستند**: `MusicRepository.nightSuitableTracks()`/`drivingSuitableTracks()` بر اساس moodTag/energyLevel واقعیِ AudioAnalyzer فیلتر می‌کنند؛ تا وقتی تحلیل در پس‌زمینه هنوز کافی انجام نشده، پیام کوتاه «در حال تحلیل آهنگ‌ها…» نشان داده می‌شود به‌جای کارت خالی یا داده جعلی.
-- **تحلیل متن شعر فارسی (best-effort)**: `analysis/LyricsAnalyzer.kt` فقط یک فایل sidecar محلی `.lrc` هم‌نام آهنگ را می‌خواند (اگر کاربر داشته باشد) و با یک فهرست کلیدواژه فارسی حس غم/شادی را تخمین می‌زند تا حس مرزی («neutral») صوتی را دقیق‌تر کند؛ هیچ مدل NLP یا سروری در کار نیست.
+The default product is offline-first. Music files, local LRC lyrics, listening history and taste profile stay on-device. Audio analysis runs locally with Android media APIs. The APK does not contain API keys or merchant access tokens.
 
-رفع‌شده در این نوبت (باگ‌های گزارش‌شده از تست واقعی روی دستگاه):
-- **کرش هنگام اسکن/رفرش کتابخانه**: `MediaStore.Audio.Media.GENRE` روی برخی دستگاه‌ها (مثلاً Android 10 / API 29) اصلاً به‌عنوان ستون قابل‌کوئری وجود ندارد و کوئری با `IllegalArgumentException: Invalid column genre` کرش می‌کرد. حالا فقط API 30+ درخواست می‌شود و در صورت رد شدن توسط provider، به‌صورت خودکار بدون genre دوباره کوئری می‌زند.
-- **پرش لحظه‌ای صفحه Home**: `hasLibrary` پیش‌فرض `true` بود، پس یک فریم کل کارت‌ها را نشان می‌داد و بلافاصله (وقتی `trackCount()` واقعی صفر برمی‌گشت) به پیام «کتابخانه خالی» می‌پرید. اکنون این مقدار تا پایان اولین بررسی `null` (نامشخص) است و هیچ‌چیز رندر نمی‌شود تا وضعیت واقعی معلوم شود.
-- **برچسب تب‌های پایین/عنوان صفحه به انگلیسی** (Home/Library/Artists/…): این‌ها هاردکد بودند و از `strings.xml` نمی‌آمدند؛ اصلاح شد تا همه‌جا فارسی نمایش داده شود.
+Online AI similarity is available as an opt-in beta. It remains off by default and sends only a short metadata document for the current song and a small local candidate set; it never uploads audio files or local LRC text. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for the current product privacy draft.
 
-فقط معماری/جای‌گذاری‌شده برای آینده (طبق سند، عمداً در MVP ساخته نشده):
-- کارت‌های «مناسب شب»/«مناسب رانندگی» تا وقتی AudioAnalysisWorker کتابخانه را تحلیل نکرده (چند دقیقه اول پس از اولین اسکن، بسته به تعداد آهنگ) خالی/در-حال-تحلیل هستند — این طبیعی است، نه باگ.
-- **AI DJ, Voice Assistant, Android Auto, Widget, Backup/Sync**: هیچ‌کدام شروع نشده (طبق سند: «فعلاً نساز»)
+## Smart recommendations
 
-هرگز ساخته نشده (طبق دستور صریح سند): حساب کاربری، سرور، اشتراک، پرداخت، تبلیغات، AI ابری.
+This release uses explainable, deterministic local signals rather than claiming to use a trained deep-learning model. Signals include favourite state, completion, replay, skip, artist/genre affinity, energy, BPM and recency. Unsupported or damaged media is skipped without blocking the rest of the library.
 
-## DATABASE STRUCTURE (Room, version 3)
+## Free and Premium architecture
 
-**tracks** — id, path (MediaStore URI، unique)، title، artist، album، genre؟، durationMs، albumArtUri؟، dateAdded، isFavorite، **energyLevel؟ (Float 0..1)، bpm؟ (Int)، moodTag؟ (calm/energetic/neutral)، analyzed (Boolean)**
+Core playback, library management, local recommendations, local lyrics and backup are free. The repository also contains a secure commercial foundation:
 
-**listening_history** — id، trackId، startTime، listenDurationMs، completedPercentage، skipped، replayCount
+- Myket non-consumable `premium_lifetime` billing-client abstraction.
+- Cloudflare Worker endpoints for server-side Myket verification and durable entitlement storage.
+- Server-enforced online-AI quota configuration: 8 free and 120 premium embedding requests per UTC day.
 
-**user_preference** — تک‌ردیفی (id=0)، favoriteArtists، favoriteGenres، favoriteEnergyLevel، preferredDurationMs، preferredTimeOfDay — توسط `TasteProfileWorker` هر روز بازسازی می‌شود
+The online-AI beta uses an anonymous installation session and is limited to 8 requests per UTC day. A production authenticated account/JWT issuer, Myket public key, SKU and Myket server access token are still required before enabling paid features. Do not present a recurring subscription until a provider/store that supports subscriptions is selected.
 
-**playlists** — id، name، createdAt
+## Cloudflare Worker
 
-**playlist_track_cross_ref** — کلید ترکیبی (playlistId, trackId)، position (برای حفظ ترتیب)
+`cloudflare-worker/` is an optional backend boundary. It keeps provider and merchant secrets outside the APK. The opt-in AI beta receives a short-lived anonymous session JWT; entitlement and Myket endpoints require the same server-issued JWT model. Do not embed a static token in the app.
 
-> Migration: v2→v3 یک `Migration` واقعی است (چهار `ALTER TABLE ADD COLUMN`) — داده کاربر پاک نمی‌شود. v1→v2 هنوز `fallbackToDestructiveMigrationFrom(1)` است چون v1 هرگز منتشر نشد.
+## Licensed online lyrics
 
-## AI ROADMAP
+Local `.lrc` files are the only active lyrics source. The code has an abstraction for a licensed provider, but deliberately does not scrape search engines or lyric websites. A commercial release should enable online lyrics only after obtaining a provider licence, documenting the data flow, adding explicit user consent and keeping the provider key server-side.
 
-### Commercial embedding boundary
+## Build
 
-The repository includes `cloudflare-worker/`: an optional authenticated gateway
-for GapGPT's embedding endpoint. It is intentionally not wired directly into
-the Android application: a provider API key inside an APK would be extractable.
-The Worker expects `GAPGPT_API_KEY` and `JWT_SIGNING_SECRET` as Cloudflare
-secrets, uses a short-lived authenticated user token, and accepts only
-user-approved metadata. Local LRC lyrics stay local by default.
+Requirements: JDK 17, Android SDK 34 and Android Studio or Gradle with network access to Google/Maven repositories.
 
-The Android `embedding/EmbeddingContract.kt` keeps the app ready for this
-gateway while the current recommendation system remains private and local.
+```bash
+./gradlew assembleDebug
+```
 
-1. **انجام‌شده**: Metadata scoring (Favorite/Completion/Skip/Replay) + WorkManager دوره‌ای برای پروفایل
-2. **انجام‌شده**: Audio energy (RMS) + tempo (BPM از autocorrelation) به‌صورت DSP سبک روی خود دستگاه — بدون مدل ML؛ TensorFlow Lite/ONNX هنوز اضافه نشده و برای mood/genre classification دقیق‌تر در آینده باقی می‌ماند.
-3. **انجام‌شده**: کارت‌های «شب»/«رانندگی» از استاتیک به فیلتر واقعی energyLevel/moodTag تبدیل شدند.
-4. **شروع محدود**: تحلیل شعر فارسی فقط برای فایل‌های `.lrc` sidecar محلی (کلیدواژه‌محور، نه NLP) — نه استخراج از ID3/متادیتا، نه دانلود شعر.
-5. بعدی: AI DJ (زبان طبیعی → فیلتر mood/energy)، Voice Assistant، Android Auto (نیاز به تبدیل PlaybackService به `MediaLibraryService`)، Widget صفحه اصلی، Backup/Restore محلی (JSON از پلی‌لیست‌ها/علاقه‌مندی‌ها/تنظیمات — بدون سرور/Sync ابری، طبق سند).
-6. در صورت اضافه‌شدن AI ابری: Consent UI + کنترل کاربر + حذف اطلاعات شخصی طبق سند (فعلاً هیچ کدی برایش نیست و هیچ مجوز اینترنتی هم در Manifest درخواست نشده)
+The app targets Android 14 (`targetSdk 34`) and supports Android 8+ (`minSdk 26`). For Myket configuration, supply properties locally rather than committing them:
 
-## KNOWN LIMITATIONS
+```properties
+MYKET_IAB_PUBLIC_KEY=...
+MYKET_PREMIUM_SKU=premium_lifetime
+```
 
-- بدون Gradle Wrapper jar در ریپو در بعضی حالت‌ها (بسته به شبکه سندباکس ساخت) — در Android Studio باز کنید تا خودش حلش کند.
-- بدون تست ساخت واقعی/APK در این نوبت هم — سندباکس این محیط به Android SDK/`google()`/`mavenCentral()` دسترسی ندارد؛ قبل از انتشار حتماً در Android Studio Build کنید.
-- Album art از URI قدیمی `content://media/external/audio/albumart/{id}` خوانده می‌شود که در برخی دستگاه‌های Android 10+ ممکن است کار نکند.
-- منطق «Skip vs Completed» در `PlayerViewModel` یک heuristic ساده است، نه دقیق ۱۰۰٪.
-- **تخمین BPM/انرژی یک heuristic DSP است، نه یک مدل آموزش‌دیده** — روی آهنگ‌های کم‌ضرب (آمبینت، صدای تنها) ممکن است BPM را null برگرداند (عمدی، به‌جای حدس اشتباه)؛ فقط ۴۵ ثانیه اول هر فایل تحلیل می‌شود تا سریع و کم‌مصرف بماند.
-- **`LyricsAnalyzer` روی Android 10+ (scoped storage) ممکن است هیچ‌وقت فایل `.lrc` را پیدا نکند** مگر دستگاه/نسخه اجازه دسترسی مستقیم به مسیر فایل را بدهد؛ این محدودیت شناخته‌شده و مستند است، نه باگ پنهان — راه‌حل کامل‌تر (SAF folder picker) هنوز ساخته نشده.
-- بدون تست واحد (Unit Test) یا UI Test.
-- بدون DI framework (Hilt/Koin) — به‌عمد برای سادگی MVP.
-- رشته‌های UI صفحات Playlist مستقیم در Kotlin نوشته شده‌اند نه در `strings.xml` — برای لوکالایز کامل باید استخراج شوند.
-- `fallbackToDestructiveMigrationFrom(1)` یعنی فقط ارتقاء از نسخه v1 (که هرگز منتشر نشد) داده را پاک می‌کند؛ v2→v3 امن است.
+## Current limitations and next release work
 
-## Privacy & Security (طبق سند)
+- AI similarity is beta-only, opt-in and quota-limited. Replace anonymous sessions with real authentication before a broad commercial rollout.
+- Online lyrics are intentionally disabled until a licensed source is selected.
+- Queue editing (play next/remove/reorder), Android Auto, widget, equalizer and advanced statistics are future phases.
+- BPM/mood are lightweight local heuristics, not a trained classifier.
+- Verify every release with device testing and CI across supported Android versions.
 
-- بدون اینترنت permission در Manifest.
-- هیچ فایل صوتی یا تاریخچه‌ای از دستگاه خارج نمی‌شود — همه‌چیز در Room محلی است، شامل پروفایل‌سازی دوره‌ای و تحلیل صوتی/شعر که هر دو کاملاً آفلاین اجرا می‌شوند.
-- هیچ حساب کاربری/سرور/تبلیغاتی وجود ندارد.
+## Commercial release checklist
+
+1. Complete Myket panel setup and server verification secrets.
+2. Add production authentication before enabling any cloud-AI endpoint.
+3. Run CI, unit tests and device QA; sign the release outside source control.
+4. Review [PRIVACY_POLICY.md](PRIVACY_POLICY.md) and [TERMS.md](TERMS.md) with legal counsel and add support/contact details.
+
+## License
+
+No open-source licence has been granted yet. All rights are reserved pending a separate owner decision.

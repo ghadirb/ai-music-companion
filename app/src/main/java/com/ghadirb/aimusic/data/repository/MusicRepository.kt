@@ -95,6 +95,8 @@ class MusicRepository(
 
     suspend fun deletePlaylist(playlistId: Long) = playlistDao.deletePlaylist(playlistId)
 
+    suspend fun renamePlaylist(playlistId: Long, name: String) = playlistDao.renamePlaylist(playlistId, name)
+
     fun observeTracksInPlaylist(playlistId: Long): Flow<List<TrackEntity>> =
         playlistDao.observeTracksInPlaylist(playlistId)
 

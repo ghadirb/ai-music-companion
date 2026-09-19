@@ -23,4 +23,10 @@ class PlaylistsViewModel(private val repository: MusicRepository) : ViewModel() 
     fun deletePlaylist(playlistId: Long) {
         viewModelScope.launch { repository.deletePlaylist(playlistId) }
     }
+
+    fun renamePlaylist(playlistId: Long, name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch { repository.renamePlaylist(playlistId, trimmed) }
+    }
 }

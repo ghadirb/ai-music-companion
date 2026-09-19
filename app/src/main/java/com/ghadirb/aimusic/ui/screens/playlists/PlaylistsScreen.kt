@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,7 +20,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ghadirb.aimusic.data.local.entity.PlaylistEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 
-/** MVP manual playlists: create / list / delete / open. Reordering and renaming are not implemented yet. */
 @Composable
 fun PlaylistsScreen(
     repository: MusicRepository,
@@ -30,6 +30,7 @@ fun PlaylistsScreen(
     )
     val playlists by viewModel.playlists.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var playlistToRename by remember { mutableStateOf<PlaylistEntity?>(null) }
 
     Scaffold(
         floatingActionButton = {
@@ -49,7 +50,8 @@ fun PlaylistsScreen(
                         playlist = playlist,
                         repository = repository,
                         onClick = { onOpenPlaylist(playlist.id, playlist.name) },
-                        onDelete = { viewModel.deletePlaylist(playlist.id) }
+                        onDelete = { viewModel.deletePlaylist(playlist.id) },
+                        onRename = { playlistToRename = playlist }
                     )
                 }
             }
@@ -65,6 +67,16 @@ fun PlaylistsScreen(
             }
         )
     }
+    playlistToRename?.let { playlist ->
+        RenamePlaylistDialog(
+            initialName = playlist.name,
+            onDismiss = { playlistToRename = null },
+            onRename = { name ->
+                viewModel.renamePlaylist(playlist.id, name)
+                playlistToRename = null
+            }
+        )
+    }
 }
 
 @Composable
@@ -72,7 +84,8 @@ private fun PlaylistRow(
     playlist: PlaylistEntity,
     repository: MusicRepository,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onRename: () -> Unit
 ) {
     val trackCount by repository.observePlaylistTrackCount(playlist.id).collectAsState(initial = 0)
     ListItem(
@@ -80,8 +93,13 @@ private fun PlaylistRow(
         supportingContent = { Text("$trackCount آهنگ") },
         leadingContent = { Icon(Icons.Filled.QueueMusic, contentDescription = null) },
         trailingContent = {
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "حذف پلی‌لیست")
+            Row {
+                IconButton(onClick = onRename) {
+                    Icon(Icons.Filled.Edit, contentDescription = "ویرایش نام پلی‌لیست")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "حذف پلی‌لیست")
+                }
             }
         },
         modifier = Modifier.clickable(onClick = onClick)
@@ -108,5 +126,26 @@ private fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Un
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("انصراف") }
         }
+    )
+}
+
+@Composable
+private fun RenamePlaylistDialog(initialName: String, onDismiss: () -> Unit, onRename: (String) -> Unit) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ویرایش نام پلی‌لیست") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("نام پلی‌لیست") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onRename(name) }, enabled = name.isNotBlank()) { Text("ذخیره") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
     )
 }

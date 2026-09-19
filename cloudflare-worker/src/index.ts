@@ -3,13 +3,15 @@ export interface Env {
   JWT_SIGNING_SECRET: string;
   MYKET_ACCESS_TOKEN?: string;
   MYKET_PACKAGE_NAME?: string;
+  FREE_DAILY_EMBEDDING_LIMIT?: string;
+  PREMIUM_DAILY_EMBEDDING_LIMIT?: string;
   PURCHASE_ENTITLEMENTS?: KVNamespace;
 }
 
 type Claims = { sub?: string; exp?: number };
 type EmbeddingRequest = {
   model?: "text-embedding-3-small" | "text-embedding-3-large" | "gemini-embedding-001";
-  input: string;
+  input: string | string[];
 };
 type MyketVerificationRequest = { sku?: string; tokenId?: string; developerPayload?: string };
 
@@ -27,6 +29,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+    if (path === "/v1/session/anonymous") return issueAnonymousSession(request, env);
 
     const claims = await authenticatedClaims(request, env.JWT_SIGNING_SECRET);
     if (!claims?.sub) return json({ error: "unauthorized" }, 401);
@@ -41,7 +44,11 @@ export default {
 
 async function createEmbedding(request: Request, env: Env, claims: Claims): Promise<Response> {
   const payload = await request.json<EmbeddingRequest>().catch(() => null);
-  if (!payload?.input || payload.input.length > 6_000) return json({ error: "invalid_input" }, 400);
+  const inputs = typeof payload?.input === "string" ? [payload.input] : payload?.input;
+  if (!inputs?.length || inputs.length > 12 || inputs.some(value => !value || value.length > 6_000)) return json({ error: "invalid_input" }, 400);
+
+  const model = payload.model ?? "text-embedding-3-small";
+  if (!ALLOWED_EMBEDDING_MODELS.has(model)) return json({ error: "unsupported_model" }, 400);
 
   const entitlement = await entitlementFor(env, claims.sub!);
   const usage = await reserveEmbeddingUsage(env, claims.sub!, entitlement.premium);
@@ -52,13 +59,24 @@ async function createEmbedding(request: Request, env: Env, claims: Claims): Prom
   const upstream = await fetch("https://api.gapgpt.app/v1/embeddings", {
     method: "POST",
     headers: { authorization: `Bearer ${env.GAPGPT_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ model: payload.model ?? "text-embedding-3-small", input: payload.input }),
+    body: JSON.stringify({ model, input: payload.input }),
   });
   const response = json(await upstream.json(), upstream.status);
   response.headers.set("x-ai-daily-limit", usage.limit.toString());
   response.headers.set("x-ai-daily-remaining", usage.remaining.toString());
   response.headers.set("x-ai-tier", entitlement.premium ? "premium" : "free");
   return response;
+}
+
+async function issueAnonymousSession(request: Request, env: Env): Promise<Response> {
+  const body = await request.json<{ installationId?: string }>().catch(() => null);
+  if (!body?.installationId || !/^[a-zA-Z0-9_-]{24,128}$/.test(body.installationId)) {
+    return json({ error: "invalid_installation_id" }, 400);
+  }
+  const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = base64UrlEncode(JSON.stringify({ sub: `anon:${body.installationId}`, exp: Math.floor(Date.now() / 1000) + 604800 }));
+  const signature = await hmacBase64Url(`${header}.${payload}`, env.JWT_SIGNING_SECRET);
+  return json({ accessToken: `${header}.${payload}.${signature}`, expiresInSeconds: 604800 });
 }
 
 async function getEntitlement(env: Env, claims: Claims): Promise<Response> {
@@ -119,6 +137,7 @@ async function verifyMyketPurchase(request: Request, env: Env, claims: Claims): 
 
 const FREE_DAILY_EMBEDDING_LIMIT = 8;
 const PREMIUM_DAILY_EMBEDDING_LIMIT = 120;
+const ALLOWED_EMBEDDING_MODELS = new Set(["text-embedding-3-small"]);
 
 async function entitlementFor(env: Env, subject: string): Promise<{ premium: boolean }> {
   if (!env.PURCHASE_ENTITLEMENTS) return { premium: false };
@@ -140,10 +159,17 @@ async function currentEmbeddingUsage(env: Env, subject: string, premium: boolean
   const day = now.toISOString().slice(0, 10);
   const nextUtcDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
   const expiration = Math.floor(nextUtcDay.getTime() / 1000) + 86_400;
-  const limit = premium ? PREMIUM_DAILY_EMBEDDING_LIMIT : FREE_DAILY_EMBEDDING_LIMIT;
+  const limit = premium
+    ? positiveLimit(env.PREMIUM_DAILY_EMBEDDING_LIMIT, PREMIUM_DAILY_EMBEDDING_LIMIT)
+    : positiveLimit(env.FREE_DAILY_EMBEDDING_LIMIT, FREE_DAILY_EMBEDDING_LIMIT);
   const key = `ai-usage:${day}:${subject}`;
   const used = Number.parseInt((await env.PURCHASE_ENTITLEMENTS?.get(key)) ?? "0", 10) || 0;
   return { key, used, limit, remaining: Math.max(0, limit - used), expiration, resetsAt: nextUtcDay.toISOString() };
+}
+
+function positiveLimit(raw: string | undefined, fallback: number): number {
+  const value = Number.parseInt(raw ?? "", 10);
+  return Number.isFinite(value) && value > 0 && value <= 10_000 ? value : fallback;
 }
 
 async function authenticatedClaims(request: Request, secret: string): Promise<Claims | null> {

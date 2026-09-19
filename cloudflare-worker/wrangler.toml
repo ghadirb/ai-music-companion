@@ -6,6 +6,8 @@ workers_dev = true
 
 [vars]
 MYKET_PACKAGE_NAME = "com.ghadirb.aimusic"
+FREE_DAILY_EMBEDDING_LIMIT = "8"
+PREMIUM_DAILY_EMBEDDING_LIMIT = "120"
 
 [[kv_namespaces]]
 binding = "PURCHASE_ENTITLEMENTS"

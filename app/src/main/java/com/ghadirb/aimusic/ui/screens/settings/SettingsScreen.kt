@@ -34,6 +34,7 @@ import com.ghadirb.aimusic.backup.LocalLibraryBackup
 import com.ghadirb.aimusic.billing.MyketBillingClient
 import com.ghadirb.aimusic.billing.MyketBillingState
 import com.ghadirb.aimusic.data.repository.MusicRepository
+import com.ghadirb.aimusic.embedding.OnlineSimilarityRanker
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,6 +51,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val backup = remember(repository) { LocalLibraryBackup(repository) }
+    val cloudAiPreferences = remember { context.getSharedPreferences(OnlineSimilarityRanker.PREFS, android.content.Context.MODE_PRIVATE) }
+    var cloudAiEnabled by remember { mutableStateOf(cloudAiPreferences.getBoolean(OnlineSimilarityRanker.CONSENT_KEY, false)) }
     var backupMessage by remember { mutableStateOf<String?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -69,7 +72,7 @@ fun SettingsScreen(
                 val result = backup.restoreFrom(context.contentResolver, uri)
                 "بازیابی انجام شد: ${result.favorites} علاقه‌مندی، ${result.playlists} پلی‌لیست و ${result.tracksLinked} آهنگ متصل شد."
             } catch (error: Exception) {
-                backupMessage = error.message ?: "بازیابی فایل انجام نشد."
+                error.message ?: "بازیابی فایل انجام نشد."
             }
         }
     }
@@ -106,6 +109,21 @@ fun SettingsScreen(
         ListItem(
             headlineContent = { Text(stringResource(R.string.online_lyrics_title)) },
             supportingContent = { Text(stringResource(R.string.online_lyrics_detail)) }
+        )
+        HorizontalDivider()
+
+        ListItem(
+            headlineContent = { Text("AI آنلاین برای پیشنهاد مشابه (بتا)") },
+            supportingContent = { Text("با فعال‌سازی، فقط نام آهنگ، خواننده، آلبوم، ژانر، BPM و برچسب حال‌و‌هوا برای رتبه‌بندی شباهت به سرور پروژه فرستاده می‌شود؛ فایل صوتی و متن LRC ارسال نمی‌شود. سهمیهٔ رایگان: ۸ درخواست در روز.") },
+            trailingContent = {
+                Switch(
+                    checked = cloudAiEnabled,
+                    onCheckedChange = { enabled ->
+                        cloudAiEnabled = enabled
+                        cloudAiPreferences.edit().putBoolean(OnlineSimilarityRanker.CONSENT_KEY, enabled).apply()
+                    }
+                )
+            }
         )
         HorizontalDivider()
 

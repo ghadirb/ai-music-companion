@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ fun PlayerScreen(
     val uiState by playerViewModel.uiState.collectAsState()
     val similarTracks by playerViewModel.similarTracks.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
+    val onlineAiMessage by playerViewModel.onlineAiMessage.collectAsState()
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showSleepTimer by rememberSaveable { mutableStateOf(false) }
     // Keep a stable local reference. `uiState.currentTrack` is read from a
@@ -163,7 +165,10 @@ fun PlayerScreen(
 
         if (similarTracks.isNotEmpty()) {
             Spacer(Modifier.height(28.dp))
-            Text("آهنگ‌های مشابه", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("آهنگ‌های مشابه", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = playerViewModel::improveSimilarWithAi) { Text("بهبود با AI") }
+            }
             Spacer(Modifier.height(8.dp))
             LazyRow {
                 items(similarTracks, key = { it.id }) { track ->
@@ -174,6 +179,7 @@ fun PlayerScreen(
                     )
                 }
             }
+            onlineAiMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
         }
 
     }

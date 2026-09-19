@@ -12,6 +12,7 @@ import com.ghadirb.aimusic.analysis.LyricsAnalyzer
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.playback.PlayerController
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
+import com.ghadirb.aimusic.embedding.OnlineSimilarityRanker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +51,9 @@ class PlayerViewModel(
     val similarTracks: StateFlow<List<TrackEntity>> = _similarTracks.asStateFlow()
     private val _lyrics = MutableStateFlow<List<LyricsAnalyzer.LrcLine>>(emptyList())
     val lyrics: StateFlow<List<LyricsAnalyzer.LrcLine>> = _lyrics.asStateFlow()
+    private val onlineSimilarityRanker = OnlineSimilarityRanker(application)
+    private val _onlineAiMessage = MutableStateFlow<String?>(null)
+    val onlineAiMessage: StateFlow<String?> = _onlineAiMessage.asStateFlow()
 
     private var currentQueue: List<TrackEntity> = emptyList()
     private var sessionStartTime: Long = 0L
@@ -117,6 +121,25 @@ class PlayerViewModel(
     }
 
     fun playSimilarTrack(track: TrackEntity) = playQueue(_similarTracks.value, track)
+
+    fun improveSimilarWithAi() {
+        val source = _uiState.value.currentTrack ?: return
+        val candidates = _similarTracks.value.take(7)
+        if (candidates.isEmpty()) return
+        _onlineAiMessage.value = "در حال بهبود پیشنهادهای مشابه با AI…"
+        viewModelScope.launch {
+            when (val result = onlineSimilarityRanker.rank(source, candidates)) {
+                is OnlineSimilarityRanker.Result.Success -> {
+                    _similarTracks.value = result.tracks
+                    _onlineAiMessage.value = result.remaining?.let { "پیشنهادها با AI بهبود یافت؛ $it درخواست امروز باقی مانده است." }
+                        ?: "پیشنهادها با AI بهبود یافت."
+                }
+                OnlineSimilarityRanker.Result.ConsentRequired -> _onlineAiMessage.value = "ابتدا AI آنلاین را از تنظیمات و با رضایت خود فعال کنید."
+                OnlineSimilarityRanker.Result.QuotaReached -> _onlineAiMessage.value = "سهمیهٔ روزانهٔ AI به پایان رسیده است."
+                is OnlineSimilarityRanker.Result.Error -> _onlineAiMessage.value = result.message
+            }
+        }
+    }
 
     fun toggleFavorite(track: TrackEntity) {
         viewModelScope.launch {
