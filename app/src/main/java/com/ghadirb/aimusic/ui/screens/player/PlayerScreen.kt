@@ -28,6 +28,9 @@ fun PlayerScreen(
     playerViewModel: PlayerViewModel
 ) {
     val uiState by playerViewModel.uiState.collectAsState()
+    // Keep a stable local reference. `uiState.currentTrack` is read from a
+    // StateFlow-backed object and Kotlin cannot smart-cast that expression.
+    val currentTrack = uiState.currentTrack
 
     // Poll playback position once a second while this screen is visible.
     LaunchedEffect(Unit) {
@@ -46,10 +49,10 @@ fun PlayerScreen(
             modifier = Modifier.size(260.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (uiState.currentTrack?.albumArtUri != null) {
+            if (currentTrack?.albumArtUri != null) {
                 AsyncImage(
-                    model = uiState.currentTrack.albumArtUri,
-                    contentDescription = uiState.currentTrack.album,
+                    model = currentTrack.albumArtUri,
+                    contentDescription = currentTrack.album,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
