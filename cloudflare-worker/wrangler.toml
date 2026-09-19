@@ -1,0 +1,7 @@
+name = "ai-music-companion-embedding"
+main = "src/index.ts"
+compatibility_date = "2026-09-19"
+
+# Set these only through Cloudflare secrets; never put their values in this file.
+# wrangler secret put GAPGPT_API_KEY
+# wrangler secret put JWT_SIGNING_SECRET

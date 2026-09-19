@@ -34,6 +34,7 @@ fun PlayerScreen(
 ) {
     val uiState by playerViewModel.uiState.collectAsState()
     val similarTracks by playerViewModel.similarTracks.collectAsState()
+    val lyrics by playerViewModel.lyrics.collectAsState()
     // Keep a stable local reference. `uiState.currentTrack` is read from a
     // StateFlow-backed object and Kotlin cannot smart-cast that expression.
     val currentTrack = uiState.currentTrack
@@ -132,6 +133,25 @@ fun PlayerScreen(
                         label = { Text(track.title, maxLines = 1) },
                         modifier = Modifier.padding(end = 8.dp)
                     )
+                }
+            }
+        }
+
+        if (lyrics.isNotEmpty()) {
+            val activeLine = lyrics.lastOrNull { it.timeMs <= uiState.positionMs }
+            Spacer(Modifier.height(28.dp))
+            Text("متن آهنگ", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+            Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        activeLine?.text ?: lyrics.first().text,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    val upcoming = lyrics.filter { it.timeMs > uiState.positionMs }.take(3)
+                    upcoming.forEach { line ->
+                        Text(line.text, modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }

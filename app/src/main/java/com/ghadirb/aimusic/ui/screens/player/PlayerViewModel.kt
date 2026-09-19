@@ -1,12 +1,14 @@
 package com.ghadirb.aimusic.ui.screens.player
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.ghadirb.aimusic.data.local.entity.ListeningHistoryEntity
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
+import com.ghadirb.aimusic.analysis.LyricsAnalyzer
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.playback.PlayerController
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
@@ -41,6 +43,8 @@ class PlayerViewModel(
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
     private val _similarTracks = MutableStateFlow<List<TrackEntity>>(emptyList())
     val similarTracks: StateFlow<List<TrackEntity>> = _similarTracks.asStateFlow()
+    private val _lyrics = MutableStateFlow<List<LyricsAnalyzer.LrcLine>>(emptyList())
+    val lyrics: StateFlow<List<LyricsAnalyzer.LrcLine>> = _lyrics.asStateFlow()
 
     private var currentQueue: List<TrackEntity> = emptyList()
     private var sessionStartTime: Long = 0L
@@ -108,6 +112,9 @@ class PlayerViewModel(
         _uiState.value = _uiState.value.copy(currentTrack = track, positionMs = 0L)
         viewModelScope.launch {
             _similarTracks.value = track?.let { recommendationEngine.similarTracks(it, limit = 8) }.orEmpty()
+            _lyrics.value = track?.let {
+                LyricsAnalyzer.loadLrc(getApplication<Application>(), Uri.parse(it.path))
+            }.orEmpty()
         }
     }
 

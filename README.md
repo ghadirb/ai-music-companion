@@ -55,6 +55,18 @@
 
 ## AI ROADMAP
 
+### Commercial embedding boundary
+
+The repository includes `cloudflare-worker/`: an optional authenticated gateway
+for GapGPT's embedding endpoint. It is intentionally not wired directly into
+the Android application: a provider API key inside an APK would be extractable.
+The Worker expects `GAPGPT_API_KEY` and `JWT_SIGNING_SECRET` as Cloudflare
+secrets, uses a short-lived authenticated user token, and accepts only
+user-approved metadata. Local LRC lyrics stay local by default.
+
+The Android `embedding/EmbeddingContract.kt` keeps the app ready for this
+gateway while the current recommendation system remains private and local.
+
 1. **انجام‌شده**: Metadata scoring (Favorite/Completion/Skip/Replay) + WorkManager دوره‌ای برای پروفایل
 2. **انجام‌شده**: Audio energy (RMS) + tempo (BPM از autocorrelation) به‌صورت DSP سبک روی خود دستگاه — بدون مدل ML؛ TensorFlow Lite/ONNX هنوز اضافه نشده و برای mood/genre classification دقیق‌تر در آینده باقی می‌ماند.
 3. **انجام‌شده**: کارت‌های «شب»/«رانندگی» از استاتیک به فیلتر واقعی energyLevel/moodTag تبدیل شدند.

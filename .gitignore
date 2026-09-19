@@ -9,3 +9,7 @@
 .cxx
 local.properties
 *.log
+*.key
+*.token
+.dev.vars
+cloudflare-worker/.dev.vars

@@ -24,6 +24,9 @@ import java.io.File
  */
 object LyricsAnalyzer {
 
+    /** One timestamped line from a local LRC sidecar file. */
+    data class LrcLine(val timeMs: Long, val text: String)
+
     object LyricMood {
         const val SAD = "sad"
         const val HAPPY = "happy"
@@ -65,6 +68,30 @@ object LyricsAnalyzer {
             happyCount > sadCount -> LyricMood.HAPPY
             else -> null
         }
+    }
+
+    /**
+     * Loads user-owned sidecar lyrics. No network lookup is performed: an LRC
+     * file beside the track always has priority and remains private.
+     */
+    fun loadLrc(context: Context, trackUri: Uri): List<LrcLine> {
+        val lrcFile = findSidecarLrc(context, trackUri) ?: return emptyList()
+        val text = try { lrcFile.readText() } catch (_: Exception) { return emptyList() }
+        val timestamp = Regex("\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?\\]")
+        return text.lineSequence().flatMap { rawLine ->
+            val lineText = rawLine.replace(timestamp, "").trim()
+            if (lineText.isBlank()) emptySequence() else timestamp.findAll(rawLine).mapNotNull { match ->
+                val minutes = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
+                val seconds = match.groupValues[2].toLongOrNull() ?: return@mapNotNull null
+                val fraction = match.groupValues[3]
+                val millis = when (fraction.length) {
+                    1 -> fraction.toLongOrNull()?.times(100) ?: 0L
+                    2 -> fraction.toLongOrNull()?.times(10) ?: 0L
+                    else -> fraction.toLongOrNull() ?: 0L
+                }
+                LrcLine((minutes * 60 + seconds) * 1000 + millis, lineText)
+            }
+        }.sortedBy { it.timeMs }.toList()
     }
 
     /**
