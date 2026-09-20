@@ -180,6 +180,31 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+        var lyricsAccess by remember { mutableStateOf(com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(context)) }
+        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) lyricsAccess = com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(context)
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+        ListItem(
+            headlineContent = { Text("شناسایی خودکار متن آهنگ‌ها") },
+            supportingContent = {
+                Column {
+                    Text(
+                        if (lyricsAccess) "فعال است: فایل هم‌نام «نام آهنگ.lrc» کنار هر آهنگ (و متن داخل تگ فایل) خودکار پیدا می‌شود."
+                        else "برای پیداکردن خودکار فایل‌های lrc کنار آهنگ‌ها، یک‌بار دسترسی به فایل‌ها را فعال کنید. فقط روی همین دستگاه خوانده می‌شود و چیزی ارسال نمی‌شود. متن داخل تگ MP3/FLAC بدون این دسترسی هم شناسایی می‌شود."
+                    )
+                    if (!lyricsAccess && com.ghadirb.aimusic.lyrics.StorageAccess.canRequestAllFilesAccess) {
+                        TextButton(onClick = { com.ghadirb.aimusic.ui.screens.player.openAllFilesAccess(context) }) { Text("فعال‌سازی دسترسی") }
+                    }
+                }
+            }
+        )
+        HorizontalDivider()
+
         ListItem(
             headlineContent = { Text("حریم خصوصی") },
             supportingContent = {

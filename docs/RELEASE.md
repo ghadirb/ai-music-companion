@@ -22,3 +22,6 @@ To rotate the signing key: `node scripts/generate-entitlement-keys.mjs`, `npx wr
 * Add store screenshots to `docs/screenshots/`.
 * Manual QA on real devices (Android 8, 10, 12, 13, 14, 15): playback in background, headphone unplug, incoming call, sleep timer, resume after kill, LRC import/folder grant, backup/restore on a second device, Premium purchase + restore after reinstall (needs real Myket credentials).
 * Revoke every token that was pasted into chats or project files.
+
+## 5. Store policy note: "All files access"
+Automatic detection of sidecar `.lrc` files on Android 11+ uses the optional `MANAGE_EXTERNAL_STORAGE` permission (user-granted, never requested at install). This is fine for Myket/direct APK distribution. **Google Play** restricts this permission; if you publish there, remove the permission from `AndroidManifest.xml` (lyrics then work through embedded tags, per-song import, or a granted folder) or file the Play declaration.
