@@ -59,6 +59,11 @@ jobs:
           set -o pipefail
           ./gradlew assembleRelease bundleRelease -PVERSION_CODE="$VERSION_CODE" --stacktrace 2>&1 | tee build-release.log
 
+      - name: Verify release signature (apksigner)
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/*.apk 2>&1 | tee apksigner.log
+
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
@@ -86,7 +91,7 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           rm -rf /tmp/report && mkdir -p /tmp/report
-          for f in unit-tests.log lint.log build-debug.log build-release.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
+          for f in unit-tests.log lint.log build-debug.log build-release.log apksigner.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
           mkdir -p /tmp/report/test-results /tmp/report/schemas
           find app/build/test-results -name '*.xml' -exec cp {} /tmp/report/test-results/ \; 2>/dev/null || true
           [ -d app/schemas ] && cp -r app/schemas/. /tmp/report/schemas/ || true
@@ -157,3 +162,40 @@ jobs:
           cd /tmp/rep && git init -q && git checkout -q -b ci-report-instrumented && git add -A \
             && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Instrumented report for ${GITHUB_SHA}" \
             && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-report-instrumented
+
+  # ---------------------------------------------------------------- Release (R8) smoke test on an emulator
+  release-smoke:
+    needs: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-release
+          path: rel
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Launch the minified release build
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: bash .github/scripts/release-smoke.sh
+      - name: Publish smoke report branch
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          rm -rf /tmp/smoke && mkdir -p /tmp/smoke
+          cp screenshot-*.png /tmp/smoke/ 2>/dev/null || true
+          tail -n 300 logcat.txt > /tmp/smoke/logcat-tail.txt 2>/dev/null || true
+          echo "sha=${GITHUB_SHA} run=${GITHUB_RUN_ID}" > /tmp/smoke/RUN.txt
+          cd /tmp/smoke && git init -q && git checkout -q -b ci-report-smoke && git add -A \
+            && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Smoke report for ${GITHUB_SHA}" \
+            && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-report-smoke
