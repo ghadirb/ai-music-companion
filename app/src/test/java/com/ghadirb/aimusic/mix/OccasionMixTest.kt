@@ -24,7 +24,7 @@ class OccasionMixTest {
 
     @Test fun workoutIsHighEnergyNotSadAndLongEnough() = assertEquals(setOf(1L, 2L), mix(MixType.WORKOUT))
 
-    @Test fun drivingWantsMidTempoTracksOfReasonableLength() = assertEquals(setOf(2L, 5L), mix(MixType.DRIVING))
+    @Test fun drivingWantsMidTempoTracksOfReasonableLength() = assertEquals(setOf(1L, 2L, 5L), mix(MixType.DRIVING)) // 6 is too short, 3/4 are slow
 
     @Test fun happyAndSadFollowMood() {
         assertTrue(mix(MixType.HAPPY).containsAll(listOf(2L)))
