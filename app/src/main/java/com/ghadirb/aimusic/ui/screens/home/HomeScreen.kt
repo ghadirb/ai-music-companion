@@ -8,6 +8,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import com.ghadirb.aimusic.lyrics.StorageAccess
+import com.ghadirb.aimusic.mix.MixType
+import com.ghadirb.aimusic.recommendation.TimeBuckets
+import com.ghadirb.aimusic.ui.screens.player.openAllFilesAccess
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -108,6 +118,33 @@ fun HomeScreen(
             }
         }
 
+        // One-time hint: lets the app find "<song name>.lrc" files next to the songs automatically.
+        val prefs = remember { context.getSharedPreferences("ui_preferences", android.content.Context.MODE_PRIVATE) }
+        var hintDismissed by remember { mutableStateOf(prefs.getBoolean("lyrics_hint_dismissed", false)) }
+        var allFilesGranted by remember { mutableStateOf(StorageAccess.hasAllFilesAccess(context)) }
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) allFilesGranted = StorageAccess.hasAllFilesAccess(context)
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+        if (StorageAccess.canRequestAllFilesAccess && !allFilesGranted && !hintDismissed) {
+            Card(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("🎤 شناسایی خودکار متن آهنگ‌ها", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "اگر کنار آهنگ‌ها فایل هم‌نام با پسوند lrc دارید (مثلاً «نام آهنگ.lrc»)، با یک‌بار دسترسی به فایل‌ها متن همگام با آواز خودکار نشان داده می‌شود. فقط روی همین دستگاه خوانده می‌شود.",
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Row {
+                        TextButton(onClick = { openAllFilesAccess(context) }) { Text("فعال‌سازی") }
+                        TextButton(onClick = { prefs.edit().putBoolean("lyrics_hint_dismissed", true).apply(); hintDismissed = true }) { Text("بعداً") }
+                    }
+                }
+            }
+        }
+
         val (analysed, total) = progress
         if (total > 0 && analysed < total) {
             Card(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
@@ -132,11 +169,44 @@ fun HomeScreen(
             RecommendationRail(picks) { onTrackClick(it, picks.map { r -> r.track }) }
         }
 
-        if (mixes.isEmpty()) {
-            Spacer(Modifier.height(16.dp))
+        // ---- occasions: "what do I want to listen to now?" ----
+        val occasionMixes = mixes.filter { it.type.occasion }
+        val personalMixes = mixes.filter { !it.type.occasion }
+        Spacer(Modifier.height(24.dp))
+        SectionHeader(emoji = "🎯", title = "برای هر موقعیت")
+        if (occasionMixes.isEmpty()) {
             Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+        } else {
+            val suggested = remember { MixType.suggestedFor(TimeBuckets.bucketOf(System.currentTimeMillis())) }
+            var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+            val selected = occasionMixes.firstOrNull { it.type.name == chosen }
+                ?: occasionMixes.firstOrNull { it.type == suggested }
+                ?: occasionMixes.first()
+            LazyRow(Modifier.padding(bottom = 8.dp)) {
+                items(MixType.values().filter { it.occasion }, key = { it.name }) { type ->
+                    val count = occasionMixes.firstOrNull { it.type == type }?.tracks?.size ?: 0
+                    FilterChip(
+                        selected = selected.type == type,
+                        enabled = count > 0,
+                        onClick = { chosen = type.name },
+                        label = { Text("${type.emoji} ${type.titleFa} ($count)") },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+            SectionHeader(
+                emoji = selected.type.emoji,
+                title = selected.type.titleFa,
+                actions = {
+                    TextButton(onClick = { selected.tracks.firstOrNull()?.let { onTrackClick(it.track, selected.trackList) } }) { Text("پخش همه") }
+                    TextButton(onClick = { viewModel.saveMixAsPlaylist(selected) }) { Text("ذخیره") }
+                }
+            )
+            RecommendationRail(selected.tracks) { onTrackClick(it, selected.trackList) }
         }
-        mixes.forEach { mix ->
+
+        // ---- personal mixes ----
+        personalMixes.forEach { mix ->
             Spacer(Modifier.height(24.dp))
             SectionHeader(
                 emoji = mix.type.emoji,

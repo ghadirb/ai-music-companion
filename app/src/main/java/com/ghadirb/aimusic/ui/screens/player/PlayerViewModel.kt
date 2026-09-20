@@ -68,6 +68,9 @@ class PlayerViewModel(
     private val _lyricsHasFolder = MutableStateFlow(lyricsSource.hasFolder())
     val lyricsHasFolder: StateFlow<Boolean> = _lyricsHasFolder.asStateFlow()
     private var lyricsJob: Job? = null
+    private val _allFilesAccess = MutableStateFlow(com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(application))
+    /** Whether plain .lrc files next to the songs can be read (Android 11+: "All files access"). */
+    val allFilesAccess: StateFlow<Boolean> = _allFilesAccess.asStateFlow()
 
     private val _onlineAiMessage = MutableStateFlow<String?>(null)
     val onlineAiMessage: StateFlow<String?> = _onlineAiMessage.asStateFlow()
@@ -256,6 +259,15 @@ class PlayerViewModel(
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
             val parsed = lyricsSource.load(track)
             _lyrics.value = if (parsed != null) LyricsState.Found(parsed) else LyricsState.NotFound
+        }
+    }
+
+    /** Called when the screen resumes (e.g. back from system settings): pick up a newly granted permission. */
+    fun refreshStorageAccess() {
+        val granted = com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(getApplication())
+        if (granted != _allFilesAccess.value) {
+            _allFilesAccess.value = granted
+            if (_lyrics.value !is LyricsState.Found) loadLyrics(_uiState.value.currentTrack)
         }
     }
 

@@ -11,15 +11,32 @@ import com.ghadirb.aimusic.recommendation.ScoringConfig
 import java.util.Random
 import java.util.TimeZone
 
-enum class MixType(val titleFa: String, val emoji: String) {
-    MY_FAVORITES("علاقه‌مندی‌های من", "❤️"),
-    RECENTLY_LOVED("اخیراً دوست داشتی", "🔥"),
-    REDISCOVER("دوباره کشف کن", "🔄"),
-    CHILL("آرام", "🌿"),
-    ENERGETIC("پرانرژی", "⚡"),
-    FOCUS("تمرکز", "🎯"),
-    NIGHT("مناسب شب", "🌙"),
-    RANDOM_FROM_TASTE("تصادفی از سلیقهٔ من", "🎲")
+/** [occasion] mixes answer "what do I want to listen to now?" (workout, driving, …); the others are personal. */
+enum class MixType(val titleFa: String, val emoji: String, val occasion: Boolean) {
+    MY_FAVORITES("علاقه‌مندی‌های من", "❤️", false),
+    RECENTLY_LOVED("اخیراً دوست داشتی", "🔥", false),
+    REDISCOVER("دوباره کشف کن", "🔄", false),
+    RANDOM_FROM_TASTE("تصادفی از سلیقهٔ من", "🎲", false),
+
+    WORKOUT("ورزشی", "🏋️", true),
+    DRIVING("رانندگی", "🚗", true),
+    HAPPY("شاد", "😄", true),
+    CHILL("آرام", "🌿", true),
+    FOCUS("تمرکز و مطالعه", "🎯", true),
+    NIGHT("مناسب شب", "🌙", true),
+    SAD("غمگین", "😢", true),
+    MORNING("شروع روز", "☀️", true),
+    ENERGETIC("پرانرژی", "⚡", true);
+
+    companion object {
+        /** The occasion that fits the time of day best (used as the default selection on Home). */
+        fun suggestedFor(bucket: String): MixType = when (bucket) {
+            "morning" -> MORNING
+            "afternoon" -> FOCUS
+            "evening" -> DRIVING
+            else -> NIGHT
+        }
+    }
 }
 
 data class SmartMix(val type: MixType, val tracks: List<Recommendation>) {
@@ -101,6 +118,32 @@ object SmartMixGenerator {
 
         MixType.CHILL -> scored.filter { isCalm(it.track) }.take(limit)
 
+        MixType.WORKOUT -> scored.filter { r ->
+            val t = r.track
+            t.moodTag != SAD && t.durationMs >= 90_000 && (t.moodTag == ENERGETIC || (t.energyLevel != null && t.energyLevel >= 0.65f))
+        }.sortedByDescending { it.score + tempoBonus(it.track, 110..175) }.take(limit)
+
+        MixType.DRIVING -> scored.filter { r ->
+            val t = r.track
+            val e = t.energyLevel
+            t.moodTag != SAD && t.durationMs >= 150_000 &&
+                (t.moodTag == ENERGETIC || t.moodTag == HAPPY || (e != null && e in 0.4f..0.8f)) &&
+                (t.bpm == null || t.bpm in 80..150)
+        }.take(limit)
+
+        MixType.HAPPY -> scored.filter { r ->
+            val t = r.track
+            t.moodTag == HAPPY || (t.moodTag != SAD && t.moodTag != CALM && t.energyLevel != null && t.energyLevel >= 0.5f && (t.bpm ?: 100) >= 100)
+        }.take(limit)
+
+        MixType.SAD -> scored.filter { it.track.moodTag == SAD }.take(limit)
+
+        MixType.MORNING -> scored.filter { r ->
+            val t = r.track
+            val e = t.energyLevel
+            t.moodTag != SAD && t.durationMs >= 120_000 && e != null && e in 0.35f..0.7f
+        }.take(limit)
+
         MixType.ENERGETIC -> scored.filter { isEnergetic(it.track) }.take(limit)
 
         MixType.FOCUS -> scored.filter {
@@ -116,6 +159,8 @@ object SmartMixGenerator {
 
         MixType.RANDOM_FROM_TASTE -> weightedSample(scored.take(200), limit, seed = nowMs / DAY_MS)
     }
+
+    private fun tempoBonus(t: TrackEntity, range: IntRange): Double = if (t.bpm != null && t.bpm in range) 0.6 else 0.0
 
     private fun isCalm(t: TrackEntity) = t.moodTag == CALM || (t.energyLevel != null && t.energyLevel < 0.4f)
     private fun isEnergetic(t: TrackEntity) =

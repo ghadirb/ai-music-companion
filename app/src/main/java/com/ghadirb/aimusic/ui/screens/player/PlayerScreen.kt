@@ -55,6 +55,7 @@ fun PlayerScreen(
     val similarTracks by playerViewModel.similarTracks.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
     val lyricsHasFolder by playerViewModel.lyricsHasFolder.collectAsState()
+    val allFilesAccess by playerViewModel.allFilesAccess.collectAsState()
     val onlineAiMessage by playerViewModel.onlineAiMessage.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
     val sleepState by playerViewModel.sleepTimer.collectAsState()
@@ -70,11 +71,21 @@ fun PlayerScreen(
         if (uri != null) playerViewModel.addLyricsFolder(uri)
     }
 
-    // Poll playback position once a second while this screen is visible (display only).
+    // Returning from the system "All files access" screen: re-check and reload lyrics automatically.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) playerViewModel.refreshStorageAccess()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Poll playback position while this screen is visible (display only).
     LaunchedEffect(Unit) {
         while (true) {
             playerViewModel.refreshProgress()
-            delay(1000)
+            delay(300) // fine enough for line-by-line lyric highlighting
         }
     }
 
@@ -197,6 +208,17 @@ fun PlayerScreen(
 
         SleepTimerStatus(sleepState, onCancel = playerViewModel::cancelSleepTimer)
 
+        LyricsCard(
+            state = lyrics,
+            positionMs = uiState.positionMs,
+            hasFolder = lyricsHasFolder,
+            allFilesAccess = allFilesAccess,
+            onExpand = { showLyrics = true },
+            onSeek = playerViewModel::seekTo,
+            onImportFile = { importLauncher.launch(arrayOf("*/*")) },
+            onPickFolder = { folderLauncher.launch(null) }
+        )
+
         if (similarTracks.isNotEmpty()) {
             Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -218,10 +240,12 @@ fun PlayerScreen(
     }
 
     if (showLyrics) {
-        LyricsDialog(
+        LyricsFullScreen(
+            title = currentTrack.title,
             state = lyrics,
             positionMs = uiState.positionMs,
             hasFolder = lyricsHasFolder,
+            allFilesAccess = allFilesAccess,
             onDismiss = { showLyrics = false },
             onSeek = playerViewModel::seekTo,
             onImportFile = { importLauncher.launch(arrayOf("*/*")) },
@@ -407,79 +431,6 @@ private fun QueueSheet(
 }
 
 private fun Modifier.clickableRow(onClick: () -> Unit): Modifier = this.clickable(onClick = onClick)
-
-@Composable
-private fun LyricsDialog(
-    state: LyricsState,
-    positionMs: Long,
-    hasFolder: Boolean,
-    onDismiss: () -> Unit,
-    onSeek: (Long) -> Unit,
-    onImportFile: () -> Unit,
-    onPickFolder: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
-            when (state) {
-                LyricsState.Loading -> Column(
-                    Modifier.fillMaxWidth().padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator()
-                    Text("در حال جستجوی متن آهنگ…", modifier = Modifier.padding(top = 16.dp))
-                }
-                LyricsState.NotFound -> Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("متن آهنگ پیدا نشد", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "فایل .lrc را برای همین آهنگ انتخاب کنید، یا پوشهٔ موسیقی را یک‌بار انتخاب کنید تا متن‌ها خودکار پیدا شوند. " +
-                            "فایل‌ها فقط روی همین دستگاه خوانده می‌شوند.",
-                        modifier = Modifier.padding(top = 12.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Button(onClick = onImportFile, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                        Text("انتخاب فایل LRC برای این آهنگ")
-                    }
-                    OutlinedButton(onClick = onPickFolder, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                        Text(if (hasFolder) "افزودن پوشهٔ دیگر" else "انتخاب پوشهٔ موسیقی/متن‌ها")
-                    }
-                    TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 4.dp)) { Text("بستن") }
-                }
-                is LyricsState.Found -> {
-                    val lines = state.parsed.lines
-                    val synced = state.parsed.synced
-                    val activeIndex = if (synced) lines.indexOfLast { it.timeMs <= positionMs } else -1
-                    val listState = rememberLazyListState()
-                    LaunchedEffect(activeIndex) {
-                        if (activeIndex >= 0) listState.animateScrollToItem((activeIndex - 2).coerceAtLeast(0))
-                    }
-                    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(if (synced) "متن همگام" else "متن آهنگ", style = MaterialTheme.typography.titleLarge)
-                            TextButton(onClick = onDismiss) { Text("بستن") }
-                        }
-                        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
-                            itemsIndexed(lines, key = { index, _ -> index }) { index, line ->
-                                val active = index == activeIndex
-                                val lineModifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
-                                Text(
-                                    line.text,
-                                    modifier = if (synced) lineModifier.clickableRow { onSeek(line.timeMs) } else lineModifier,
-                                    style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
-                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (active) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 private fun formatMs(ms: Long): String {
     val totalSeconds = ms / 1000

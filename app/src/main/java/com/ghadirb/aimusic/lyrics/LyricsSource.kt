@@ -35,11 +35,13 @@ class LyricsSource(context: Context) {
 
     /** Raw decoded text of the best matching lyrics file, or null. Blocking — call off the main thread. */
     fun readRawText(track: TrackEntity): String? {
-        val bytes = try { readBytes(track) } catch (e: Exception) {
+        val sidecar = try { readBytes(track) } catch (e: Exception) {
             Log.w(TAG, "Lyrics lookup failed: ${e.javaClass.simpleName}")
             null
         }
-        return bytes?.let { LrcParser.decode(it) }
+        if (sidecar != null) return LrcParser.decode(sidecar)
+        // No .lrc found next to the song: fall back to lyrics embedded in the file's own tags.
+        return embeddedRead(track)
     }
 
     private fun readBytes(track: TrackEntity): ByteArray? {
@@ -105,19 +107,35 @@ class LyricsSource(context: Context) {
 
     private fun directRead(track: TrackEntity, names: List<String>): ByteArray? {
         val dir = track.folderPath?.takeIf { it.isNotBlank() }?.let(::File) ?: return null
+        // 1) Exact names (works on Android <= 9 and wherever the file is readable).
         for (name in names) {
             try {
                 val file = File(dir, name)
                 if (file.isFile && file.canRead()) return file.inputStream().use(::readLimited)
             } catch (_: Exception) { /* not readable under scoped storage: try the next strategy */ }
         }
-        // Case-insensitive match (".LRC", different capitalisation).
+        // 2) Tolerant name match against every .lrc in the song's folder (case, Persian letter variants, numbering).
         return try {
-            val wanted = names.map { it.lowercase() }.toSet()
-            dir.listFiles()?.firstOrNull { it.isFile && it.name.lowercase() in wanted && it.canRead() }
-                ?.inputStream()?.use(::readLimited)
+            val index = directoryIndex(dir) ?: return null
+            val keys = LyricsFileMatcher.keysFor(names.firstOrNull()?.removeSuffix(".lrc"), track.title, track.artist)
+            val picked = LyricsFileMatcher.pick(index.keys, keys) ?: return null
+            index[picked]?.takeIf { it.canRead() }?.inputStream()?.use(::readLimited)
         } catch (_: Exception) { null }
     }
+
+    /** name -> file for the .lrc files of [dir]; cached briefly because a folder is queried once per song. */
+    private fun directoryIndex(dir: File): Map<String, File>? {
+        val now = System.currentTimeMillis()
+        dirCache[dir.path]?.let { (at, map) -> if (now - at < DIR_CACHE_MS) return map }
+        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".lrc", ignoreCase = true) } ?: return null
+        val map = files.associateBy { it.name }
+        dirCache[dir.path] = now to map
+        return map
+    }
+
+    private fun embeddedRead(track: TrackEntity): String? = try {
+        appContext.contentResolver.openInputStream(Uri.parse(track.path))?.use { EmbeddedLyricsReader.read(it) }
+    } catch (_: Exception) { null }
 
     private fun mediaStoreRead(track: TrackEntity, names: List<String>): ByteArray? {
         val filesUri = MediaStore.Files.getContentUri("external")
@@ -139,10 +157,11 @@ class LyricsSource(context: Context) {
 
     private fun safRead(track: TrackEntity, names: List<String>): ByteArray? {
         val folderName = track.folderPath?.let { File(it).name }.orEmpty()
+        val keys = LyricsFileMatcher.keysFor(names.firstOrNull()?.removeSuffix(".lrc"), track.title, track.artist)
         for (tree in folders()) {
             val index = treeIndex.getOrPut(tree) { buildIndex(Uri.parse(tree)) }
-            for (name in names) {
-                val matches = index[name.lowercase()] ?: continue
+            for (key in keys) {
+                val matches = index[key] ?: continue
                 val chosen = matches.firstOrNull { folderName.isNotEmpty() && it.toString().contains(Uri.encode(folderName)) }
                     ?: matches.first()
                 try {
@@ -178,8 +197,9 @@ class LyricsSource(context: Context) {
                         if (c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) {
                             if (depth < MAX_DEPTH) stack.addLast(id to depth + 1)
                         } else if (name.endsWith(".lrc", ignoreCase = true)) {
-                            result.getOrPut(name.lowercase()) { mutableListOf() }
-                                .add(DocumentsContract.buildDocumentUriUsingTree(tree, id))
+                            LyricsFileMatcher.keyOfFile(name)?.let { key ->
+                                result.getOrPut(key) { mutableListOf() }.add(DocumentsContract.buildDocumentUriUsingTree(tree, id))
+                            }
                         }
                     }
                 }
@@ -212,5 +232,7 @@ class LyricsSource(context: Context) {
         const val MAX_DEPTH = 8
         const val MAX_INDEXED_ENTRIES = 60_000
         val treeIndex = ConcurrentHashMap<String, Map<String, List<Uri>>>()
+        val dirCache = ConcurrentHashMap<String, Pair<Long, Map<String, File>>>()
+        const val DIR_CACHE_MS = 5 * 60_000L
     }
 }
