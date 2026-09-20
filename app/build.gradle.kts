@@ -12,6 +12,11 @@ val myketPublicKey = providers.gradleProperty("MYKET_IAB_PUBLIC_KEY").orElse("")
 val myketPremiumSku = providers.gradleProperty("MYKET_PREMIUM_SKU").orElse("premium_lifetime").get()
 val escapedMyketPublicKey = myketPublicKey.replace("\\", "\\\\").replace("\"", "\\\"")
 val escapedMyketPremiumSku = myketPremiumSku.replace("\\", "\\\\").replace("\"", "\\\"")
+val myketPremiumSkus = providers.gradleProperty("MYKET_PREMIUM_SKUS").orElse(myketPremiumSku).get()
+    .replace("\\", "\\\\").replace("\"", "\\\"")
+// Public key (X.509 SPKI, base64) used to verify server-signed entitlement tokens offline. Not a secret.
+val entitlementPublicKey = providers.gradleProperty("ENTITLEMENT_PUBLIC_KEY").orElse("").get()
+    .replace("\\", "\\\\").replace("\"", "\\\"")
 val cloudAiBaseUrl = providers.gradleProperty("CLOUD_AI_BASE_URL")
     .orElse("https://ai-music-companion-embedding.ghadir-baraty.workers.dev")
     .get().trimEnd('/').replace("\\", "\\\\").replace("\"", "\\\"")
@@ -39,6 +44,8 @@ android {
         buildConfigField("String", "IAB_PUBLIC_KEY", "\"$escapedMyketPublicKey\"")
         buildConfigField("String", "MYKET_PREMIUM_SKU", "\"$escapedMyketPremiumSku\"")
         buildConfigField("String", "CLOUD_AI_BASE_URL", "\"$cloudAiBaseUrl\"")
+        buildConfigField("String", "MYKET_PREMIUM_SKUS", "\"$myketPremiumSkus\"")
+        buildConfigField("String", "ENTITLEMENT_PUBLIC_KEY", "\"$entitlementPublicKey\"")
     }
 
     buildTypes {
@@ -114,6 +121,7 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))

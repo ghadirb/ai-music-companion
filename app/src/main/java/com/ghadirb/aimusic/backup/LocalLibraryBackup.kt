@@ -1,88 +1,77 @@
 package com.ghadirb.aimusic.backup
 
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
-import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
+import com.ghadirb.aimusic.BuildConfig
 import com.ghadirb.aimusic.data.repository.MusicRepository
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
- * Portable, local-only backup. Audio files and listening history never leave
- * the device; only paths of favourites, playlists and taste settings are
- * stored. Restore merges into the current library and ignores missing songs.
+ * Local-only backup/restore. Never includes audio files, tokens, purchases or the cloud-AI consent.
+ * Restore validates the file, checks version compatibility, matches songs by path OR metadata (so it also
+ * works on a new device), merges playlists with the same name instead of duplicating them, skips
+ * history that already exists, and applies everything in one transaction.
  */
-class LocalLibraryBackup(private val repository: MusicRepository) {
+class LocalLibraryBackup(private val repository: MusicRepository, private val context: Context? = null) {
+
     suspend fun exportTo(resolver: ContentResolver, destination: Uri) {
         val tracks = repository.allTracksSnapshot()
-        val root = JSONObject().put("format", FORMAT).put("version", 1)
-        root.put("favoritePaths", JSONArray(tracks.filter { it.isFavorite }.map { it.path }))
-        repository.getUserPreference()?.let { root.put("tasteProfile", preferenceToJson(it)) }
+        val byId = tracks.associateBy { it.id }
+        fun ref(t: com.ghadirb.aimusic.data.local.entity.TrackEntity) = TrackRef(t.path, t.title, t.artist, t.album, t.durationMs)
 
-        val playlists = JSONArray()
-        repository.getAllPlaylists().forEach { playlist ->
-            val paths = repository.getTracksInPlaylist(playlist.id).map { it.path }
-            playlists.put(JSONObject().put("name", playlist.name).put("trackPaths", JSONArray(paths)))
+        val playlists = repository.getAllPlaylists().map { playlist ->
+            BackupPlaylist(playlist.name, repository.getTracksInPlaylist(playlist.id).map(::ref))
         }
-        root.put("playlists", playlists)
-        resolver.openOutputStream(destination)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(root.toString()) }
-            ?: error("Cannot open the selected backup file")
+        val history = repository.recentHistory(BackupCodec.MAX_HISTORY).mapNotNull { h ->
+            byId[h.trackId]?.let { BackupHistoryEntry(ref(it), h.startTime, h.listenDurationMs, h.completedPercentage, h.skipped, h.replayCount) }
+        }
+        val darkTheme = context?.getSharedPreferences("ui_preferences", Context.MODE_PRIVATE)?.getBoolean("dark_theme", true)
+        val data = BackupData(
+            createdAt = System.currentTimeMillis(),
+            appVersion = BuildConfig.VERSION_NAME,
+            favorites = tracks.filter { it.isFavorite }.map(::ref),
+            playlists = playlists,
+            history = history,
+            tasteProfile = repository.getUserPreference(),
+            settings = darkTheme?.let { mapOf("dark_theme" to it.toString()) }.orEmpty()
+        )
+        val text = BackupCodec.encode(data)
+        resolver.openOutputStream(destination)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(text) }
+            ?: throw BackupException("فایل مقصد بکاپ باز نشد.")
     }
 
     suspend fun restoreFrom(resolver: ContentResolver, source: Uri): RestoreSummary {
-        val text = resolver.openInputStream(source)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
-            ?: error("Cannot read the selected backup file")
-        val root = JSONObject(text)
-        require(root.optString("format") == FORMAT) { "این فایل، بکاپ این برنامه نیست." }
-        val knownTracks = repository.allTracksSnapshot().associateBy { it.path }
-        val favorites = root.optJSONArray("favoritePaths").stringList().filter { it in knownTracks }
-        repository.restoreFavoritePaths(favorites)
-
-        root.optJSONObject("tasteProfile")?.let { profile -> repository.saveUserPreference(profile.toPreference()) }
-
-        var importedPlaylists = 0
-        var linkedTracks = 0
-        root.optJSONArray("playlists").forEachObject { playlistJson ->
-            val name = playlistJson.optString("name").trim().take(80)
-            if (name.isBlank()) return@forEachObject
-            val playlistId = repository.createPlaylist("$name (بازیابی‌شده)")
-            playlistJson.optJSONArray("trackPaths").stringList().forEach { path ->
-                knownTracks[path]?.let { track ->
-                    repository.addTrackToPlaylist(playlistId, track.id)
-                    linkedTracks++
-                }
+        val text = resolver.openInputStream(source)?.use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(16 * 1024)
+            var total = 0
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                total += n
+                if (total > BackupCodec.MAX_BYTES) throw BackupException("فایل بکاپ بیش از حد بزرگ است.")
+                out.write(buffer, 0, n)
             }
-            importedPlaylists++
+            String(out.toByteArray(), Charsets.UTF_8)
+        } ?: throw BackupException("فایل بکاپ خوانده نشد.")
+
+        val data = BackupCodec.decode(text)
+        val localTracks = repository.allTracksSnapshot()
+        val existingPlaylists = repository.getAllPlaylists().associate { p ->
+            p.name.lowercase() to (p.id to repository.getTracksInPlaylist(p.id).map { it.id }.toSet())
         }
-        return RestoreSummary(favorites.size, importedPlaylists, linkedTracks)
+        val existingHistory = repository.recentHistory(BackupCodec.MAX_HISTORY * 2).map { it.trackId to it.startTime }.toSet()
+        val plan = BackupMerger.plan(data, localTracks, existingPlaylists, existingHistory, repository.getUserPreference() != null)
+
+        repository.applyRestorePlan(plan, data.tasteProfile)
+        return RestoreSummary(
+            favorites = plan.favoriteIds.size,
+            playlistsCreated = plan.playlists.count { it.existingId == null },
+            playlistsMerged = plan.playlists.count { it.existingId != null },
+            tracksLinked = plan.playlists.sumOf { it.trackIds.size },
+            historyEntries = plan.history.size,
+            unmatchedTracks = plan.unmatchedTracks,
+            darkTheme = plan.settings["dark_theme"]?.toBooleanStrictOrNull()
+        )
     }
-
-    private fun preferenceToJson(value: UserPreferenceEntity) = JSONObject()
-        .put("favoriteArtists", value.favoriteArtists)
-        .put("favoriteGenres", value.favoriteGenres)
-        .put("favoriteEnergyLevel", value.favoriteEnergyLevel)
-        .put("preferredDurationMs", value.preferredDurationMs)
-        .put("preferredTimeOfDay", value.preferredTimeOfDay)
-
-    private fun JSONObject.toPreference() = UserPreferenceEntity(
-        favoriteArtists = optString("favoriteArtists"),
-        favoriteGenres = optString("favoriteGenres"),
-        favoriteEnergyLevel = optString("favoriteEnergyLevel", "unknown"),
-        preferredDurationMs = optLong("preferredDurationMs"),
-        preferredTimeOfDay = optString("preferredTimeOfDay", "unknown")
-    )
-
-    private fun JSONArray?.stringList(): List<String> {
-        if (this == null) return emptyList()
-        return buildList { for (index in 0 until length()) optString(index).takeIf { it.isNotBlank() }?.let(::add) }
-    }
-
-    private inline fun JSONArray?.forEachObject(action: (JSONObject) -> Unit) {
-        if (this == null) return
-        for (index in 0 until length()) optJSONObject(index)?.let(action)
-    }
-
-    companion object { private const val FORMAT = "ai-music-companion-backup" }
 }
-
-data class RestoreSummary(val favorites: Int, val playlists: Int, val tracksLinked: Int)

@@ -31,8 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.backup.LocalLibraryBackup
-import com.ghadirb.aimusic.billing.MyketBillingClient
-import com.ghadirb.aimusic.billing.MyketBillingState
+import com.ghadirb.aimusic.cloud.CloudConsent
+import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
+import androidx.compose.foundation.clickable
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.embedding.OnlineSimilarityRanker
 import kotlinx.coroutines.launch
@@ -44,15 +45,17 @@ fun SettingsScreen(
     onThemeChange: (Boolean) -> Unit,
     notificationsNeedPermission: Boolean,
     onRequestNotificationPermission: () -> Unit,
-    myketBillingClient: MyketBillingClient
+    onOpenPremium: () -> Unit = {},
+    onOpenStats: () -> Unit = {}
 ) {
     val profile by repository.observeUserPreferenceFlow().collectAsState(initial = null)
-    val billingState by myketBillingClient.state.collectAsState()
+    val premiumAccess = LocalPremiumAccess.current
+    val entitlement by (premiumAccess?.entitlement ?: kotlinx.coroutines.flow.MutableStateFlow(com.ghadirb.aimusic.premium.Entitlement.FREE)).collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val backup = remember(repository) { LocalLibraryBackup(repository) }
-    val cloudAiPreferences = remember { context.getSharedPreferences(OnlineSimilarityRanker.PREFS, android.content.Context.MODE_PRIVATE) }
-    var cloudAiEnabled by remember { mutableStateOf(cloudAiPreferences.getBoolean(OnlineSimilarityRanker.CONSENT_KEY, false)) }
+    val backup = remember(repository) { LocalLibraryBackup(repository, context) }
+    val cloudConsent = remember { CloudConsent(context) }
+    var cloudAiEnabled by remember { mutableStateOf(cloudConsent.enabled) }
     var backupMessage by remember { mutableStateOf<String?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -70,7 +73,13 @@ fun SettingsScreen(
         scope.launch {
             backupMessage = try {
                 val result = backup.restoreFrom(context.contentResolver, uri)
-                "بازیابی انجام شد: ${result.favorites} علاقه‌مندی، ${result.playlists} پلی‌لیست و ${result.tracksLinked} آهنگ متصل شد."
+                result.darkTheme?.let(onThemeChange)
+                buildString {
+                    append("بازیابی انجام شد: ${result.favorites} علاقه‌مندی، ${result.playlistsCreated} پلی‌لیست جدید")
+                    if (result.playlistsMerged > 0) append("، ${result.playlistsMerged} پلی‌لیست ادغام‌شده")
+                    append("، ${result.tracksLinked} آهنگ به پلی‌لیست‌ها اضافه شد و ${result.historyEntries} مورد تاریخچه.")
+                    if (result.unmatchedTracks > 0) append(" ${result.unmatchedTracks} آهنگ در کتابخانهٔ فعلی پیدا نشد.")
+                }
             } catch (error: Exception) {
                 error.message ?: "بازیابی فایل انجام نشد."
             }
@@ -114,13 +123,13 @@ fun SettingsScreen(
 
         ListItem(
             headlineContent = { Text("AI آنلاین برای پیشنهاد مشابه (بتا)") },
-            supportingContent = { Text("با فعال‌سازی، فقط نام آهنگ، خواننده، آلبوم، ژانر، BPM و برچسب حال‌و‌هوا برای رتبه‌بندی شباهت به سرور پروژه فرستاده می‌شود؛ فایل صوتی و متن LRC ارسال نمی‌شود. سهمیهٔ رایگان: ۸ درخواست در روز.") },
+            supportingContent = { Text("با فعال‌سازی، فقط نام آهنگ، خواننده، آلبوم، ژانر، BPM و برچسب حال‌و‌هوا برای رتبه‌بندی شباهت به سرور پروژه فرستاده می‌شود؛ فایل صوتی و متن LRC ارسال نمی‌شود. سهمیهٔ روزانه توسط سرور اعمال می‌شود (رایگان: ۸ درخواست، پرمیوم: بیشتر). این اجازه برای AI DJ هم لازم است و در آن فقط متن درخواست شما ارسال می‌شود.") },
             trailingContent = {
                 Switch(
                     checked = cloudAiEnabled,
                     onCheckedChange = { enabled ->
                         cloudAiEnabled = enabled
-                        cloudAiPreferences.edit().putBoolean(OnlineSimilarityRanker.CONSENT_KEY, enabled).apply()
+                        cloudConsent.enabled = enabled
                     }
                 )
             }
@@ -131,24 +140,24 @@ fun SettingsScreen(
             headlineContent = { Text(stringResource(R.string.premium_title)) },
             supportingContent = {
                 Text(
-                    when (billingState) {
-                        MyketBillingState.NotConfigured -> stringResource(R.string.premium_setup_needed)
-                        MyketBillingState.Connecting -> "در حال اتصال امن به مایکت…"
-                        MyketBillingState.Ready -> "محصول آماده است؛ شروع خرید پس از دریافت توکن یک‌بارمصرفِ سرور فعال می‌شود."
-                        MyketBillingState.PurchaseInProgress -> "فرایند پرداخت مایکت در حال انجام است…"
-                        MyketBillingState.NeedsSecureCheckout -> "برای جلوگیری از تقلب، ابتدا باید سرویس امن صدور توکن خرید پیکربندی شود."
-                        MyketBillingState.RestoreRequiresServerVerification -> "خرید قبلی پیدا شد و برای فعال‌سازی، منتظر تأیید امن سرور است."
-                        is MyketBillingState.AwaitingServerVerification -> "پرداخت ثبت شد و در انتظار تأیید امن سرور است."
-                        is MyketBillingState.Error -> "اتصال خرید در حال حاضر در دسترس نیست."
-                    }
+                    if (entitlement.isPremiumAt(System.currentTimeMillis())) "پرمیوم فعال است ✅"
+                    else "رایگان — مشاهدهٔ مزایا، خرید و بازیابی خرید"
                 )
-            }
+            },
+            modifier = Modifier.clickable(onClick = onOpenPremium)
+        )
+        HorizontalDivider()
+
+        ListItem(
+            headlineContent = { Text("آمار شنیدن") },
+            supportingContent = { Text("آمار پایه رایگان است؛ آمار و بینش‌های پیشرفته ویژهٔ پرمیوم است.") },
+            modifier = Modifier.clickable(onClick = onOpenStats)
         )
         HorizontalDivider()
 
         ListItem(
             headlineContent = { Text("بکاپ و بازیابی محلی") },
-            supportingContent = { Text("فقط پلی‌لیست‌ها، علاقه‌مندی‌ها و پروفایل سلیقه ذخیره می‌شود؛ هیچ فایل موسیقی یا سابقهٔ شنیدن صادر نمی‌شود.") },
+            supportingContent = { Text("پلی‌لیست‌ها، علاقه‌مندی‌ها، تاریخچهٔ شنیدن، پروفایل سلیقه و تم برنامه ذخیره می‌شود؛ هیچ فایل موسیقی، توکن یا خریدی در بکاپ نیست. هنگام بازیابی، آهنگ‌ها حتی روی دستگاه جدید با نام و خواننده پیدا می‌شوند و پلی‌لیست هم‌نام ادغام می‌شود.") },
             trailingContent = {
                 Column {
                     TextButton(onClick = { exportLauncher.launch("ai-music-companion-backup.json") }) { Text("بکاپ") }

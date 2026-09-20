@@ -40,7 +40,20 @@ import androidx.navigation.navArgument
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
-import com.ghadirb.aimusic.billing.MyketBillingClient
+import com.ghadirb.aimusic.billing.MyketBillingGateway
+import com.ghadirb.aimusic.premium.PremiumFeature
+import com.ghadirb.aimusic.billing.PurchaseUiState
+import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
+import com.ghadirb.aimusic.ui.premium.PremiumAccess
+import com.ghadirb.aimusic.ui.premium.PremiumScreen
+import com.ghadirb.aimusic.ui.premium.PremiumViewModel
+import com.ghadirb.aimusic.ui.premium.UpgradeDialog
+import com.ghadirb.aimusic.ui.screens.smartplaylist.SmartPlaylistScreen
+import com.ghadirb.aimusic.ui.screens.stats.StatisticsScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.compose.ui.platform.LocalContext
 import com.ghadirb.aimusic.ui.components.LocalQueueActions
 import com.ghadirb.aimusic.ui.components.MiniPlayerBar
 import com.ghadirb.aimusic.ui.components.QueueActions
@@ -49,6 +62,9 @@ import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ALBUM_DETAIL
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ARTIST_DETAIL
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYER
+import com.ghadirb.aimusic.ui.navigation.ROUTE_PREMIUM
+import com.ghadirb.aimusic.ui.navigation.ROUTE_SMART_PLAYLIST
+import com.ghadirb.aimusic.ui.navigation.ROUTE_STATS
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYLIST_DETAIL
 import com.ghadirb.aimusic.ui.navigation.Screen
 import com.ghadirb.aimusic.ui.navigation.albumDetailRoute
@@ -72,13 +88,14 @@ import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
     private var openPlayerRequest by mutableStateOf(false)
-    private lateinit var myketBillingClient: MyketBillingClient
+    private lateinit var billingGateway: MyketBillingGateway
 
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as AiMusicApp
-        myketBillingClient = MyketBillingClient(this)
+        billingGateway = MyketBillingGateway(this)
+        app.purchases.gateway = billingGateway
         openPlayerRequest = intent.getBooleanExtra("open_player", false)
         val uiPreferences = getSharedPreferences("ui_preferences", MODE_PRIVATE)
 
@@ -91,7 +108,6 @@ class MainActivity : ComponentActivity() {
                         openPlayerOnLaunch = openPlayerRequest,
                         onPlayerOpened = { openPlayerRequest = false },
                         darkTheme = darkTheme,
-                        myketBillingClient = myketBillingClient,
                         onThemeChange = { enabled ->
                             darkTheme = enabled
                             uiPreferences.edit().putBoolean("dark_theme", enabled).apply()
@@ -108,8 +124,19 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra("open_player", false)) openPlayerRequest = true
     }
 
+    @Deprecated("Required to complete the Myket checkout flow")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (::billingGateway.isInitialized && billingGateway.handleActivityResult(requestCode, resultCode, data)) return
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun onDestroy() {
-        if (::myketBillingClient.isInitialized) myketBillingClient.dispose()
+        if (::billingGateway.isInitialized) {
+            billingGateway.dispose()
+            val app = application as AiMusicApp
+            if (app.purchases.gateway === billingGateway) app.purchases.gateway = null
+        }
         super.onDestroy()
     }
 }
@@ -121,8 +148,7 @@ private fun AppRoot(
     openPlayerOnLaunch: Boolean = false,
     onPlayerOpened: () -> Unit,
     darkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit,
-    myketBillingClient: MyketBillingClient
+    onThemeChange: (Boolean) -> Unit
 ) {
     val audioPermission = rememberPermissionState(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -142,7 +168,6 @@ private fun AppRoot(
             onPlayerOpened = onPlayerOpened,
             darkTheme = darkTheme,
             onThemeChange = onThemeChange,
-            myketBillingClient = myketBillingClient,
             notificationsNeedPermission = notificationsNeedPermission,
             onRequestNotificationPermission = { notificationPermission.launchPermissionRequest() }
         )
@@ -176,12 +201,26 @@ private fun MainScaffold(
     onPlayerOpened: () -> Unit,
     darkTheme: Boolean,
     onThemeChange: (Boolean) -> Unit,
-    myketBillingClient: MyketBillingClient,
     notificationsNeedPermission: Boolean,
     onRequestNotificationPermission: () -> Unit
 ) {
     val navController = rememberNavController()
     val playerViewModel = rememberPlayerViewModel(repository)
+    val context = LocalContext.current
+    val app = context.applicationContext as AiMusicApp
+    val premiumViewModel: PremiumViewModel = viewModel(
+        factory = viewModelFactory { initializer { PremiumViewModel(app.entitlements, app.purchases) } }
+    )
+    var upgradeFeature by remember { mutableStateOf<PremiumFeature?>(null) }
+    val purchaseState by premiumViewModel.purchaseState.collectAsState()
+    val premiumAccess = remember(premiumViewModel) {
+        PremiumAccess(premiumViewModel.entitlement, premiumViewModel::isAllowed) { feature -> upgradeFeature = feature }
+    }
+    // Refresh the plan in the background only if a (cached, offline-verified) premium token is close to expiry.
+    LaunchedEffect(Unit) { if (app.entitlements.needsRefresh()) premiumViewModel.refresh() }
+    LaunchedEffect(purchaseState) {
+        if (purchaseState is PurchaseUiState.Success && upgradeFeature != null) upgradeFeature = null
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val playerUiState by playerViewModel.uiState.collectAsState()
@@ -216,6 +255,9 @@ private fun MainScaffold(
     val screenTitle = when {
         currentRoute == null -> stringResource(R.string.app_name)
         currentRoute == ROUTE_PLAYER -> "در حال پخش"
+        currentRoute == ROUTE_PREMIUM -> "پرمیوم"
+        currentRoute == ROUTE_STATS -> "آمار"
+        currentRoute == ROUTE_SMART_PLAYLIST -> "پلی‌لیست هوشمند"
         currentRoute == ROUTE_PLAYLIST_DETAIL ->
             backStackEntry?.arguments?.getString("playlistName")
                 ?.let { URLDecoder.decode(it, "UTF-8") } ?: "پلی‌لیست"
@@ -272,14 +314,20 @@ private fun MainScaffold(
             }
         }
     ) { padding ->
-        CompositionLocalProvider(LocalQueueActions provides queueActions) {
+        CompositionLocalProvider(LocalQueueActions provides queueActions, LocalPremiumAccess provides premiumAccess) {
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(padding)
         ) {
             composable(Screen.Home.route) {
-                HomeScreen(repository = repository, onTrackClick = ::openPlayer)
+                HomeScreen(
+                    repository = repository,
+                    onTrackClick = ::openPlayer,
+                    onOpenSmartPlaylist = { navController.navigate(ROUTE_SMART_PLAYLIST) { launchSingleTop = true } },
+                    onOpenStats = { navController.navigate(ROUTE_STATS) { launchSingleTop = true } },
+                    onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } }
+                )
             }
             composable(Screen.Library.route) {
                 LibraryScreen(
@@ -323,7 +371,19 @@ private fun MainScaffold(
                     onThemeChange = onThemeChange,
                     notificationsNeedPermission = notificationsNeedPermission,
                     onRequestNotificationPermission = onRequestNotificationPermission,
-                    myketBillingClient = myketBillingClient
+                    onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } },
+                    onOpenStats = { navController.navigate(ROUTE_STATS) { launchSingleTop = true } }
+                )
+            }
+            composable(ROUTE_PREMIUM) { PremiumScreen(premiumViewModel) }
+            composable(ROUTE_STATS) { StatisticsScreen(repository) }
+            composable(ROUTE_SMART_PLAYLIST) {
+                SmartPlaylistScreen(
+                    repository = repository,
+                    cloudApi = app.cloudApi,
+                    cloudConsent = app.cloudConsent,
+                    currentTrackId = playerUiState.currentTrack?.id,
+                    onTrackClick = ::openPlayer
                 )
             }
             composable(ROUTE_PLAYER) {
@@ -367,6 +427,17 @@ private fun MainScaffold(
             }
         }
         }
+    }
+
+    upgradeFeature?.let { feature ->
+        UpgradeDialog(
+            feature = feature,
+            purchaseState = purchaseState,
+            skus = premiumViewModel.offeredSkus,
+            onBuy = premiumViewModel::buy,
+            onRestore = premiumViewModel::restore,
+            onDismiss = { upgradeFeature = null; premiumViewModel.resetPurchaseState() }
+        )
     }
 }
 

@@ -1,41 +1,38 @@
-# Secure embedding gateway
+# AI Music Companion — Gateway (Cloudflare Worker)
 
-This Worker is an optional server-side gateway for GapGPT embeddings. It keeps
-`GAPGPT_API_KEY` outside the Android APK and Git history.
+The only place where provider keys, Myket credentials and the entitlement signing key exist.
+The Android app never contains an API secret; it talks to this Worker over HTTPS.
 
-It deliberately requires a short-lived HS256 JWT. Before deployment, connect
-the application to a real authentication/entitlement service that issues those
-tokens. Do not replace the JWT check with a static token in the mobile app.
+## Endpoints (all `POST`, JSON, `Authorization: Bearer <session>` except session)
 
-Only send user-approved text metadata. Local `.lrc` content is private by
-default and must not be sent to the endpoint unless the user explicitly agrees.
+| Path | Purpose |
+|---|---|
+| `/v1/session/anonymous` | Issues a 7-day anonymous session (rate-limited per network address). |
+| `/v1/music-embedding` | Embedding for on-device "similar tracks" re-ranking (quota enforced). |
+| `/v1/dj/intent` | **Premium.** Turns a short text request into a *structured playlist intent* (the app then picks tracks locally; the model never sees the library). |
+| `/v1/myket/purchase-nonce` | Server-signed, single-use, 10-minute developer payload bound to user + SKU. |
+| `/v1/myket/verify` | Verifies a purchase with Myket, redeems the nonce once, grants the entitlement. |
+| `/v1/myket/restore` | Re-verifies a Myket purchase token after reinstall and moves the entitlement to the new identity (transfer count + cooldown limited). |
+| `/v1/entitlements/me` | Current plan, SKUs, quota and an **ES256-signed entitlement token** the app verifies offline. |
+| `GET /healthz` | Liveness. |
 
-## Myket premium purchase
+## Security model
+* **Auth**: HS256 session JWT (alg pinned, `exp` required). No static app tokens.
+* **Quota**: enforced here with a Durable Object (atomic). Free users are additionally capped per IP so minting many anonymous IDs does not multiply the quota. Failed provider calls are refunded.
+* **Premium** is decided from server-side records (KV) and delivered as a signed token; a boolean in the APK is never trusted.
+* **Replay protection**: nonces are single-use; a purchase token can belong to one identity at a time.
+* **Validation**: content-type, size limits, strict field checks, SKU whitelist, sanitized model output. Upstream error bodies are never forwarded.
+* **Logging**: request id + event only. No tokens, purchase tokens, prompts, IPs or secrets.
+* **Privacy**: the only user text sent to a provider is the DJ prompt / the short track descriptors used for embeddings; nothing is stored beyond counters.
 
-The Worker now contains the server boundary for Myket's **non-consumable**
-`premium_lifetime` product. It issues a signed, ten-minute developer payload,
-verifies the returned token directly with Myket, checks that the payload is
-bound to the authenticated user, and records the durable entitlement in KV.
-The Android app never receives `MYKET_ACCESS_TOKEN`.
+## Configuration
+Plain values live in `wrangler.toml [vars]` (quotas, SKU table). Secrets only via `wrangler secret put`:
+`GAPGPT_API_KEY`, `JWT_SIGNING_SECRET`, `MYKET_ACCESS_TOKEN`, `ENTITLEMENT_SIGNING_JWK`.
+Generate the signing key pair with `node scripts/generate-entitlement-keys.mjs` and put the public key in the Android build (`ENTITLEMENT_PUBLIC_KEY`).
 
-Before deployment, configure all of the following yourself:
-
-- A real sign-in service that issues the short-lived JWT used by this Worker.
-- Cloudflare rate limiting and a KV binding called `PURCHASE_ENTITLEMENTS`.
-- `MYKET_ACCESS_TOKEN`, `JWT_SIGNING_SECRET`, `GAPGPT_API_KEY` as secrets and
-  `MYKET_PACKAGE_NAME=com.ghadirb.aimusic` as an environment value.
-- The matching non-consumable SKU in the Myket developer panel and its public
-  RSA key as the local Gradle property `MYKET_IAB_PUBLIC_KEY`.
-
-Do not deploy the Worker until all of these are configured. Myket's current
-documentation says recurring subscriptions are not supported; a future
-recurring plan needs a provider/store that supports subscriptions.
-
-## Online AI quota
-
-After a real authenticated account service is connected, `/v1/music-embedding`
-uses the KV binding to enforce a conservative server-side quota: **8 free
-requests per UTC day** and **120 premium requests per UTC day**. The endpoint
-returns remaining quota headers and never trusts a plan flag supplied by the
-Android app. These values are product defaults and can be changed centrally in
-the Worker without releasing a new APK.
+## Develop
+```
+npm install
+npm run typecheck
+npm test
+```

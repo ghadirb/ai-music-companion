@@ -6,17 +6,29 @@ workers_dev = true
 
 [vars]
 MYKET_PACKAGE_NAME = "com.ghadirb.aimusic"
+# Quotas are configuration, enforced server-side. Change here, not in code.
 FREE_DAILY_EMBEDDING_LIMIT = "8"
 PREMIUM_DAILY_EMBEDDING_LIMIT = "120"
+FREE_IP_DAILY_FACTOR = "5"
+SESSION_LIMIT_PER_IP_DAY = "30"
+REQUEST_LIMIT_PER_MINUTE = "40"
+ENTITLEMENT_TTL_DAYS = "7"
+DJ_MODEL = "gpt-4o-mini"
+# SKU table: durationDays = null means lifetime. Add/rename SKUs here without touching code.
+PREMIUM_SKUS = '{"premium_lifetime":{"durationDays":null},"premium_monthly":{"durationDays":31},"premium_yearly":{"durationDays":366}}'
 
 [[kv_namespaces]]
 binding = "PURCHASE_ENTITLEMENTS"
 id = "08ae4a508e3d411d9c353cde59669bcf"
 
-# Set these only through Cloudflare secrets; never put their values in this file.
-# wrangler secret put GAPGPT_API_KEY
-# wrangler secret put JWT_SIGNING_SECRET
-# wrangler secret put MYKET_ACCESS_TOKEN
-# Set MYKET_PACKAGE_NAME as a non-secret environment variable and bind a KV
-# namespace named PURCHASE_ENTITLEMENTS before deployment. Do not put access
-# tokens or a Cloudflare API token in this repository or the Android app.
+# Atomic counters for quota, rate limits and single-use purchase nonces.
+[[durable_objects.bindings]]
+name = "QUOTA_COUNTER"
+class_name = "QuotaCounter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["QuotaCounter"]
+
+# Secrets (set ONLY with `wrangler secret put`, never in this file or the repository):
+#   GAPGPT_API_KEY, JWT_SIGNING_SECRET, MYKET_ACCESS_TOKEN, ENTITLEMENT_SIGNING_JWK

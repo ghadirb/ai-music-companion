@@ -130,6 +130,21 @@ class MusicRepository(
         return if (database != null) database.withTransaction { create() } else create()
     }
 
+    /** Applies a validated backup restore plan atomically (favourites, playlists merge, history, taste profile). */
+    suspend fun applyRestorePlan(plan: com.ghadirb.aimusic.backup.RestorePlan, tasteProfile: UserPreferenceEntity?) {
+        val apply: suspend () -> Unit = {
+            plan.favoriteIds.forEach { trackDao.setFavorite(it, true) }
+            plan.playlists.forEach { p ->
+                val id = p.existingId ?: playlistDao.insertPlaylist(PlaylistEntity(name = p.name))
+                var position = if (p.existingId != null) playlistDao.nextPosition(id) else 0
+                p.trackIds.forEach { trackId -> playlistDao.addTrackToPlaylist(PlaylistTrackCrossRef(id, trackId, position++)) }
+            }
+            plan.history.forEach { historyDao.insert(it) }
+            if (plan.applyTasteProfile && tasteProfile != null) preferenceDao.upsert(tasteProfile.copy(id = 0))
+        }
+        if (database != null) database.withTransaction { apply() } else apply()
+    }
+
     suspend fun deletePlaylist(playlistId: Long) = playlistDao.deletePlaylist(playlistId)
 
     suspend fun renamePlaylist(playlistId: Long, name: String) = playlistDao.renamePlaylist(playlistId, name)

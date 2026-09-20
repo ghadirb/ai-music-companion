@@ -36,7 +36,10 @@ import com.ghadirb.aimusic.recommendation.Recommendation
 @Composable
 fun HomeScreen(
     repository: MusicRepository,
-    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
+    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
+    onOpenSmartPlaylist: () -> Unit = {},
+    onOpenStats: () -> Unit = {},
+    onOpenPremium: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: HomeViewModel = viewModel(
@@ -68,6 +71,12 @@ fun HomeScreen(
                 return@Column
             }
             true -> Unit
+        }
+
+        Row(Modifier.padding(bottom = 16.dp)) {
+            AssistChip(onClick = onOpenSmartPlaylist, label = { Text("پلی‌لیست هوشمند") }, modifier = Modifier.padding(end = 8.dp))
+            AssistChip(onClick = onOpenStats, label = { Text("آمار") }, modifier = Modifier.padding(end = 8.dp))
+            AssistChip(onClick = onOpenPremium, label = { Text("پرمیوم") })
         }
 
         message?.let {

@@ -8,7 +8,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
+import com.ghadirb.aimusic.billing.PurchaseRepository
+import com.ghadirb.aimusic.cloud.CloudApi
+import com.ghadirb.aimusic.cloud.CloudConsent
 import com.ghadirb.aimusic.data.local.AppDatabase
+import com.ghadirb.aimusic.premium.EntitlementRepository
+import com.ghadirb.aimusic.premium.EntitlementTokenVerifier
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.recommendation.TasteProfileWorker
 import java.util.concurrent.TimeUnit
@@ -24,6 +29,14 @@ class AiMusicApp : Application() {
 
     lateinit var repository: MusicRepository
         private set
+
+    /** Gateway client + plan state. Created lazily: nothing here touches the network until the user uses a cloud/premium feature. */
+    val cloudApi: CloudApi by lazy { CloudApi(this) }
+    val cloudConsent: CloudConsent by lazy { CloudConsent(this) }
+    val entitlements: EntitlementRepository by lazy {
+        EntitlementRepository(this, cloudApi, EntitlementTokenVerifier(BuildConfig.ENTITLEMENT_PUBLIC_KEY))
+    }
+    val purchases: PurchaseRepository by lazy { PurchaseRepository(cloudApi, entitlements) }
 
     override fun onCreate() {
         super.onCreate()
