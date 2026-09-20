@@ -168,10 +168,10 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 20.dp, start = 16.dp)
             )
             if (preference.favoriteArtists.isNotBlank()) {
-                ListItem(headlineContent = { Text("خوانندگان محبوب") }, supportingContent = { Text(preference.favoriteArtists) })
+                ListItem(headlineContent = { Text("خوانندگان محبوب") }, supportingContent = { Text(com.ghadirb.aimusic.recommendation.ListCodec.decode(preference.favoriteArtists).joinToString("، ")) })
             }
             if (preference.favoriteGenres.isNotBlank()) {
-                ListItem(headlineContent = { Text("سبک‌های محبوب") }, supportingContent = { Text(preference.favoriteGenres) })
+                ListItem(headlineContent = { Text("سبک‌های محبوب") }, supportingContent = { Text(com.ghadirb.aimusic.recommendation.ListCodec.decode(preference.favoriteGenres).joinToString("، ")) })
             }
             if (preference.favoriteEnergyLevel != "unknown") {
                 ListItem(headlineContent = { Text("انرژی ترجیحی") }, supportingContent = { Text(preference.favoriteEnergyLevel) })

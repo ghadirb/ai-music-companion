@@ -2,69 +2,93 @@ package com.ghadirb.aimusic.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
+import com.ghadirb.aimusic.mix.SmartMix
+import com.ghadirb.aimusic.mix.SmartMixGenerator
+import com.ghadirb.aimusic.recommendation.Recommendation
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+@OptIn(FlowPreview::class)
 class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
 
     private val recommendationEngine = RecommendationEngine(repository)
 
-    private val _todaysPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val todaysPicks: StateFlow<List<TrackEntity>> = _todaysPicks.asStateFlow()
+    private val _picks = MutableStateFlow<List<Recommendation>>(emptyList())
+    /** "Today's picks", each with a short reason ("because you listen to this artist a lot"). */
+    val picks: StateFlow<List<Recommendation>> = _picks.asStateFlow()
 
-    private val _rediscoverPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val rediscoverPicks: StateFlow<List<TrackEntity>> = _rediscoverPicks.asStateFlow()
+    private val _mixes = MutableStateFlow<List<SmartMix>>(emptyList())
+    val mixes: StateFlow<List<SmartMix>> = _mixes.asStateFlow()
 
-    private val _nightPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val nightPicks: StateFlow<List<TrackEntity>> = _nightPicks.asStateFlow()
-
-    private val _drivingPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val drivingPicks: StateFlow<List<TrackEntity>> = _drivingPicks.asStateFlow()
-
-    private val _focusPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val focusPicks: StateFlow<List<TrackEntity>> = _focusPicks.asStateFlow()
-
-    private val _workoutPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val workoutPicks: StateFlow<List<TrackEntity>> = _workoutPicks.asStateFlow()
-
-    private val _happyDancePicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val happyDancePicks: StateFlow<List<TrackEntity>> = _happyDancePicks.asStateFlow()
-
-    private val _sadPicks = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val sadPicks: StateFlow<List<TrackEntity>> = _sadPicks.asStateFlow()
-
-    // Unknown until the first trackCount() check completes — NOT "true", otherwise the
-    // screen briefly renders the full card layout on the very first frame and then
-    // flashes to the empty-library message once the real (often 0) count comes back.
+    // Unknown until the first load completes — NOT "true", otherwise the screen flashes the full
+    // layout and then collapses to the empty-library message.
     private val _hasLibrary = MutableStateFlow<Boolean?>(null)
     val hasLibrary: StateFlow<Boolean?> = _hasLibrary.asStateFlow()
 
     private val _isReanalyzing = MutableStateFlow(false)
     val isReanalyzing: StateFlow<Boolean> = _isReanalyzing.asStateFlow()
 
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    /** (analysed, total) tracks — drives the progress card. */
+    val analysisProgress: StateFlow<Pair<Int, Int>> = repository.observeAnalysisProgress()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0 to 0)
+
     init {
         viewModelScope.launch {
-            repository.observeTracks().collectLatest { tracks -> refresh(tracks.size) }
+            // New tracks or new listening history => recompute (debounced so a big scan doesn't thrash).
+            combine(repository.observeTracks(), repository.observeTrackStats()) { tracks, _ -> tracks.size }
+                .debounce(400)
+                .collect { count -> refresh(count) }
         }
     }
 
     private suspend fun refresh(count: Int) {
-            _todaysPicks.value = recommendationEngine.topRecommendations(limit = 6)
-            _rediscoverPicks.value = repository.rediscoverTracks(limit = 6)
-            _nightPicks.value = repository.nightSuitableTracks(limit = 6)
-            _drivingPicks.value = repository.drivingSuitableTracks(limit = 6)
-            _focusPicks.value = repository.focusSuitableTracks(limit = 6)
-            _workoutPicks.value = repository.workoutSuitableTracks(limit = 6)
-            _happyDancePicks.value = repository.happyDanceTracks(limit = 6)
-            _sadPicks.value = repository.sadTracks(limit = 6)
+        try {
+            if (count == 0) {
+                _picks.value = emptyList()
+                _mixes.value = emptyList()
+            } else {
+                val tracks = repository.observeTracks().first()
+                val history = repository.recentHistory(3000)
+                val now = System.currentTimeMillis()
+                _picks.value = recommendationEngine.recommend(limit = 8, nowMs = now)
+                _mixes.value = withContext(Dispatchers.Default) { SmartMixGenerator.generateAll(tracks, history, now, limit = 30) }
+            }
+        } catch (e: Exception) {
+            // Recommendations are a nice-to-have: never crash the Home screen because of them.
+            _picks.value = emptyList()
+            _mixes.value = emptyList()
+        } finally {
             _hasLibrary.value = count > 0
+        }
     }
+
+    fun saveMixAsPlaylist(mix: SmartMix) {
+        viewModelScope.launch {
+            try {
+                repository.createPlaylistWithTracks(mix.type.titleFa, mix.tracks.map { it.track.id })
+                _message.value = "پلی‌لیست «${mix.type.titleFa}» ذخیره شد."
+            } catch (e: Exception) {
+                _message.value = "ذخیرهٔ پلی‌لیست انجام نشد."
+            }
+        }
+    }
+
+    fun dismissMessage() { _message.value = null }
 
     fun reanalyzeLibrary() {
         viewModelScope.launch {

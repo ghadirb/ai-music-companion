@@ -113,6 +113,23 @@ class MusicRepository(
     suspend fun createPlaylist(name: String): Long =
         playlistDao.insertPlaylist(PlaylistEntity(name = name))
 
+    /** Creates a playlist (unique name) and fills it in one transaction. Used by smart mixes / generated playlists. */
+    suspend fun createPlaylistWithTracks(name: String, trackIds: List<Long>): Long {
+        val taken = playlistDao.getAllPlaylists().map { it.name.lowercase() }.toSet()
+        val base = name.trim().ifEmpty { "پلی‌لیست هوشمند" }
+        var finalName = base
+        var n = 2
+        while (finalName.lowercase() in taken) { finalName = "$base ($n)"; n++ }
+        val create: suspend () -> Long = {
+            val id = playlistDao.insertPlaylist(PlaylistEntity(name = finalName))
+            trackIds.distinct().forEachIndexed { index, trackId ->
+                playlistDao.addTrackToPlaylist(PlaylistTrackCrossRef(id, trackId, index))
+            }
+            id
+        }
+        return if (database != null) database.withTransaction { create() } else create()
+    }
+
     suspend fun deletePlaylist(playlistId: Long) = playlistDao.deletePlaylist(playlistId)
 
     suspend fun renamePlaylist(playlistId: Long, name: String) = playlistDao.renamePlaylist(playlistId, name)

@@ -35,7 +35,7 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
         PlaylistEntity::class,
         PlaylistTrackCrossRef::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -48,6 +48,19 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN favoriteMoods TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN preferredBpm INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN energyRange TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN topTrackIds TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN skipRate REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN favoriteRatio REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN peakHours TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE user_preference ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -70,7 +83,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ai_music_companion.db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     // v1 predates any real install (never released), so the only
                     // gap we can't hand-migrate is v1->v2; destructive fallback
                     // only kicks in for that very old case.

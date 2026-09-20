@@ -25,10 +25,8 @@ class TasteProfileWorker(
             val tracks = repository.observeTracks().first()
             if (tracks.isEmpty()) return Result.success()
 
-            val history = repository.recentHistory(1000)
-            val historyByTrack = history.groupBy { it.trackId }
-
-            val profile = engine.buildTasteProfile(tracks, historyByTrack)
+            val history = repository.recentHistory(3000)
+            val profile = engine.buildTasteProfile(tracks, history.groupBy { it.trackId })
             repository.saveUserPreference(profile)
 
             Result.success()
