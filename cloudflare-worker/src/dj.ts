@@ -26,7 +26,11 @@ export const INTENT_SYSTEM_PROMPT = [
   "\"genre\": string|null, \"artist\": string|null, \"language\": \"persian\"|\"non_persian\"|null, \"duration_minutes\": integer|null,",
   "\"exclude_recent_days\": integer|null, \"favorite_only\": boolean, \"similar_to_current\": boolean,",
   "\"sort\": \"best_match\"|\"least_played\"|\"most_played\"|\"recently_added\"|\"random\", \"limit\": integer 1-100, \"title\": short Persian title|null}.",
-  "Use exclude_recent_days=14 and sort=least_played when the user wants songs they have not listened to recently.",
+  "Leave every field at its default unless the user explicitly asks for it. Defaults: moods [], energy null, genre null, artist null, language null,",
+  "duration_minutes null, exclude_recent_days null, favorite_only false, similar_to_current false, sort best_match, limit 25, title null.",
+  "language is set ONLY when the user explicitly asks for Persian/Iranian or for non-Persian/foreign music (the language of the request is NOT the language of the music).",
+  "Set exclude_recent_days=14 and sort=least_played ONLY when the user says they want songs they have not heard or played recently.",
+  "limit is a track count only if the user states one; a requested duration goes in duration_minutes.",
 ].join(" ");
 
 const str = (value: unknown, max = 60): string | null =>

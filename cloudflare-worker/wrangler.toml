@@ -3,6 +3,7 @@ account_id = "1609c905e10f5c9a6cf1a0cb240f356f"
 main = "src/index.ts"
 compatibility_date = "2026-09-19"
 workers_dev = true
+preview_urls = false
 
 [vars]
 MYKET_PACKAGE_NAME = "com.ghadirb.aimusic"

@@ -1,28 +1,16 @@
 # Release & go-live checklist
 
-## 1. Release signing (owner action — keep the keystore safe; losing it means you can never update the app)
-```bash
-keytool -genkeypair -v -keystore release.keystore -alias aimusic -keyalg RSA -keysize 4096 -validity 10000
-base64 -w0 release.keystore      # paste into the GitHub secret below
-```
-GitHub → Settings → Secrets and variables → Actions:
-`RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`.
-CI then produces a **signed** `app-release.apk` and `.aab` (artifact `app-release`, R8 enabled, `mapping.txt` included). Never commit the keystore.
-
+## 1. Release signing — done
+A 4096-bit RSA PKCS12 keystore (alias `aimusic`) was generated and stored in `Documents\AIMusicCompanion-secrets\` together with `release-signing-info.txt` (passwords). **Back this folder up now** (USB/cloud): losing the keystore means you can never publish updates of the same app.
+GitHub Actions secrets `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD` are set, so CI produces a **signed** `app-release.apk` / `.aab` (artifact `app-release`, R8 enabled, `mapping.txt` included). Never commit the keystore.
 Version: `versionCode` = CI run number, `versionName` = `-PVERSION_NAME` (default `1.0.0-rc1`).
 
-## 2. Gateway Worker (Cloudflare)
-```bash
-cd cloudflare-worker && npm ci && npm test
-node scripts/generate-entitlement-keys.mjs           # prints PRIVATE JWK + PUBLIC key
-npx wrangler secret put ENTITLEMENT_SIGNING_JWK      # paste the PRIVATE JWK (server only)
-npx wrangler secret put JWT_SIGNING_SECRET           # long random string
-npx wrangler secret put GAPGPT_API_KEY
-npx wrangler deploy
-```
-Put the PUBLIC key in `gradle.properties` → `ENTITLEMENT_PUBLIC_KEY` (the value committed today matches the key pair created for this build; replace it if you generate your own).
-Alternatively run the manual GitHub workflow *Deploy gateway Worker* after adding `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (and optionally `ENTITLEMENT_SIGNING_JWK`) as repository secrets. Delete those secrets/tokens after deploying.
-`wrangler.toml` binds the KV namespace and the `QuotaCounter` Durable Object (SQLite class, migration `v1`).
+## 2. Gateway Worker (Cloudflare) — deployed
+Worker `ai-music-companion-embedding` is deployed (`npx wrangler deploy` from `cloudflare-worker/`) with the KV binding and the `QuotaCounter` Durable Object.
+Secrets set on the Worker: `GAPGPT_API_KEY`, `JWT_SIGNING_SECRET`, `ENTITLEMENT_SIGNING_JWK` (private ES256 key). Still to set: `MYKET_ACCESS_TOKEN`.
+The matching PUBLIC key is `ENTITLEMENT_PUBLIC_KEY` in `gradle.properties`. The private key backup is in `Documents\AIMusicCompanion-secrets\` on the owner's PC (never in the repository).
+To re-deploy: `cd cloudflare-worker && npm ci --include=dev && npm test && npx wrangler@4 deploy` (needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in the environment).
+To rotate the signing key: `node scripts/generate-entitlement-keys.mjs`, `npx wrangler secret put ENTITLEMENT_SIGNING_JWK`, update `ENTITLEMENT_PUBLIC_KEY`, ship a new app build.
 
 ## 3. Myket (only real values are missing)
 * Worker: `wrangler secret put MYKET_ACCESS_TOKEN`; `MYKET_PACKAGE_NAME` in `wrangler.toml [vars]`.

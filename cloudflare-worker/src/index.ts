@@ -24,7 +24,12 @@ const DAY_SECONDS = 86_400;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    return handle(request, env, { counter: counterFor(env), fetchImpl: fetch, now: Date.now });
+    // Wrap fetch: calling the bare global as a method of `deps` throws "Illegal invocation" in workerd.
+    return handle(request, env, {
+      counter: counterFor(env),
+      fetchImpl: (input, init) => fetch(input, init),
+      now: () => Date.now(),
+    });
   },
 };
 

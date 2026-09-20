@@ -82,6 +82,13 @@ class StatsAndDjTest {
         assertNull(i.genre)
     }
 
+    @Test fun languageFilterOnlyWhenTheUserExplicitlyAsksForIt() {
+        val fromModel = DjIntentMapper.fromJson(JSONObject("""{"moods":["calm"],"language":"persian"}"""), null)
+        assertNull(DjIntentMapper.withExplicitLanguageOnly(fromModel, "یک ساعت موسیقی آرام برای مطالعه").language)
+        assertEquals(LanguageFilter.PERSIAN, DjIntentMapper.withExplicitLanguageOnly(fromModel, "آهنگ آرام ایرانی").language)
+        assertEquals(LanguageFilter.NON_PERSIAN, DjIntentMapper.withExplicitLanguageOnly(fromModel, "calm foreign songs").language)
+    }
+
     @Test fun junkIntentBecomesUnconstrainedDefaults() {
         val i = DjIntentMapper.fromJson(JSONObject("""{"energy":"extreme","sort":"???","limit":"x"}"""), null)
         assertTrue(i.isUnconstrained)

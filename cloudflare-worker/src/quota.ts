@@ -55,9 +55,16 @@ export class DurableObjectCounter implements Counter {
   constructor(private readonly namespace: DurableObjectNamespace) {}
 
   private async call<T>(key: string, payload: object): Promise<T> {
-    const stub = this.namespace.get(this.namespace.idFromName(key));
-    const response = await stub.fetch("https://counter/op", { method: "POST", body: JSON.stringify(payload) });
-    return (await response.json()) as T;
+    // A Durable Object can be reset right after a deploy/migration; one immediate retry is the documented remedy.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const stub = this.namespace.get(this.namespace.idFromName(key));
+        const response = await stub.fetch("https://counter/op", { method: "POST", body: JSON.stringify(payload) });
+        return (await response.json()) as T;
+      } catch (error) {
+        if (attempt >= 1) throw error;
+      }
+    }
   }
   incrementIfBelow(key: string, limit: number, ttlSeconds: number) {
     return this.call<CounterResult>(key, { op: "incr", limit, ttl: ttlSeconds });

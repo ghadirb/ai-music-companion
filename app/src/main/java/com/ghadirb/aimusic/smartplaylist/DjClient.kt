@@ -7,6 +7,13 @@ import org.json.JSONObject
 
 /** Maps the gateway's (already server-sanitised) JSON intent into a [PlaylistIntent], sanitising again on-device. */
 object DjIntentMapper {
+    /**
+     * Language models tend to infer "Persian music" from a Persian-language request. The language filter is only kept
+     * when the user explicitly asked for Persian/foreign music, which the deterministic local parser detects.
+     */
+    fun withExplicitLanguageOnly(intent: PlaylistIntent, prompt: String): PlaylistIntent =
+        intent.copy(language = PlaylistIntentParser.parse(prompt).language)
+
     fun fromJson(json: JSONObject, currentTrackId: Long?): PlaylistIntent {
         val moods = json.optJSONArray("moods")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotBlank() } } }.orEmpty().toSet()
         val energy = when (json.optString("energy")) {
@@ -70,7 +77,7 @@ class DjClient(private val api: CloudApi, private val consent: CloudConsent) {
             response.code == 429 -> Result.QuotaReached
             !response.isSuccess -> Result.Unavailable
             else -> response.body.optJSONObject("intent")
-                ?.let { Result.Success(DjIntentMapper.fromJson(it, currentTrackId), response.dailyRemaining) }
+                ?.let { Result.Success(DjIntentMapper.withExplicitLanguageOnly(DjIntentMapper.fromJson(it, currentTrackId), prompt), response.dailyRemaining) }
                 ?: Result.Unavailable
         }
     }
