@@ -1,76 +1,83 @@
-# AI Music Companion
+# AI Music Companion — Offline, Private & Personalized
 
-Offline, private and personalized Android music player. The app plays music stored on the device and learns from local listening behaviour to build useful recommendations without uploading audio files.
+**یک موزیک‌پلیر آفلاین اندروید که سلیقهٔ شما را به‌مرور یاد می‌گیرد؛ همه‌چیز روی همین دستگاه، بدون حساب کاربری اجباری.**
 
-## What works today
+An offline-first Android music player that learns your taste from *your own* listening and suggests music from *your own* library — locally, explainably and privately. Cloud AI is optional, off by default and never sees your files.
 
-- Local MediaStore library: songs, artists, albums, folders, favourites and manual playlists.
-- Media3 playback with background service, notification and lock-screen controls, resume behaviour, shuffle, repeat and sleep timer.
-- Full player with cover art, queue playback, similar tracks and synchronized local `.lrc` lyrics. The active lyric line is highlighted and can be tapped to seek.
-- Local search across song title, artist, album and genre.
-- Smart recommendations based on favourites, completions, replays, skips, artist/genre affinity and rediscovery.
-- On-device audio analysis for energy and approximate BPM. This powers Focus, Night, Driving, Workout and Happy/Dance mixes. A local LRC file can additionally label a track as happy or sad.
-- Light/dark theme, Persian RTL interface, contextual media and notification permissions.
-- Local JSON backup/restore of favourites, playlists and taste profile. Audio files and listening history are never copied into a backup.
+> Local-first · Privacy-first · Offline-first · Explainable recommendations · Secure Premium · Minimal cloud
 
-## Privacy-first design
+## Screenshots
+Store screenshots live in `docs/screenshots/` (add device captures before a store release).
 
-The default product is offline-first. Music files, local LRC lyrics, listening history and taste profile stay on-device. Audio analysis runs locally with Android media APIs. The APK does not contain API keys or merchant access tokens.
+## Key features
+* **Full offline player** — Media3/ExoPlayer, background playback, notification / lock-screen / Bluetooth controls, audio-focus and headphone-unplug handling, resume where you stopped, queue (play next / add / remove / reorder / clear), shuffle, repeat, **sleep timer** (15/30/45/60 min, end of track, custom).
+* **Library** — scan, folders, artists, albums, playlists, favourites, history; **Persian-aware search** (ي/ی, ك/ک, ZWNJ, digits) grouped by artist/album/genre/playlist/song; sort & filter by recently added/played, most played, title, artist, album, duration, favourite, genre, mood, energy.
+* **Synced lyrics** from your own `.lrc` files (UTF-8/UTF-16/Windows-1256, offsets, plain text). On modern Android, pick the file per song or grant a music folder once.
+* **On-device audio analysis** — BPM, energy, mood (background, cancellable, corrupt files are skipped).
+* **Backup / restore** of favourites, playlists, history, taste profile and theme — no audio files, tokens or purchases; songs are re-matched by path *or* metadata, same-name playlists are merged.
 
-Online AI similarity is available as an opt-in beta. It remains off by default and sends only a short metadata document for the current song and a small local candidate set; it never uploads audio files or local LRC text. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for the current product privacy draft.
+## Offline & privacy
+See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for the exact data flows.
+* Music files are processed **locally**. Listening history, favourites, playlists, taste profile and lyrics never leave the device.
+* **No API secret is inside the APK.** Provider keys, the Myket access token and the entitlement signing key exist only as Cloudflare Worker secrets.
+* Cloud AI is **opt-in**, used only when you press an AI action, and sends only what is listed in the privacy policy (a few track descriptors, or your typed AI DJ request).
+* No ads, analytics or trackers. Crash reports stay on the device until *you* share them.
 
-## Smart recommendations
+## Smart recommendations (explainable, no black box)
+A deterministic weighted score over: favourites, completed plays (recency-decayed), replays, skips, artist/genre affinity, time-of-day energy match, BPM, rediscovery of neglected favourites and light exploration. Every suggestion can say *why* ("because you listen to this artist a lot", "not played for 45 days"…).
+* **Taste profile** (local): favourite artists/genres/moods, BPM and energy range, top tracks, skip & favourite behaviour, peak hours.
+* **Smart mixes** from your library: My Favourites · Recently Loved · Rediscover · Chill · Energetic · Focus · Night · Random From My Taste.
+* **Smart playlists** — describe what you want; a rule-based parser turns it into a structured intent (`mood, energy, genre, artist, language, duration, exclude_recent, favorite_only, sort, limit`) and the *app* selects tracks locally.
 
-This release uses explainable, deterministic local signals rather than claiming to use a trained deep-learning model. Signals include favourite state, completion, replay, skip, artist/genre affinity, energy, BPM and recency. Unsupported or damaged media is skipped without blocking the rest of the library.
+## AI features
+**AI DJ (Premium)** sends only your typed request to the gateway, which returns a *validated structured intent*. The model never sees or picks your files; if offline/over quota the local parser is used.
 
-## Free and Premium architecture
+## Free vs Premium
+| | Free | Premium |
+|---|:--:|:--:|
+| Player, queue, sleep timer, library, search, sort/filter, favourites, playlists, history | ✅ | ✅ |
+| Basic recommendations with reasons, basic smart mixes & rediscover, basic statistics | ✅ | ✅ |
+| Local audio analysis, local `.lrc` lyrics, backup/restore | ✅ | ✅ |
+| Smart playlist generation, natural-language requests | – | ✅ |
+| **AI DJ** (cloud intent) | – | ✅ |
+| Advanced statistics & listening insights, recommendation tuning, advanced rediscover | – | ✅ |
+| Higher daily AI quota (config: free 8 / premium 120) | – | ✅ |
+| Licensed online lyrics (when added) | – | ✅ |
 
-Core playback, library management, local recommendations, local lyrics and backup are free. The repository also contains a secure commercial foundation:
+Which plan unlocks what is a single table (`premium/Entitlement.kt → FeatureGate`) — change one line to move a feature. Upgrade prompts appear only when a Free user actually uses a Premium feature; the player itself is never paywalled.
 
-- Myket non-consumable `premium_lifetime` billing-client abstraction.
-- Cloudflare Worker endpoints for server-side Myket verification and durable entitlement storage.
-- Server-enforced online-AI quota configuration: 8 free and 120 premium embedding requests per UTC day.
-
-The online-AI beta uses an anonymous installation session and is limited to 8 requests per UTC day. A production authenticated account/JWT issuer, Myket public key, SKU and Myket server access token are still required before enabling paid features. Do not present a recurring subscription until a provider/store that supports subscriptions is selected.
-
-## Cloudflare Worker
-
-`cloudflare-worker/` is an optional backend boundary. It keeps provider and merchant secrets outside the APK. The opt-in AI beta receives a short-lived anonymous session JWT; entitlement and Myket endpoints require the same server-issued JWT model. Do not embed a static token in the app.
-
-## Licensed online lyrics
-
-Local `.lrc` files are the only active lyrics source. The code has an abstraction for a licensed provider, but deliberately does not scrape search engines or lyric websites. A commercial release should enable online lyrics only after obtaining a provider licence, documenting the data flow, adding explicit user consent and keeping the provider key server-side.
+## Architecture
+```
+app/                      Kotlin · Jetpack Compose · Room · Media3 · WorkManager (no DI framework)
+  playback/               PlaybackService (ExoPlayer, MediaSession, focus, resume, sleep timer, ListeningRecorder)
+  data/ library/ search/  Room entities/DAOs/repository, sort/filter, Persian search index
+  recommendation/ mix/ smartplaylist/   scorer, taste profile, mixes, intent parser/generator, AI DJ client
+  premium/ billing/ cloud/ Entitlement (offline-verified ES256 token), FeatureGate, Purchase/Restore, gateway client
+  lyrics/ analysis/ backup/ stats/ crash/
+cloudflare-worker/        Gateway: sessions, quotas (Durable Object), Myket verify/restore, DJ intent, entitlements
+```
+Premium is decided by the **server**: purchase → Myket verification → signed entitlement token → verified offline in the app with an embedded *public* key. A boolean in the APK is never trusted.
 
 ## Build
+Requirements: JDK 17, Android SDK 35. `./gradlew testDebugUnitTest assembleDebug`.
+CI (GitHub Actions) runs unit tests, lint, debug + release (R8) builds, the Worker tests and emulator tests (migrations/DAO). Release signing uses GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`) — the keystore is never in the repository. Versions: `-PVERSION_NAME`, `-PVERSION_CODE` (CI uses the run number).
 
-Requirements: JDK 17, Android SDK 34 and Android Studio or Gradle with network access to Google/Maven repositories.
+## Configuration (Gradle properties — none are secrets)
+| Property | Meaning |
+|---|---|
+| `CLOUD_AI_BASE_URL` | Gateway Worker URL |
+| `ENTITLEMENT_PUBLIC_KEY` | Base64 X.509 public key that verifies signed entitlement tokens |
+| `MYKET_IAB_PUBLIC_KEY` | Myket in-app-billing public key (empty until real Myket details exist → purchase UI shows "not configured") |
+| `MYKET_PREMIUM_SKUS` | Comma-separated SKUs offered (default `premium_lifetime`; `premium_monthly`, `premium_yearly` supported by the server table) |
 
-```bash
-./gradlew assembleDebug
-```
+## Myket integration
+Architecture is complete: billing abstraction → nonce → checkout → server verification → signed entitlement, plus *Restore purchase* (works after reinstall/new device with transfer limits). To go live only add real values: Worker secret `MYKET_ACCESS_TOKEN` + var `MYKET_PACKAGE_NAME`, and the app property `MYKET_IAB_PUBLIC_KEY`. No code change is needed.
 
-The app targets Android 14 (`targetSdk 34`) and supports Android 8+ (`minSdk 26`). For Myket configuration, supply properties locally rather than committing them:
+## Cloudflare Worker
+See [cloudflare-worker/README.md](cloudflare-worker/README.md): endpoints, security model, secrets (`GAPGPT_API_KEY`, `JWT_SIGNING_SECRET`, `MYKET_ACCESS_TOKEN`, `ENTITLEMENT_SIGNING_JWK`), configuration and tests (`npm test`).
 
-```properties
-MYKET_IAB_PUBLIC_KEY=...
-MYKET_PREMIUM_SKU=premium_lifetime
-```
-
-## Current limitations and next release work
-
-- AI similarity is beta-only, opt-in and quota-limited. Replace anonymous sessions with real authentication before a broad commercial rollout.
-- Online lyrics are intentionally disabled until a licensed source is selected.
-- Queue editing (play next/remove/reorder), Android Auto, widget, equalizer and advanced statistics are future phases.
-- BPM/mood are lightweight local heuristics, not a trained classifier.
-- Verify every release with device testing and CI across supported Android versions.
-
-## Commercial release checklist
-
-1. Complete Myket panel setup and server verification secrets.
-2. Add production authentication before enabling any cloud-AI endpoint.
-3. Run CI, unit tests and device QA; sign the release outside source control.
-4. Review [PRIVACY_POLICY.md](PRIVACY_POLICY.md) and [TERMS.md](TERMS.md) with legal counsel and add support/contact details.
+## Roadmap
+Phase 2: home-screen widget, Android Auto browse/playback, licensed online lyrics (provider abstraction exists), Google Play billing as a second `BillingGateway`, account-based restore.
 
 ## License
-
-No open-source licence has been granted yet. All rights are reserved pending a separate owner decision.
+Proprietary — all rights reserved. See [LICENSE](LICENSE). Not open source; no permission is granted to copy, redistribute or use the code commercially without the owner's written consent.

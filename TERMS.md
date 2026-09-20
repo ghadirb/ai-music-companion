@@ -1,21 +1,14 @@
-# Terms of Service Draft — AI Music Companion
+# شرایط استفاده — AI Music Companion
+# Terms of Service — AI Music Companion
 
-Last updated: September 19, 2026.
+آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: **[ایمیل پشتیبانی را پیش از انتشار اینجا وارد کنید / insert support e-mail before publishing]**
 
-This is a product draft, not legal advice. It must be reviewed and completed with the publisher identity, contact method, governing law and refund policy before commercial publication.
-
-## Service
-
-AI Music Companion is a local music player for audio content the user already has permission to access. The app does not provide music streaming or a music catalogue.
-
-## User content and rights
-
-Users remain responsible for their audio files, lyrics files and any backups. The app must not be used to infringe copyright or to obtain lyrics from unlicensed sources.
-
-## Optional paid features
-
-Any premium entitlement is granted only after verified purchase. Store rules, including Myket purchase and refund rules where applicable, govern payment processing. Features may require connectivity only when clearly disclosed.
-
-## Availability
-
-Local features depend on device capability and media format support. Audio analysis and recommendations are best-effort and do not guarantee a particular mood, genre or recommendation outcome.
+1. **خدمت / Service.** پخش‌کنندهٔ آفلاین موسیقی با پیشنهادهای شخصی‌سازی‌شده روی دستگاه شما. قابلیت‌های ابری اختیاری‌اند. / An offline music player with on-device personalisation. Cloud features are optional.
+2. **محتوای شما / Your content.** شما مسئول قانونی‌بودن فایل‌های موسیقی و متن‌هایی هستید که استفاده می‌کنید. برنامه فایلی را آپلود، توزیع یا بازنویسی نمی‌کند. / You are responsible for the legality of the music and lyrics you use. The app never uploads or redistributes your files.
+3. **پرمیوم و پرداخت / Premium & payment.** خرید از طریق مایکت انجام می‌شود و قیمت در صفحهٔ پرداخت مایکت نمایش داده می‌شود. پرمیوم پس از **تأیید سروری** خرید فعال می‌شود. «بازیابی خرید» همان خرید را روی همان حساب مایکت بازمی‌گرداند؛ یک خرید همزمان برای یک هویت فعال است و انتقال آن محدودیت دارد. / Purchases go through Myket; the price is shown at checkout. Premium activates after **server-side verification**. "Restore purchase" re-verifies your Myket purchase; a purchase belongs to one identity at a time and transfers are limited.
+4. **بازپرداخت / Refunds.** بازپرداخت طبق سیاست‌های مایکت انجام می‌شود؛ در صورت بازپرداخت یا لغو، حق‌دسترسی پرمیوم پس از بررسی سرور متوقف می‌شود. برای مشکل خرید با ایمیل بالا تماس بگیرید. / Refunds follow Myket's policy; if a purchase is refunded/revoked, Premium ends after server verification. For purchase problems, contact us.
+5. **AI / AI features.** خروجی AI ممکن است ناقص باشد و فقط یک ساختار پیشنهادی برای انتخاب از کتابخانهٔ شماست. سهمیهٔ روزانه اعمال می‌شود و می‌تواند تغییر کند. / AI output may be imperfect and only produces a suggested structure used to pick from your library. Daily quotas apply and may change.
+6. **استفادهٔ ممنوع / Prohibited use.** دور زدن سهمیه یا خرید، مهندسی معکوس سرویس، ارسال درخواست‌های خودکار یا مخرب به سرور. / Circumventing quotas or purchases, attacking or automating the service.
+7. **سلب مسئولیت / Disclaimer.** برنامه «همان‌طور که هست» ارائه می‌شود. مسئولیت ما در حد قانون و حداکثر برابر مبلغ پرداختی شماست. / Provided "as is"; liability is limited to the extent permitted by law and to the amount you paid.
+8. **حریم خصوصی / Privacy.** طبق [PRIVACY_POLICY.md](PRIVACY_POLICY.md). / See the Privacy Policy.
+9. **تغییرات و قانون حاکم / Changes & governing law.** شرایط ممکن است به‌روزرسانی شود. قانون حاکم و مرجع رسیدگی: **[پیش از انتشار مشخص شود / to be set before publishing]**.

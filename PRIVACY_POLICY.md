@@ -1,25 +1,33 @@
-# Privacy Policy Draft — AI Music Companion
+# سیاست حریم خصوصی — AI Music Companion
+# Privacy Policy — AI Music Companion
 
-Last updated: September 19, 2026.
+آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: **[ایمیل پشتیبانی را پیش از انتشار اینجا وارد کنید / insert support e-mail before publishing]**
 
-This draft must be reviewed for the final company identity, support address, jurisdiction and enabled features before publication.
+## خلاصه / Summary
+برنامه به‌صورت پیش‌فرض **همه‌چیز را روی دستگاه شما** نگه می‌دارد و **هیچ حساب کاربری، تبلیغ یا ابزار ردیابی** ندارد. ارسال هر داده‌ای به سرور فقط برای قابلیت‌های اختیاریِ زیر و پس از اقدام یا رضایت شماست.
+By default everything stays **on your device**. There are **no accounts, ads or trackers**. Data is sent to a server only for the optional features below, after your action/consent.
 
-## Local data
+## داده‌های محلی (هرگز ارسال نمی‌شوند) / Local data (never uploaded)
+فایل‌های موسیقی، متادیتا، کتابخانه، تاریخچهٔ شنیدن، علاقه‌مندی‌ها، پلی‌لیست‌ها، پروفایل سلیقه، آمار، متن `.lrc`، نتایج تحلیل صوتی و صف پخش. با حذف برنامه پاک می‌شوند. بکاپ فقط در محلی که خودتان انتخاب می‌کنید ذخیره می‌شود و شامل فایل صوتی، توکن یا خرید نیست.
+Music files, metadata, library, listening history, favourites, playlists, taste profile, statistics, `.lrc` lyrics, audio-analysis results and the play queue. Removed when you uninstall. Backups go only where you choose and contain no audio, tokens or purchases.
 
-The app reads audio metadata and files selected by Android's media permission to build a local music library. Playback history, favourites, playlists, preference profile, local `.lrc` lyrics and audio-analysis results are stored on the device by default. Audio files are not uploaded by the app.
+## داده‌هایی که ممکن است به سرور بروند / Data that may be sent
+| چه داده‌ای / What | چرا / Why | چه زمانی / When | به کجا / Where | نگهداری / Retention |
+|---|---|---|---|---|
+| شناسهٔ تصادفی نصب + نشست ناشناس، آدرس IP (فقط برای محدودسازی) / Random install ID + anonymous session; IP (rate-limiting only) | احراز نشست، جلوگیری از سوءاستفاده / session auth, abuse prevention | هنگام اولین استفاده از قابلیت ابری یا خرید / on first cloud/purchase use | Cloudflare Worker | IP فقط به‌صورت هش‌شده و شمارنده؛ شمارنده‌ها حداکثر ≈۲۵ ساعت / IP only as a salted hash inside counters; counters ≤ ~25 h |
+| توصیف کوتاه حداکثر ۸ آهنگ (نام، خواننده، آلبوم، سبک، حال‌وهوا، BPM) / Short descriptors of ≤8 tracks (title, artist, album, genre, mood, BPM) | «بهبود آهنگ‌های مشابه با AI» / "Improve similar tracks with AI" | فقط با فعال‌بودن اجازهٔ AI و زدن دکمه / only with AI consent, when you tap the button | Worker → ارائه‌دهندهٔ AI (GapGPT) | ذخیره نمی‌شود؛ نگهداری نزد ارائه‌دهنده طبق شرایط او / not stored by us; provider retention per its terms |
+| متن درخواست AI DJ (حداکثر ۳۰۰ نویسه) / AI DJ request text (≤300 chars) | تبدیل به ساختار پلی‌لیست / convert to a playlist intent | فقط با پرمیوم + اجازهٔ AI، هنگام زدن «ساخت» / Premium + consent, when you tap create | Worker → ارائه‌دهندهٔ AI | ذخیره نمی‌شود / not stored by us. **نام آهنگ‌ها، فایل‌ها و تاریخچه هرگز ارسال نمی‌شوند / no song names, files or history are sent** |
+| SKU، توکن خرید مایکت، payload یک‌بارمصرف / SKU, Myket purchase token, one-time payload | تأیید خرید، فعال‌سازی و بازیابی پرمیوم / verify purchase, unlock & restore Premium | هنگام خرید یا «بازیابی خرید» / on purchase or Restore | Worker → مایکت (Myket) | رکورد حق‌دسترسی (SKU، شناسهٔ خرید، زمان) تا زمانی که پرمیوم معتبر است، برای بازیابی و جلوگیری از تقلب / entitlement record kept while Premium is valid, for restore & fraud prevention |
 
-## Optional local backup
+گزارش‌های Worker فقط شناسهٔ درخواست و نوع رویداد دارند؛ هیچ توکن، متن درخواست، IP یا کلیدی ثبت نمی‌شود. / Worker logs contain only a request id and event name.
+گزارش خطا محلی است و فقط با اشتراک‌گذاری خودتان خارج می‌شود (مسیرها و آدرس آهنگ‌ها حذف می‌شوند). / Crash reports are local and leave the device only if you share them (paths/URIs are redacted).
 
-When the user exports a backup, the user selects the destination using Android's file picker. A backup contains favourites, playlist names and song references, plus taste preferences. It does not copy audio files or listening history.
+## مجوزها / Permissions
+دسترسی به فایل‌های صوتی (ساخت کتابخانه)، اعلان‌ها (کنترل پخش)، اینترنت (فقط قابلیت‌های اختیاری بالا). انتخاب فایل/پوشهٔ LRC از انتخابگر سیستم انجام می‌شود و فقط همان مورد خوانده می‌شود.
+Audio access (library), notifications (playback controls), internet (only the optional features above). LRC file/folder selection uses the system picker and only that item is read.
 
-## Optional cloud features
+## انتخاب‌های شما / Your choices
+قابلیت‌های ابری پیش‌فرض خاموش‌اند و از «تنظیمات» قابل لغو هستند. برای حذف رکورد حق‌دسترسی سروری با ایمیل بالا تماس بگیرید. کودکان: برنامه اطلاعات شخصی نمی‌گیرد. / Cloud features are off by default and revocable in Settings. To delete a server-side entitlement record, contact us. Children: the app collects no personal data.
 
-Cloud AI similarity is optional and off by default. It requires an explicit settings toggle. Only the approved metadata needed for the feature, such as title, artist, album, genre, local mood label or BPM, is sent through the project's Cloudflare Worker to the configured AI provider. Local lyric text and audio files are not sent. The backend enforces daily quotas and keeps provider secrets outside the app. The current beta uses an anonymous installation session; a production release should replace this with a documented account/authentication system.
-
-## Purchases
-
-Myket purchases are not active until merchant setup is complete. When enabled, verification is server-to-server. The Myket developer access token remains server-side.
-
-## Your choices
-
-Users can decline media and notification permissions, avoid cloud features, and remove local app data through Android settings. Backup files remain controlled by the user at their selected destination.
+## تغییرات / Changes
+تغییرات مهم این سیاست پیش از اعمال در برنامه اعلام می‌شود. / Material changes will be announced in the app before taking effect.
