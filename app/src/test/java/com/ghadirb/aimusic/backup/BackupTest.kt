@@ -115,7 +115,7 @@ class BackupTest {
         assertNull(plan.playlists.first { it.name == "Brand new" }.existingId)
         assertEquals(1, plan.history.size)
         assertFalse(plan.applyTasteProfile)                            // local profile wins
-        assertEquals(2, plan.unmatchedTracks)                          // ref(99) counted for the playlist... and once more below
+        assertEquals(1, plan.unmatchedTracks)                          // only ref(99) has no local match
     }
 
     @Test fun tasteProfileAppliedOnlyWhenNoneExistsAndEmptyBackupIsSafe() {

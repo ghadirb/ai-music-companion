@@ -155,6 +155,30 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        var crashReport by remember { mutableStateOf(com.ghadirb.aimusic.crash.CrashLogger.lastReport(context)) }
+        crashReport?.let { report ->
+            ListItem(
+                headlineContent = { Text("گزارش خطای آخر") },
+                supportingContent = { Text("برنامه دفعهٔ قبل به‌طور غیرمنتظره بسته شد. گزارش فقط روی دستگاه شما ذخیره شده و خودکار ارسال نمی‌شود؛ مسیر فایل‌ها و آدرس آهنگ‌ها از آن حذف شده است.") },
+                trailingContent = {
+                    Column {
+                        TextButton(onClick = {
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, report)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(send, "اشتراک‌گذاری گزارش خطا"))
+                        }) { Text("اشتراک") }
+                        TextButton(onClick = {
+                            com.ghadirb.aimusic.crash.CrashLogger.clear(context)
+                            crashReport = null
+                        }) { Text("حذف") }
+                    }
+                }
+            )
+            HorizontalDivider()
+        }
+
         ListItem(
             headlineContent = { Text("بکاپ و بازیابی محلی") },
             supportingContent = { Text("پلی‌لیست‌ها، علاقه‌مندی‌ها، تاریخچهٔ شنیدن، پروفایل سلیقه و تم برنامه ذخیره می‌شود؛ هیچ فایل موسیقی، توکن یا خریدی در بکاپ نیست. هنگام بازیابی، آهنگ‌ها حتی روی دستگاه جدید با نام و خواننده پیدا می‌شوند و پلی‌لیست هم‌نام ادغام می‌شود.") },
@@ -190,7 +214,7 @@ fun SettingsScreen(
             }
             HorizontalDivider()
         }
-        ListItem(headlineContent = { Text("نسخه") }, supportingContent = { Text("0.1.0-mvp") })
+        ListItem(headlineContent = { Text("نسخه") }, supportingContent = { Text("${com.ghadirb.aimusic.BuildConfig.VERSION_NAME} (${com.ghadirb.aimusic.BuildConfig.VERSION_CODE})") })
         ListItem(
             headlineContent = { Text("حریم خصوصی") },
             supportingContent = { Text("تحلیل موسیقی و LRC محلی روی دستگاه انجام می‌شود. متن آنلاین فقط در صورت فعال‌سازی یک سرویس دارای مجوز و رضایت شما استفاده خواهد شد.") }

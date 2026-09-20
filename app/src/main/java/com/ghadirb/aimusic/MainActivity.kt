@@ -124,13 +124,6 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra("open_player", false)) openPlayerRequest = true
     }
 
-    @Deprecated("Required to complete the Myket checkout flow")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
-        if (::billingGateway.isInitialized && billingGateway.handleActivityResult(requestCode, resultCode, data)) return
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-    }
-
     override fun onDestroy() {
         if (::billingGateway.isInitialized) {
             billingGateway.dispose()

@@ -190,7 +190,7 @@ private fun Bars(values: List<Int>, labels: List<String>) {
 
 @Composable
 private fun LockedCard(title: String, subtitle: String, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(top = 20.dp), onClick = onClick) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Lock, contentDescription = "ویژهٔ پرمیوم")
             Column(Modifier.padding(start = 12.dp)) {

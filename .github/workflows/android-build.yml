@@ -1,4 +1,4 @@
-name: Android CI
+name: CI
 
 on:
   push:
@@ -12,10 +12,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ---------------------------------------------------------------- Android: lint, unit tests, debug + release builds
   android:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # only used to publish the plain-text CI report branch on pushes
+      contents: write   # only used to publish the plain-text CI report branch on pushes to master
+    env:
+      VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -24,6 +27,7 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
+
       - name: Unit tests
         run: |
           set -o pipefail
@@ -37,10 +41,36 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
+
+      # Release signing material comes from GitHub Secrets only (never from the repository).
+      - name: Prepare release keystore (if secrets exist)
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        if: env.KS_B64 != ''
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+      - name: Build release APK + AAB (R8 enabled)
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease bundleRelease -PVERSION_CODE="$VERSION_CODE" --stacktrace 2>&1 | tee build-release.log
+
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,7 +86,7 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           rm -rf /tmp/report && mkdir -p /tmp/report
-          for f in unit-tests.log lint.log build-debug.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
+          for f in unit-tests.log lint.log build-debug.log build-release.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
           mkdir -p /tmp/report/test-results /tmp/report/schemas
           find app/build/test-results -name '*.xml' -exec cp {} /tmp/report/test-results/ \; 2>/dev/null || true
           [ -d app/schemas ] && cp -r app/schemas/. /tmp/report/schemas/ || true
@@ -65,3 +95,65 @@ jobs:
           cd /tmp/report && git init -q && git checkout -q -b ci-report && git add -A \
             && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "CI report for ${GITHUB_SHA}" \
             && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-report
+
+  # ---------------------------------------------------------------- Cloudflare Worker: type-check + tests
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare-worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  # ---------------------------------------------------------------- Android instrumented tests (migrations, DAO, repository)
+  instrumented:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-results
+          path: app/build/outputs/androidTest-results/**
+          if-no-files-found: ignore
+      - name: Publish instrumented report branch
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          rm -rf /tmp/rep && mkdir -p /tmp/rep
+          find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} /tmp/rep/ \; 2>/dev/null || true
+          find app/build/reports/androidTests -name '*.html' -maxdepth 3 -exec cp --parents {} /tmp/rep/ \; 2>/dev/null || true
+          echo "sha=${GITHUB_SHA} run=${GITHUB_RUN_ID}" > /tmp/rep/RUN.txt
+          cd /tmp/rep && git init -q && git checkout -q -b ci-report-instrumented && git add -A \
+            && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Instrumented report for ${GITHUB_SHA}" \
+            && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-report-instrumented

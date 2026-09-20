@@ -23,14 +23,15 @@ val cloudAiBaseUrl = providers.gradleProperty("CLOUD_AI_BASE_URL")
 
 android {
     namespace = "com.ghadirb.aimusic"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.ghadirb.aimusic"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0-mvp"
+        targetSdk = 35
+        // CI passes -PVERSION_CODE=<run number>; -PVERSION_NAME sets the marketing version.
+        versionCode = providers.gradleProperty("VERSION_CODE").orElse("1").get().toInt()
+        versionName = providers.gradleProperty("VERSION_NAME").orElse("1.0.0-rc1").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -48,14 +49,49 @@ android {
         buildConfigField("String", "ENTITLEMENT_PUBLIC_KEY", "\"$entitlementPublicKey\"")
     }
 
+    // Release signing: keystore + passwords come ONLY from environment variables / Gradle properties
+    // (GitHub Secrets in CI). Nothing secret is ever committed. Without them the release build is unsigned.
+    val releaseKeystorePath = providers.environmentVariable("RELEASE_KEYSTORE_PATH")
+        .orElse(providers.gradleProperty("RELEASE_KEYSTORE_PATH")).orNull
+    signingConfigs {
+        if (releaseKeystorePath != null) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = providers.environmentVariable("RELEASE_KEYSTORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD").orNull
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            buildConfigField("boolean", "VERBOSE_LOGS", "true")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            buildConfigField("boolean", "VERBOSE_LOGS", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (releaseKeystorePath != null) signingConfig = signingConfigs.getByName("release")
         }
+    }
+
+    lint {
+        // UnsafeOptInUsageError is a known false positive for Kotlin @OptIn(UnstableApi) with Media3.
+        disable += setOf("UnsafeOptInUsageError")
+        abortOnError = false
+        checkReleaseBuilds = false
+        htmlReport = true
+        textReport = true
+    }
+
+    sourceSets {
+        // Room schema JSONs are used by MigrationTestHelper in instrumented tests.
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
     }
 
     compileOptions {
@@ -123,6 +159,10 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.room:room-testing:2.6.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

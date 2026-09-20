@@ -1,7 +1,6 @@
 package com.ghadirb.aimusic.billing
 
 import android.app.Activity
-import android.content.Intent
 import com.ghadirb.aimusic.BuildConfig
 import ir.myket.billingclient.IabHelper
 import kotlinx.coroutines.CompletableDeferred
@@ -72,10 +71,6 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         }
         return outcome.await().also { pendingPurchase = null }
     }
-
-    /** Must be forwarded from Activity.onActivityResult. */
-    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean =
-        helper?.handleActivityResult(requestCode, resultCode, data) ?: false
 
     fun dispose() {
         pendingPurchase?.complete(PurchaseOutcome.Cancelled)

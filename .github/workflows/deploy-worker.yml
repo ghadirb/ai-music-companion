@@ -1,0 +1,38 @@
+name: Deploy gateway Worker (manual)
+
+# Manual only. Requires repository secrets: CLOUDFLARE_API_TOKEN (Workers Scripts:Edit, Workers KV:Edit,
+# Durable Objects) and CLOUDFLARE_ACCOUNT_ID. Optional: ENTITLEMENT_SIGNING_JWK (private ES256 key) — see
+# cloudflare-worker/scripts/generate-entitlement-keys.mjs. Provider/Myket secrets stay in Cloudflare and are not touched.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare-worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare-worker
+          command: deploy
+          secrets: |
+            ENTITLEMENT_SIGNING_JWK
+        env:
+          ENTITLEMENT_SIGNING_JWK: ${{ secrets.ENTITLEMENT_SIGNING_JWK }}

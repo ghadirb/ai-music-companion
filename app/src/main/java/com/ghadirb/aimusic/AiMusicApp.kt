@@ -40,6 +40,7 @@ class AiMusicApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.ghadirb.aimusic.crash.CrashLogger.install(this)
         database = AppDatabase.getInstance(this)
         repository = MusicRepository(
             trackDao = database.trackDao(),
