@@ -82,7 +82,11 @@ object PlaylistIntentParser {
 
         val duration = parseDurationMinutes(t)
         val trackWord = SearchText.normalize("آهنگ")
-        val count = Regex("""(\d{1,3})\s*($trackWord|track|song)""").find(t)?.groupValues?.get(1)?.toIntOrNull()
+        // Remove duration phrases first so "45 دقیقه آهنگ" is not read as "45 tracks".
+        val withoutDuration = t.replace(Regex("""\d{1,3}\s*(ساعت|hours?|hrs?|دقیقه|minutes?|mins?)"""), " ")
+        val count = Regex("""(\d{1,3})\s+(?:\S+\s+){0,2}?($trackWord|track|song)""").find(withoutDuration)
+            ?.groupValues?.get(1)?.toIntOrNull()
+            ?: Regex("""(\d{1,3})\s*($trackWord|track|song)""").find(withoutDuration)?.groupValues?.get(1)?.toIntOrNull()
 
         return PlaylistIntent(
             moods = moods,

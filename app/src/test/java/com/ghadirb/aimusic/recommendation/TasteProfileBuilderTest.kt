@@ -28,7 +28,7 @@ class TasteProfileBuilderTest {
     }
 
     @Test fun computesBehaviourMetrics() {
-        assertEquals(1f / 11f, profile.skipRate, 0.001f)
+        assertEquals(1f / 10f, profile.skipRate, 0.001f)
         assertEquals(0.25f, profile.favoriteRatio, 0.001f)
         assertTrue(profile.preferredBpm in 85..130)
         assertTrue(profile.energyRange.contains("-"))

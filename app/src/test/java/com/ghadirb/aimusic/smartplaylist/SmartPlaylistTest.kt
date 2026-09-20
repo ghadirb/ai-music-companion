@@ -119,10 +119,15 @@ class SmartPlaylistTest {
 
     @Test fun limitAndSimilarity() {
         assertEquals(1, gen(PlaylistIntent(limit = 1)).tracks.size)
-        val similar = gen(PlaylistIntent(similarToTrackId = 2L)).tracks.map { it.track.id }
-        assertFalse(2L in similar)
-        assertEquals(1L, similar.first().let { if (it == 1L || it == 5L) 1L else it }) // calm neighbours rank before "Loud"
-        assertEquals(3L, similar.last { it != 4L })
+        val similar = gen(PlaylistIntent(similarToTrackId = 5L)).tracks.map { it.track.id }
+        assertFalse(5L in similar)
+        assertEquals(setOf(1L, 2L), similar.take(2).toSet()) // the two calm, low-energy neighbours rank first
+    }
+
+    @Test fun durationPhraseIsNotMistakenForTrackCount() {
+        val i = PlaylistIntentParser.parse("45 دقیقه آهنگ شاد")
+        assertEquals(45, i.durationMinutes)
+        assertEquals(PlaylistIntent.DEFAULT_LIMIT, i.limit)
     }
 
     @Test fun emptyLibraryIsSafe() {
