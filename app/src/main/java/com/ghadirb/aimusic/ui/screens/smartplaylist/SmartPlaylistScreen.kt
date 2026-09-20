@@ -98,6 +98,21 @@ class SmartPlaylistViewModel(
         }
     }
 
+    /** Advanced rediscover: liked-and-forgotten music not heard for [days] days. */
+    fun generateRediscover(days: Int) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, message = null, needsConsent = false)
+            val tracks = repository.allTracksSnapshot()
+            finish(
+                PlaylistIntent(
+                    excludeRecentDays = days, sort = com.ghadirb.aimusic.smartplaylist.SmartSort.LEAST_PLAYED,
+                    limit = 30, title = "پلی‌لیست کشف مجدد ($days روز)"
+                ),
+                tracks, null
+            )
+        }
+    }
+
     fun grantConsentAndRetry() {
         consent.enabled = true
         val text = pendingAiText ?: return
@@ -189,6 +204,16 @@ fun SmartPlaylistScreen(
                             gate(PremiumFeature.SMART_PLAYLIST_GENERATION) { viewModel.generateLocal(prompt, currentTrackId) }
                         },
                         label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+            Text("کشف مجدد پیشرفته (پرمیوم)", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
+            LazyRow {
+                items(listOf(30, 60, 90), key = { it }) { days ->
+                    AssistChip(
+                        onClick = { gate(PremiumFeature.ADVANCED_REDISCOVER) { viewModel.generateRediscover(days) } },
+                        label = { Text("نشنیده‌ام: $days روز") },
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }

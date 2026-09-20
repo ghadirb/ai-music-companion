@@ -90,9 +90,6 @@ class MusicRepository(
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =
         trackDao.setFavorite(trackId, isFavorite)
 
-    suspend fun restoreFavoritePaths(paths: List<String>) {
-        if (paths.isNotEmpty()) trackDao.markFavoritePaths(paths)
-    }
 
     suspend fun getTrack(trackId: Long): TrackEntity? = trackDao.getById(trackId)
 
@@ -100,7 +97,6 @@ class MusicRepository(
     suspend fun recordListening(entry: ListeningHistoryEntity): Long = historyDao.insert(entry)
 
     suspend fun recentHistory(limit: Int = 200) = historyDao.getRecent(limit)
-    suspend fun mostPlayed(limit: Int = 20) = historyDao.mostPlayedTrackIds(limit)
 
     fun observeUserPreferenceFlow() = preferenceDao.observe()
     suspend fun getUserPreference(): UserPreferenceEntity? = preferenceDao.get()
@@ -172,25 +168,6 @@ class MusicRepository(
 
     suspend fun allTracksSnapshot(): List<TrackEntity> = observeTracks().first()
 
-    /**
-     * "آهنگ‌های فراموش‌شده" (doc, smart-playlist list): tracks that were
-     * favorited or previously listened to completion, but have no listening
-     * history entry in the last [staleDays] days. Uses only local data
-     * already collected — no new signal required.
-     */
-    suspend fun rediscoverTracks(limit: Int = 10, staleDays: Int = 14): List<TrackEntity> {
-        val cutoff = System.currentTimeMillis() - staleDays * 24L * 60 * 60 * 1000
-        val allTracks = observeTracks().first()
-        val recentHistory = historyDao.getRecent(1000)
-        val recentlyPlayedIds = recentHistory.filter { it.startTime >= cutoff }.map { it.trackId }.toSet()
-        val everPlayedIds = recentHistory.map { it.trackId }.toSet()
-
-        return allTracks
-            .filter { it.id !in recentlyPlayedIds && (it.isFavorite || it.id in everPlayedIds) }
-            .shuffled()
-            .take(limit)
-    }
-
     // ---- On-device audio analysis (see analysis/AudioAnalyzer.kt) ----
 
     suspend fun getUnanalyzedTracks(limit: Int = 25): List<TrackEntity> = trackDao.getUnanalyzed(limit)
@@ -205,47 +182,4 @@ class MusicRepository(
         trackDao.resetAudioAnalysis()
         AudioAnalysisWorker.enqueueNow(appContext)
     }
-
-    /**
-     * Backs the "مناسب شب" Home card. Real filter now that AudioAnalyzer exists:
-     * calm-mood tracks first (favorites prioritized), and if not enough tracks
-     * have been analyzed yet, tops up with low-energy tracks so the card isn't
-     * empty during the first day of background analysis.
-     */
-    suspend fun nightSuitableTracks(limit: Int = 6): List<TrackEntity> {
-        val byMood = trackDao.getByMoodTags(listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.CALM), limit)
-        if (byMood.size >= limit) return byMood
-        val topUp = trackDao.getLowEnergyTracks(0.45f, limit)
-        return (byMood + topUp).distinctBy { it.id }.take(limit)
-    }
-
-    /** Backs the "مناسب رانندگی" Home card — same idea as [nightSuitableTracks], inverted. */
-    suspend fun drivingSuitableTracks(limit: Int = 6): List<TrackEntity> {
-        val byMood = trackDao.getByMoodTags(listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.ENERGETIC), limit)
-        if (byMood.size >= limit) return byMood
-        val topUp = trackDao.getHighEnergyTracks(0.55f, limit)
-        return (byMood + topUp).distinctBy { it.id }.take(limit)
-    }
-
-    /** Calm, low-energy mix for reading or focused work. */
-    suspend fun focusSuitableTracks(limit: Int = 6): List<TrackEntity> =
-        trackDao.getLowEnergyTracks(0.55f, limit)
-
-    /** Higher-energy mix for exercise. */
-    suspend fun workoutSuitableTracks(limit: Int = 6): List<TrackEntity> =
-        trackDao.getHighEnergyTracks(0.65f, limit)
-
-    /** Local LRC sentiment (when available) plus audio energy for a happy/dance rail. */
-    suspend fun happyDanceTracks(limit: Int = 6): List<TrackEntity> {
-        val byMood = trackDao.getByMoodTags(
-            listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.HAPPY, com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.ENERGETIC),
-            limit
-        )
-        if (byMood.size >= limit) return byMood
-        return (byMood + trackDao.getHighEnergyTracks(0.65f, limit)).distinctBy { it.id }.take(limit)
-    }
-
-    /** Only appears when a local LRC file supplied a clear sad signal. */
-    suspend fun sadTracks(limit: Int = 6): List<TrackEntity> =
-        trackDao.getByMoodTags(listOf(com.ghadirb.aimusic.analysis.AudioAnalyzer.MoodTag.SAD), limit)
 }

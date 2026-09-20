@@ -8,6 +8,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.ghadirb.aimusic.premium.PremiumFeature
+import com.ghadirb.aimusic.recommendation.TuningStore
+import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,9 +50,21 @@ fun HomeScreen(
     onOpenPremium: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val access = LocalPremiumAccess.current
+    val tuning = remember { TuningStore(context) }
     val viewModel: HomeViewModel = viewModel(
-        factory = viewModelFactory { initializer { HomeViewModel(repository) } }
+        factory = viewModelFactory {
+            initializer {
+                HomeViewModel(repository) { tuning.effective(access?.isAllowed(PremiumFeature.ADVANCED_RECOMMENDATION) == true) }
+            }
+        }
     )
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) viewModel.reload() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val picks by viewModel.picks.collectAsState()
     val mixes by viewModel.mixes.collectAsState()
     val hasLibrary by viewModel.hasLibrary.collectAsState()

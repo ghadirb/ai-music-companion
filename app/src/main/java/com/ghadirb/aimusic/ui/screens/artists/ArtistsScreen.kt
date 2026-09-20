@@ -19,7 +19,7 @@ import coil.compose.AsyncImage
 @Composable
 fun ArtistsScreen(repository: MusicRepository, onArtistClick: (String) -> Unit) {
     val tracks by repository.observeTracks().collectAsState(initial = emptyList())
-    val artists = tracks.groupBy { it.artist }.filterKeys { it != "Unknown artist" }.toSortedMap()
+    val artists = androidx.compose.runtime.remember(tracks) { tracks.groupBy { it.artist }.filterKeys { it != "Unknown artist" }.toSortedMap() }
     if (artists.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
             Text("پس از اسکن کتابخانه، هنرمندان اینجا نمایش داده می‌شوند.")

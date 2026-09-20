@@ -7,6 +7,7 @@ import com.ghadirb.aimusic.mix.SmartMix
 import com.ghadirb.aimusic.mix.SmartMixGenerator
 import com.ghadirb.aimusic.recommendation.Recommendation
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
+import com.ghadirb.aimusic.recommendation.ScoringConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,9 +22,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(FlowPreview::class)
-class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
+class HomeViewModel(
+    private val repository: MusicRepository,
+    private val configProvider: () -> ScoringConfig = { ScoringConfig() }
+) : ViewModel() {
 
-    private val recommendationEngine = RecommendationEngine(repository)
+    private var lastCount = 0
 
     private val _picks = MutableStateFlow<List<Recommendation>>(emptyList())
     /** "Today's picks", each with a short reason ("because you listen to this artist a lot"). */
@@ -56,8 +60,14 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
         }
     }
 
+    /** Re-computes with the current tuning (called when returning to Home). */
+    fun reload() { viewModelScope.launch { refresh(lastCount) } }
+
     private suspend fun refresh(count: Int) {
+        lastCount = count
         try {
+            val config = configProvider()
+            val engine = RecommendationEngine(repository, config)
             if (count == 0) {
                 _picks.value = emptyList()
                 _mixes.value = emptyList()
@@ -65,8 +75,8 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
                 val tracks = repository.observeTracks().first()
                 val history = repository.recentHistory(3000)
                 val now = System.currentTimeMillis()
-                _picks.value = recommendationEngine.recommend(limit = 8, nowMs = now)
-                _mixes.value = withContext(Dispatchers.Default) { SmartMixGenerator.generateAll(tracks, history, now, limit = 30) }
+                _picks.value = engine.recommend(limit = 8, nowMs = now)
+                _mixes.value = withContext(Dispatchers.Default) { SmartMixGenerator.generateAll(tracks, history, now, limit = 30, config = config) }
             }
         } catch (e: Exception) {
             // Recommendations are a nice-to-have: never crash the Home screen because of them.

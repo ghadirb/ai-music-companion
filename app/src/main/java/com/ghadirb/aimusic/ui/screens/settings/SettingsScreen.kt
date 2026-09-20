@@ -148,6 +148,48 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        var tuning by remember { mutableStateOf(com.ghadirb.aimusic.recommendation.TuningStore(context).selected) }
+        ListItem(
+            headlineContent = { Text("تنظیم پیشنهادها (پرمیوم)") },
+            supportingContent = {
+                Column {
+                    Text("میزان کشف موسیقی جدید در برابر آهنگ‌های آشنا. بدون پرمیوم، حالت «متعادل» اعمال می‌شود.")
+                    Row {
+                        com.ghadirb.aimusic.recommendation.RecommendationTuning.values().forEach { mode ->
+                            FilterChip(
+                                selected = tuning == mode,
+                                onClick = {
+                                    val apply = {
+                                        tuning = mode
+                                        com.ghadirb.aimusic.recommendation.TuningStore(context).selected = mode
+                                    }
+                                    if (premiumAccess == null) apply()
+                                    else premiumAccess.require(com.ghadirb.aimusic.premium.PremiumFeature.ADVANCED_RECOMMENDATION, apply)
+                                },
+                                label = { Text(mode.labelFa) },
+                                modifier = Modifier.padding(end = 8.dp, top = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        )
+        HorizontalDivider()
+
+        ListItem(
+            headlineContent = { Text("حریم خصوصی") },
+            supportingContent = {
+                Column {
+                    Text("موسیقی، تاریخچه، علاقه‌مندی‌ها و پروفایل سلیقهٔ شما فقط روی این دستگاه می‌ماند. قابلیت‌های ابری اختیاری و پیش‌فرض خاموش‌اند و فقط داده‌های مشخص‌شده در سیاست حریم خصوصی را می‌فرستند؛ هیچ کلید API داخل برنامه نیست.")
+                    Row {
+                        TextButton(onClick = { openUrl(context, POLICY_URL) }) { Text("سیاست حریم خصوصی") }
+                        TextButton(onClick = { openUrl(context, TERMS_URL) }) { Text("شرایط استفاده") }
+                    }
+                }
+            }
+        )
+        HorizontalDivider()
+
         ListItem(
             headlineContent = { Text("آمار شنیدن") },
             supportingContent = { Text("آمار پایه رایگان است؛ آمار و بینش‌های پیشرفته ویژهٔ پرمیوم است.") },
@@ -220,4 +262,13 @@ fun SettingsScreen(
             supportingContent = { Text("تحلیل موسیقی و LRC محلی روی دستگاه انجام می‌شود. متن آنلاین فقط در صورت فعال‌سازی یک سرویس دارای مجوز و رضایت شما استفاده خواهد شد.") }
         )
     }
+}
+
+private const val POLICY_URL = "https://github.com/ghadirb/ai-music-companion/blob/master/PRIVACY_POLICY.md"
+private const val TERMS_URL = "https://github.com/ghadirb/ai-music-companion/blob/master/TERMS.md"
+
+private fun openUrl(context: android.content.Context, url: String) {
+    try {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+    } catch (_: Exception) { /* no browser installed */ }
 }
