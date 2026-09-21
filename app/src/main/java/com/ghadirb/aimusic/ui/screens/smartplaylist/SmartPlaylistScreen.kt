@@ -201,7 +201,8 @@ fun SmartPlaylistScreen(
                     AssistChip(
                         onClick = {
                             text = prompt
-                            gate(PremiumFeature.SMART_PLAYLIST_GENERATION) { viewModel.generateLocal(prompt, currentTrackId) }
+                            // Basic presets are part of the free "basic smart mix" experience.
+                            viewModel.generateLocal(prompt, currentTrackId)
                         },
                         label = { Text(label) },
                         modifier = Modifier.padding(end = 8.dp)
@@ -242,7 +243,8 @@ fun SmartPlaylistScreen(
                     val run: () -> Unit = {
                         if (useAi && aiUnlocked) viewModel.generateWithAi(text, currentTrackId) else viewModel.generateLocal(text, currentTrackId)
                     }
-                    gate(PremiumFeature.NATURAL_LANGUAGE_SEARCH) { gate(PremiumFeature.SMART_PLAYLIST_GENERATION, run) }
+                    // Free-text requests (local rules or AI DJ) are the Premium "advanced smart playlist / coach".
+                    gate(PremiumFeature.SMART_PLAYLIST_GENERATION, run)
                 },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             ) { Text("ساخت پلی‌لیست") }

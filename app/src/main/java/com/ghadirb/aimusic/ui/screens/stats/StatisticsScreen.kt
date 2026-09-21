@@ -2,6 +2,8 @@ package com.ghadirb.aimusic.ui.screens.stats
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,6 +24,10 @@ import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.premium.Entitlement
 import com.ghadirb.aimusic.premium.PremiumFeature
 import com.ghadirb.aimusic.recommendation.ListCodec
+import com.ghadirb.aimusic.stats.InsightPeriods
+import com.ghadirb.aimusic.stats.InsightRange
+import com.ghadirb.aimusic.stats.JalaliCalendar
+import com.ghadirb.aimusic.stats.PeriodBounds
 import com.ghadirb.aimusic.stats.StatsCalculator
 import com.ghadirb.aimusic.stats.StatsSummary
 import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
@@ -32,25 +38,40 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.TimeZone
 
 private val FREE_FLOW = MutableStateFlow(Entitlement.FREE)
 
-enum class StatsRange(val label: String, val days: Int?) { WEEK("۷ روز", 7), MONTH("۳۰ روز", 30), ALL("همه", null) }
-
 sealed interface StatsUiState {
     data object Loading : StatsUiState
-    data class Ready(val summary: StatsSummary, val profile: UserPreferenceEntity?, val range: StatsRange) : StatsUiState
+    data class Ready(val summary: StatsSummary, val profile: UserPreferenceEntity?, val range: InsightRange, val periodLabel: String) : StatsUiState
     data object Error : StatsUiState
+}
+
+/** Jalali label for a period, e.g. "مهر ۱۴۰۵" or "۱ مهر تا ۷ مهر ۱۴۰۵". */
+fun periodLabel(range: InsightRange, bounds: PeriodBounds, zone: TimeZone = TimeZone.getDefault()): String {
+    fun j(t: Long) = JalaliCalendar.jalaliOf(t, zone)
+    val start = j(bounds.startMs)
+    return when (range) {
+        InsightRange.ALL -> "از ابتدا"
+        InsightRange.TODAY -> "${start[2]} ${JalaliCalendar.monthName(start[1])} ${start[0]}"
+        InsightRange.MONTH -> "${JalaliCalendar.monthName(start[1])} ${start[0]}"
+        InsightRange.YEAR -> "سال ${start[0]}"
+        InsightRange.WEEK -> {
+            val end = j(bounds.endMs - 1)
+            "${start[2]} ${JalaliCalendar.monthName(start[1])} تا ${end[2]} ${JalaliCalendar.monthName(end[1])} ${end[0]}"
+        }
+    }
 }
 
 class StatisticsViewModel(private val repository: MusicRepository) : ViewModel() {
     private val _state = MutableStateFlow<StatsUiState>(StatsUiState.Loading)
     val state: StateFlow<StatsUiState> = _state.asStateFlow()
-    private var range = StatsRange.MONTH
+    private var range = InsightRange.MONTH
 
     init { load() }
 
-    fun setRange(value: StatsRange) { range = value; load() }
+    fun setRange(value: InsightRange) { range = value; load() }
 
     private fun load() {
         viewModelScope.launch {
@@ -60,15 +81,20 @@ class StatisticsViewModel(private val repository: MusicRepository) : ViewModel()
                 val history = repository.recentHistory(20_000)
                 val profile = repository.getUserPreference()
                 val now = System.currentTimeMillis()
-                val since = range.days?.let { now - it * 86_400_000L } ?: 0L
-                val summary = withContext(Dispatchers.Default) { StatsCalculator.compute(tracks, history, now, since) }
-                StatsUiState.Ready(summary, profile, range)
+                val zone = TimeZone.getDefault()
+                val bounds = InsightPeriods.current(range, now, zone, persian = true)
+                val summary = withContext(Dispatchers.Default) {
+                    StatsCalculator.compute(tracks, history, now, sinceMs = bounds.startMs, untilMs = bounds.endMs, zone = zone)
+                }
+                StatsUiState.Ready(summary, profile, range, periodLabel(range, bounds, zone))
             } catch (e: Exception) {
                 StatsUiState.Error
             }
         }
     }
 }
+
+private val WEEKDAYS = listOf("یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,25 +108,27 @@ fun StatisticsScreen(repository: MusicRepository) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text("آمار شنیدن", style = MaterialTheme.typography.headlineSmall)
-        Text("همهٔ آمار فقط روی همین دستگاه از تاریخچهٔ شنیدن شما ساخته می‌شود.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp))
+        Text("همهٔ آمار فقط روی همین دستگاه از تاریخچهٔ شنیدن شما ساخته می‌شود؛ هفته از شنبه شروع می‌شود و ماه و سال شمسی است.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp))
 
         when (val current = state) {
             StatsUiState.Loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             StatsUiState.Error -> Text("خواندن آمار انجام نشد. دوباره تلاش کنید.", color = MaterialTheme.colorScheme.error)
             is StatsUiState.Ready -> {
-                Row(Modifier.padding(bottom = 12.dp)) {
-                    StatsRange.values().forEach { r ->
-                        FilterChip(selected = current.range == r, onClick = { viewModel.setRange(r) }, label = { Text(r.label) }, modifier = Modifier.padding(end = 8.dp))
+                LazyRow(Modifier.padding(bottom = 4.dp)) {
+                    items(InsightRange.values().toList(), key = { it.name }) { r ->
+                        FilterChip(selected = current.range == r, onClick = { viewModel.setRange(r) }, label = { Text(r.labelFa) }, modifier = Modifier.padding(end = 8.dp))
                     }
                 }
+                Text(current.periodLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 8.dp))
                 val s = current.summary
                 if (s.isEmpty) {
-                    Text("هنوز داده‌ای برای این بازه نیست. چند آهنگ گوش کنید تا آمار ساخته شود.", style = MaterialTheme.typography.bodyMedium)
+                    Text("برای این بازه هنوز داده‌ای نیست. چند آهنگ گوش کنید تا آمار ساخته شود.", style = MaterialTheme.typography.bodyMedium)
                     return@Column
                 }
                 StatRow("آهنگ‌های پخش‌شده", "${s.completedPlays} بار (${s.uniqueTracks} آهنگ متفاوت)")
                 StatRow("زمان گوش دادن", formatDuration(s.listenMs))
                 StatRow("میزان رد کردن", "${(s.skipRate * 100).toInt()}٪")
+                StatRow("علاقه‌مندی‌ها در کتابخانه", "${s.favoriteCount}")
 
                 SectionTitle("پرشنیده‌ترین آهنگ‌ها")
                 s.topTracks.forEachIndexed { i, r -> Text("${i + 1}. ${r.track.title} — ${r.plays} بار", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp)) }
@@ -108,21 +136,33 @@ fun StatisticsScreen(repository: MusicRepository) {
                 s.topArtists.forEachIndexed { i, r -> Text("${i + 1}. ${r.name} — ${r.plays} بار", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp)) }
 
                 if (advanced) {
+                    if (s.topAlbums.isNotEmpty()) {
+                        SectionTitle("پرشنیده‌ترین آلبوم‌ها")
+                        s.topAlbums.forEachIndexed { i, r -> Text("${i + 1}. ${r.name} — ${r.plays} بار", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp)) }
+                    }
                     SectionTitle("سبک‌های محبوب")
                     s.topGenres.forEach { Text("• ${it.name} — ${it.plays}", style = MaterialTheme.typography.bodyMedium) }
                     if (s.topGenres.isEmpty()) Text("سبکی در فایل‌ها ثبت نشده است.", style = MaterialTheme.typography.bodySmall)
+                    SectionTitle("عادت‌های شنیدن")
+                    s.peakHour?.let { StatRow("پرشنیده‌ترین ساعت", "$it تا ${(it + 1) % 24}") }
+                    s.peakWeekday?.let { StatRow("پرشنیده‌ترین روز", WEEKDAYS[it]) }
+                    StatRow("آهنگ‌های تازه‌کشف‌شده", "${s.discoveredTracks} (${(s.discoveryRate * 100).toInt()}٪ از آهنگ‌های شنیده‌شده)")
                     SectionTitle("ساعت‌های گوش دادن")
                     Bars(s.playsByHour, labels = List(24) { if (it % 6 == 0) "$it" else "" })
-                    SectionTitle("روزهای هفته")
+                    SectionTitle("روزهای هفته (از یکشنبه)")
                     Bars(s.playsByWeekday, labels = listOf("ی", "د", "س", "چ", "پ", "ج", "ش"))
                     SectionTitle("روند ۱۴ روز اخیر (دقیقه)")
                     Bars(s.dailyMinutes, labels = List(14) { "" })
+                    if (s.topSkipped.isNotEmpty()) {
+                        SectionTitle("بیشترین ردشده‌ها")
+                        s.topSkipped.forEach { Text("• ${it.track.title} — ${it.plays} بار", style = MaterialTheme.typography.bodyMedium) }
+                    }
                     if (s.moodCounts.isNotEmpty()) {
                         SectionTitle("حال‌وهوای آهنگ‌ها")
                         s.moodCounts.entries.sortedByDescending { it.value }.forEach { Text("• ${moodLabel(it.key)} — ${it.value}", style = MaterialTheme.typography.bodyMedium) }
                     }
                 } else {
-                    LockedCard("آمار پیشرفته", "سبک‌ها، ساعت‌ها و روزهای هفته، روند شنیدن و حال‌وهوا") {
+                    LockedCard("آمار پیشرفته", "آلبوم‌ها، سبک‌ها، ساعت و روز اوج، کشف موسیقی، ردشده‌ها و روند شنیدن") {
                         access?.require(PremiumFeature.ADVANCED_STATISTICS) {}
                     }
                 }
@@ -150,24 +190,24 @@ fun StatisticsScreen(repository: MusicRepository) {
     }
 }
 
-private fun moodLabel(mood: String) = when (mood) {
+internal fun moodLabel(mood: String) = when (mood) {
     "calm" -> "آرام"; "energetic" -> "پرانرژی"; "happy" -> "شاد"; "sad" -> "غمگین"; "neutral" -> "خنثی"; else -> mood
 }
 
-private fun formatDuration(ms: Long): String {
+internal fun formatDuration(ms: Long): String {
     val minutes = ms / 60_000
     return if (minutes >= 60) "${minutes / 60} ساعت و ${minutes % 60} دقیقه" else "$minutes دقیقه"
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 20.dp, bottom = 6.dp))
 }
 
 @Composable
-private fun StatRow(label: String, value: String) {
+internal fun StatRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }

@@ -26,6 +26,11 @@ object SearchText {
         return out.toString()
     }
 
+    private val persianScript = Regex("[\\u0600-\\u06FF]")
+
+    /** True when [text] contains Arabic-script (Persian/Arabic) letters. */
+    fun hasPersianScript(text: String?): Boolean = !text.isNullOrEmpty() && persianScript.containsMatchIn(text)
+
     fun tokens(query: String?): List<String> =
         normalize(query).split(' ').filter { it.isNotEmpty() }
 

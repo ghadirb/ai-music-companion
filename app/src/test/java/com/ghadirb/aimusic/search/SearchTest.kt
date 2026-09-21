@@ -55,4 +55,18 @@ class SearchTest {
     @Test fun blankQueryIsEmpty() {
         assertTrue(SearchIndex(listOf(track(1, "A")), emptyList()).search("   ").isEmpty)
     }
+
+    @Test fun toleratesCommonTypos() {
+        val index = SearchIndex(listOf(track(1, "دلتنگی", artist = "علی"), track(2, "Yesterday", artist = "Beatles")), emptyList())
+        assertEquals(1, index.search("دلتنکی").tracks.size)          // one wrong letter
+        assertEquals(2L, index.search("yestreday").tracks.single().id) // missing/swapped letters
+        assertEquals(2L, index.search("beatels").tracks.single().id)  // adjacent swap
+        assertTrue(index.search("zzzzzz").isEmpty)                    // nothing close: no false positives
+    }
+
+    @Test fun shortWordsMustBeExact() {
+        assertEquals(0, FuzzyMatch.maxDistanceFor(2))
+        assertEquals(1, FuzzyMatch.distanceAtMost("abc", "abd", 1))
+        assertEquals(2, FuzzyMatch.distanceAtMost("abc", "xyz", 1)) // exceeds max -> max+1
+    }
 }

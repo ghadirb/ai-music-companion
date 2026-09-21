@@ -1,5 +1,6 @@
 package com.ghadirb.aimusic.ui.screens.home
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -63,7 +64,8 @@ fun HomeScreen(
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
     onOpenSmartPlaylist: () -> Unit = {},
     onOpenStats: () -> Unit = {},
-    onOpenPremium: () -> Unit = {}
+    onOpenPremium: () -> Unit = {},
+    onOpenTaste: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val access = LocalPremiumAccess.current
@@ -110,9 +112,10 @@ fun HomeScreen(
             true -> Unit
         }
 
-        Row(Modifier.padding(bottom = 16.dp)) {
+        Row(Modifier.padding(bottom = 16.dp).horizontalScroll(rememberScrollState())) {
             AssistChip(onClick = onOpenSmartPlaylist, label = { Text("پلی‌لیست هوشمند") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenStats, label = { Text("آمار") }, modifier = Modifier.padding(end = 8.dp))
+            AssistChip(onClick = onOpenTaste, label = { Text("تکامل سلیقه") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenPremium, label = { Text("پرمیوم") })
         }
 
@@ -210,7 +213,7 @@ fun HomeScreen(
                 title = selected.type.titleFa,
                 actions = {
                     TextButton(onClick = { selected.tracks.firstOrNull()?.let { onTrackClick(it.track, selected.trackList) } }) { Text("پخش همه") }
-                    TextButton(onClick = { queueActions?.startRadio(selected.trackList, selected.type.titleFa) }) { Text("📻 رادیو") }
+                    TextButton(onClick = { queueActions?.let { it.startRadio(selected.trackList, selected.type.titleFa) } }) { Text("📻 رادیو") }
                     TextButton(onClick = { viewModel.saveMixAsPlaylist(selected) }) { Text("ذخیره") }
                 }
             )
@@ -225,7 +228,7 @@ fun HomeScreen(
                 title = mix.type.titleFa,
                 actions = {
                     TextButton(onClick = { mix.tracks.firstOrNull()?.let { onTrackClick(it.track, mix.trackList) } }) { Text("پخش همه") }
-                    TextButton(onClick = { queueActions?.startRadio(mix.trackList, mix.type.titleFa) }) { Text("📻 رادیو") }
+                    TextButton(onClick = { queueActions?.let { it.startRadio(mix.trackList, mix.type.titleFa) } }) { Text("📻 رادیو") }
                     TextButton(onClick = { viewModel.saveMixAsPlaylist(mix) }) { Text("ذخیره") }
                 }
             )

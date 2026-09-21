@@ -145,7 +145,7 @@ class LyricsSource(context: Context) {
 
     private fun ensureIndexes(trees: Set<String>) {
         loadFromDiskIfNeeded()
-        val missing = trees.filter { it !in memory }
+        val missing = trees.filter { !memory.containsKey(it) }
         if (missing.isNotEmpty()) refreshIndex()
     }
 

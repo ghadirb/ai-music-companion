@@ -26,9 +26,8 @@ data class Entitlement(
 data class AiQuota(val limit: Int, val remaining: Int)
 
 enum class PremiumFeature(val titleFa: String, val descriptionFa: String) {
-    AI_DJ("AI DJ", "درخواست طبیعی مثل «یک ساعت موسیقی آرام برای مطالعه» را به یک پلی‌لیست از کتابخانهٔ خودتان تبدیل می‌کند."),
-    NATURAL_LANGUAGE_SEARCH("جست‌وجوی زبان طبیعی", "با جمله‌های فارسی یا انگلیسی آهنگ‌های مناسب را از کتابخانه پیدا کنید."),
-    SMART_PLAYLIST_GENERATION("ساخت پلی‌لیست هوشمند", "پلی‌لیست‌های آماده برای مطالعه، رانندگی شبانه، آهنگ‌های کم‌شنیده و مشابه آهنگ فعلی."),
+    AI_DJ("دستیار موسیقی (AI DJ / Coach)", "درخواست طبیعی مثل «یک ساعت موسیقی آرام برای مطالعه» را با هوش مصنوعی به یک پلی‌لیست از کتابخانهٔ خودتان تبدیل می‌کند؛ فقط متن درخواست ارسال می‌شود."),
+    SMART_PLAYLIST_GENERATION("پلی‌لیست هوشمند پیشرفته", "درخواست را به زبان طبیعی بنویسید (مثلاً «۳۰ دقیقه موسیقی ورزشی») تا پلی‌لیست از کتابخانهٔ خودتان ساخته شود."),
     SMART_RADIO("رادیوی هوشمند", "از یک آهنگ، خواننده، آلبوم، پلی‌لیست، علاقه‌مندی‌ها یا میکس، رادیویی بی‌پایان از کتابخانهٔ خودتان بسازید که به‌مرور با سلیقه‌تان هماهنگ می‌شود."),
     TASTE_EVOLUTION("تکامل سلیقه", "ببینید سلیقهٔ موسیقی‌تان در هفته و ماه اخیر چطور تغییر کرده: سبک‌ها، خواننده‌های جدید، آهنگ‌های کشف‌شده."),
     ADVANCED_RECOMMENDATION("تنظیم پیشنهادها", "میزان کشف موسیقی جدید در برابر آهنگ‌های آشنا را تنظیم کنید."),
@@ -45,7 +44,6 @@ enum class PremiumFeature(val titleFa: String, val descriptionFa: String) {
 object FeatureGate {
     private val requiredPlan: Map<PremiumFeature, Plan> = mapOf(
         PremiumFeature.AI_DJ to Plan.PREMIUM,
-        PremiumFeature.NATURAL_LANGUAGE_SEARCH to Plan.PREMIUM,
         PremiumFeature.SMART_PLAYLIST_GENERATION to Plan.PREMIUM,
         PremiumFeature.SMART_RADIO to Plan.PREMIUM,
         PremiumFeature.TASTE_EVOLUTION to Plan.PREMIUM,

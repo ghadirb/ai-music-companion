@@ -9,13 +9,17 @@ import com.ghadirb.aimusic.recommendation.Recommendation
 import com.ghadirb.aimusic.recommendation.RecommendationScorer
 import com.ghadirb.aimusic.recommendation.ScoringConfig
 import java.util.Random
+import com.ghadirb.aimusic.recommendation.TimeBuckets
+import com.ghadirb.aimusic.search.SearchText
 import java.util.TimeZone
 
 /** [occasion] mixes answer "what do I want to listen to now?" (workout, driving, …); the others are personal. */
 enum class MixType(val titleFa: String, val emoji: String, val occasion: Boolean) {
     MY_FAVORITES("علاقه‌مندی‌های من", "❤️", false),
     RECENTLY_LOVED("اخیراً دوست داشتی", "🔥", false),
-    REDISCOVER("دوباره کشف کن", "🔄", false),
+    REDISCOVER("فراموش‌شده‌ها", "🔄", false),
+    HIDDEN_GEMS("گنج‌های پنهان", "💎", false),
+    PERSIAN_MIX("میکس فارسی من", "🎶", false),
     RANDOM_FROM_TASTE("تصادفی از سلیقهٔ من", "🎲", false),
 
     WORKOUT("ورزشی", "🏋️", true),
@@ -67,7 +71,8 @@ object SmartMixGenerator {
         if (tracks.isEmpty()) return emptyList()
         val stats = ListeningStats.build(tracks, history, nowMs, config, zone)
         val scored = RecommendationScorer.score(tracks, history, nowMs, config, zone, stats)
-        return MixType.values().map { type -> SmartMix(type, build(type, scored, stats, nowMs, limit, config)) }
+        val bucketPlays = bucketPlays(history, zone, config)
+        return MixType.values().map { type -> SmartMix(type, build(type, scored, stats, nowMs, limit, config, bucketPlays)) }
             .filter { it.tracks.isNotEmpty() }
     }
 
@@ -82,8 +87,28 @@ object SmartMixGenerator {
     ): List<Recommendation> {
         val stats = ListeningStats.build(tracks, history, nowMs, config, zone)
         val scored = RecommendationScorer.score(tracks, history, nowMs, config, zone, stats)
-        return build(type, scored, stats, nowMs, limit, config)
+        return build(type, scored, stats, nowMs, limit, config, bucketPlays(history, zone, config))
     }
+
+    /** trackId -> (time-of-day bucket -> completed plays): lets time-based mixes adapt to when the user really listens. */
+    private fun bucketPlays(history: List<ListeningHistoryEntity>, zone: TimeZone, config: ScoringConfig): Map<Long, Map<String, Int>> =
+        history.filter { !it.skipped && it.completedPercentage >= config.completedThreshold }
+            .groupBy { it.trackId }
+            .mapValues { (_, list) -> list.groupingBy { TimeBuckets.bucketOf(it.startTime, zone) }.eachCount() }
+
+    /** Time-based mixes keep their rule-based core but also include (and favour) what the user actually plays at that time. */
+    private fun adaptive(
+        scored: List<Recommendation>,
+        bucket: String,
+        bucketPlays: Map<Long, Map<String, Int>>,
+        limit: Int,
+        rule: (TrackEntity) -> Boolean
+    ): List<Recommendation> = scored
+        .map { r -> r to (bucketPlays[r.track.id]?.get(bucket) ?: 0) }
+        .filter { (r, n) -> rule(r.track) || n >= 2 }
+        .sortedByDescending { (r, n) -> r.score + 1.0 * minOf(n, 3) }
+        .map { (r, n) -> if (n >= 2) r.copy(reasons = listOf(Reason(ReasonType.TIME_OF_DAY_MATCH)) + r.reasons.take(1)) else r }
+        .take(limit)
 
     private fun build(
         type: MixType,
@@ -91,7 +116,8 @@ object SmartMixGenerator {
         stats: ListeningStats,
         nowMs: Long,
         limit: Int,
-        config: ScoringConfig
+        config: ScoringConfig,
+        bucketPlays: Map<Long, Map<String, Int>>
     ): List<Recommendation> = when (type) {
         MixType.MY_FAVORITES -> scored.filter { it.track.isFavorite }
             .map { it.copy(reasons = listOf(Reason(ReasonType.FAVORITE))) }.take(limit)
@@ -123,13 +149,12 @@ object SmartMixGenerator {
             t.moodTag != SAD && t.durationMs >= 90_000 && (t.moodTag == ENERGETIC || (t.energyLevel != null && t.energyLevel >= 0.65f))
         }.sortedByDescending { it.score + tempoBonus(it.track, 110..175) }.take(limit)
 
-        MixType.DRIVING -> scored.filter { r ->
-            val t = r.track
+        MixType.DRIVING -> adaptive(scored, TimeBuckets.EVENING, bucketPlays, limit) { t ->
             val e = t.energyLevel
             t.moodTag != SAD && t.durationMs >= 150_000 &&
                 (t.moodTag == ENERGETIC || t.moodTag == HAPPY || (e != null && e in 0.4f..0.8f)) &&
                 (t.bpm == null || t.bpm in 80..150)
-        }.take(limit)
+        }
 
         MixType.HAPPY -> scored.filter { r ->
             val t = r.track
@@ -138,24 +163,30 @@ object SmartMixGenerator {
 
         MixType.SAD -> scored.filter { it.track.moodTag == SAD }.take(limit)
 
-        MixType.MORNING -> scored.filter { r ->
-            val t = r.track
+        // Rarely heard tracks that fit the user's taste (artist/genre affinity) — not another list of the usual top songs.
+        MixType.HIDDEN_GEMS -> scored.filter { r ->
+            val sig = stats.signals[r.track.id]
+            val fits = (stats.artistAffinity[r.track.artist] ?: 0.0) >= 0.3 || (r.track.genre?.let { stats.genreAffinity[it] } ?: 0.0) >= 0.3
+            (sig?.completedRaw ?: 0) <= 1 && (sig?.skipsRaw ?: 0) < 2 && fits && !r.track.isFavorite
+        }.map { it.copy(reasons = listOf(Reason(ReasonType.EXPLORE))) }.take(limit)
+
+        MixType.PERSIAN_MIX -> scored.filter { SearchText.hasPersianScript(it.track.title) || SearchText.hasPersianScript(it.track.artist) }.take(limit)
+
+        MixType.MORNING -> adaptive(scored, TimeBuckets.MORNING, bucketPlays, limit) { t ->
             val e = t.energyLevel
             t.moodTag != SAD && t.durationMs >= 120_000 && e != null && e in 0.35f..0.7f
-        }.take(limit)
+        }
 
         MixType.ENERGETIC -> scored.filter { isEnergetic(it.track) }.take(limit)
 
-        MixType.FOCUS -> scored.filter {
-            val t = it.track
+        MixType.FOCUS -> adaptive(scored, TimeBuckets.AFTERNOON, bucketPlays, limit) { t ->
             val e = t.energyLevel
             e != null && e in 0.15f..0.5f && (t.moodTag == CALM || t.moodTag == NEUTRAL || t.moodTag == null) && t.durationMs >= 120_000
-        }.take(limit)
+        }
 
-        MixType.NIGHT -> scored.filter { r ->
-            val t = r.track
+        MixType.NIGHT -> adaptive(scored, TimeBuckets.NIGHT, bucketPlays, limit) { t ->
             t.moodTag == CALM || t.moodTag == SAD || (t.energyLevel != null && t.energyLevel < 0.45f)
-        }.take(limit)
+        }
 
         MixType.RANDOM_FROM_TASTE -> weightedSample(scored.take(200), limit, seed = nowMs / DAY_MS)
     }

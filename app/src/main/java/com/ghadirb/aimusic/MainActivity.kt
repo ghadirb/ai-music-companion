@@ -65,6 +65,8 @@ import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYER
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PREMIUM
 import com.ghadirb.aimusic.ui.navigation.ROUTE_SMART_PLAYLIST
 import com.ghadirb.aimusic.ui.navigation.ROUTE_STATS
+import com.ghadirb.aimusic.ui.navigation.ROUTE_TASTE
+import com.ghadirb.aimusic.ui.screens.stats.TasteEvolutionScreen
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYLIST_DETAIL
 import com.ghadirb.aimusic.ui.navigation.Screen
 import com.ghadirb.aimusic.ui.navigation.albumDetailRoute
@@ -252,6 +254,7 @@ private fun MainScaffold(
         currentRoute == ROUTE_PLAYER -> "در حال پخش"
         currentRoute == ROUTE_PREMIUM -> "پرمیوم"
         currentRoute == ROUTE_STATS -> "آمار"
+        currentRoute == ROUTE_TASTE -> "تکامل سلیقه"
         currentRoute == ROUTE_SMART_PLAYLIST -> "پلی‌لیست هوشمند"
         currentRoute == ROUTE_PLAYLIST_DETAIL ->
             backStackEntry?.arguments?.getString("playlistName")
@@ -321,7 +324,9 @@ private fun MainScaffold(
                     onTrackClick = ::openPlayer,
                     onOpenSmartPlaylist = { navController.navigate(ROUTE_SMART_PLAYLIST) { launchSingleTop = true } },
                     onOpenStats = { navController.navigate(ROUTE_STATS) { launchSingleTop = true } },
-                    onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } }
+                    onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } },
+                    // Gated centrally through PremiumAccess (no scattered checks in the UI).
+                    onOpenTaste = { premiumAccess.require(PremiumFeature.TASTE_EVOLUTION) { navController.navigate(ROUTE_TASTE) { launchSingleTop = true } } }
                 )
             }
             composable(Screen.Library.route) {
@@ -372,6 +377,7 @@ private fun MainScaffold(
             }
             composable(ROUTE_PREMIUM) { PremiumScreen(premiumViewModel) }
             composable(ROUTE_STATS) { StatisticsScreen(repository) }
+            composable(ROUTE_TASTE) { TasteEvolutionScreen(repository) }
             composable(ROUTE_SMART_PLAYLIST) {
                 SmartPlaylistScreen(
                     repository = repository,

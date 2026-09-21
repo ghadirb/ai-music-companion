@@ -165,7 +165,7 @@ fun PlayerScreen(
                 Text("📻 رادیو: ${session.label}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 TextButton(onClick = playerViewModel::stopRadio) { Text("توقف رادیو") }
             }
-        } ?: OutlinedButton(onClick = { queueActions?.startRadio(listOf(currentTrack), currentTrack.title) }, modifier = Modifier.padding(top = 8.dp)) {
+        } ?: OutlinedButton(onClick = { queueActions?.let { it.startRadio(listOf(currentTrack), currentTrack.title) } }, modifier = Modifier.padding(top = 8.dp)) {
             Text("📻 رادیو از این آهنگ")
         }
 

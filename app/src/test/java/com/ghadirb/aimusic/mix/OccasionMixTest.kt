@@ -49,3 +49,34 @@ class OccasionMixTest {
         assertEquals(MixType.NIGHT, MixType.suggestedFor("night"))
     }
 }
+
+class PersonalMixTest {
+    private fun mix(type: MixType, tracks: List<com.ghadirb.aimusic.data.local.entity.TrackEntity>, history: List<com.ghadirb.aimusic.data.local.entity.ListeningHistoryEntity> = emptyList()) =
+        SmartMixGenerator.generate(type, tracks, history, NOW, zone = UTC).map { it.track.id }
+
+    @Test fun persianMixUsesOnlyPersianScriptTracks() {
+        val tracks = listOf(track(1, title = "دلتنگی", artist = "Someone"), track(2, title = "Song", artist = "علی"), track(3, title = "English", artist = "Band"))
+        assertEquals(setOf(1L, 2L), mix(MixType.PERSIAN_MIX, tracks).toSet())
+    }
+
+    @Test fun hiddenGemsAreRarelyHeardTracksThatMatchTheTaste() {
+        val tracks = listOf(
+            track(1, artist = "Loved", genre = "Rock"), track(2, artist = "Loved", genre = "Rock"), // 2: same artist, never played
+            track(3, artist = "Other", genre = "Jazz"),                                            // unrelated: not a gem
+            track(4, artist = "Loved", genre = "Rock", fav = true)                                  // favourites are not "hidden"
+        )
+        val history = (1..6).map { com.ghadirb.aimusic.TestData.play(1, it.toDouble()) }
+        assertEquals(setOf(2L), mix(MixType.HIDDEN_GEMS, tracks, history).toSet())
+    }
+
+    @Test fun morningMixAdaptsToWhenTheUserReallyListens() {
+        // NOW is 08:00 UTC; the user plays a "not morning-like" high-energy track every morning.
+        val loud = track(1, energy = 0.95f, mood = "energetic")
+        val gentle = track(2, energy = 0.5f, mood = "neutral")
+        val history = (1..3).map { com.ghadirb.aimusic.TestData.play(1, it.toDouble()) }
+        val ids = mix(MixType.MORNING, listOf(loud, gentle), history)
+        assertTrue(1L in ids)          // included because of real behaviour
+        assertEquals(1L, ids.first())  // and favoured
+        assertTrue(2L in ids)          // rule-based candidate still present
+    }
+}

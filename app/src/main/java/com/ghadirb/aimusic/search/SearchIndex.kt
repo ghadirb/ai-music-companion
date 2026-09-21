@@ -46,6 +46,23 @@ class SearchIndex(tracks: List<TrackEntity>, playlists: List<PlaylistEntity>) {
     fun search(query: String, maxTracks: Int = 300): SearchResults {
         val tokens = SearchText.tokens(query)
         if (tokens.isEmpty()) return SearchResults.EMPTY
+        val exact = searchExact(tokens, maxTracks)
+        // Typos ("دلتنکی" for "دلتنگی"): only when nothing matched exactly, so normal searches stay fast and precise.
+        return if (exact.isEmpty && tokens.any { it.length >= 3 }) searchFuzzy(tokens, maxTracks) else exact
+    }
+
+    private fun searchFuzzy(tokens: List<String>, maxTracks: Int): SearchResults {
+        fun fuzzy(normalized: String) = FuzzyMatch.matchesAll(normalized.split(' '), tokens)
+        return SearchResults(
+            tracks = entries.filter { fuzzy(it.all) }.sortedBy { it.title }.take(maxTracks).map { it.track },
+            artists = artists.filter { fuzzy(it.normalized) }.map { it.value }.take(MAX_GROUP),
+            albums = albums.filter { fuzzy(it.normalized) }.map { it.value }.take(MAX_GROUP),
+            genres = genres.filter { fuzzy(it.normalized) }.map { it.value }.take(MAX_GROUP),
+            playlists = playlistEntries.filter { fuzzy(it.normalized) }.map { it.value }.take(MAX_GROUP)
+        )
+    }
+
+    private fun searchExact(tokens: List<String>, maxTracks: Int): SearchResults {
         val joined = tokens.joinToString(" ")
 
         val matchedTracks = entries

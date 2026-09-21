@@ -21,7 +21,6 @@ data class GeneratedPlaylist(
 /** Builds a playlist from the user's own library for a [PlaylistIntent]. Pure and deterministic (seeded). */
 object PlaylistGenerator {
     private const val DAY_MS = 24L * 60 * 60 * 1000
-    private val arabicScript = Regex("[\\u0600-\\u06FF]")
 
     fun generate(
         rawIntent: PlaylistIntent,
@@ -84,7 +83,7 @@ object PlaylistGenerator {
 
     private fun matchesLanguage(t: TrackEntity, language: LanguageFilter?): Boolean {
         if (language == null) return true
-        val persian = arabicScript.containsMatchIn(t.title) || arabicScript.containsMatchIn(t.artist)
+        val persian = SearchText.hasPersianScript(t.title) || SearchText.hasPersianScript(t.artist)
         return if (language == LanguageFilter.PERSIAN) persian else !persian
     }
 
