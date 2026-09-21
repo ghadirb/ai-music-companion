@@ -112,4 +112,35 @@ class LyricsDetectionTest {
         assertTrue(parsed.synced)
         assertEquals(listOf(3000L, 7000L), parsed.lines.map { it.timeMs })
     }
+
+    // ---- approximate sync for lyrics without timestamps ----
+    private val plain = (0 until 10).map { LrcLine(it.toLong(), "line number $it with same length") }
+
+    @Test fun estimatedIndexMovesForwardThroughTheSong() {
+        val duration = 200_000L
+        assertEquals(-1, LyricsTimeline.estimatedIndex(plain, 2_000, duration))          // still in the intro
+        val early = LyricsTimeline.estimatedIndex(plain, 30_000, duration)
+        val middle = LyricsTimeline.estimatedIndex(plain, 100_000, duration)
+        val late = LyricsTimeline.estimatedIndex(plain, 190_000, duration)
+        assertTrue("early=$early middle=$middle late=$late", early in 0 until middle && middle < late)
+        assertEquals(plain.lastIndex, LyricsTimeline.estimatedIndex(plain, 199_999, duration))
+        assertEquals(-1, LyricsTimeline.estimatedIndex(plain, 50_000, 0))               // unknown duration: no guess
+        assertEquals(-1, LyricsTimeline.estimatedIndex(emptyList(), 50_000, duration))
+    }
+
+    @Test fun longerLinesGetMoreTime() {
+        val lines = listOf(LrcLine(0, "a"), LrcLine(1, "x".repeat(200)), LrcLine(2, "b"))
+        // the long middle line owns most of the time span
+        assertEquals(1, LyricsTimeline.estimatedIndex(lines, 100_000, 200_000))
+    }
+
+    // ---- folder picker opens in the song's own folder ----
+    @Test fun documentIdsForStoragePaths() {
+        assertEquals("primary:Music/Album", StorageAccess.documentIdFor("/storage/emulated/0/Music/Album"))
+        assertEquals("primary:", StorageAccess.documentIdFor("/storage/emulated/0"))
+        assertEquals("primary:Music", StorageAccess.documentIdFor("/sdcard/Music"))
+        assertEquals("1A2B-3C4D:Music/Persian", StorageAccess.documentIdFor("/storage/1A2B-3C4D/Music/Persian"))
+        assertNull(StorageAccess.documentIdFor("/data/app/x"))
+        assertNull(StorageAccess.documentIdFor(null))
+    }
 }

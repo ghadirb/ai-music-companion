@@ -212,11 +212,12 @@ fun PlayerScreen(
         LyricsCard(
             state = lyrics,
             positionMs = uiState.positionMs,
+            durationMs = uiState.durationMs,
             hasFolder = lyricsHasFolder,
             onExpand = { showLyrics = true },
             onSeek = playerViewModel::seekTo,
             onImportFile = { importLauncher.launch(arrayOf("*/*")) },
-            onPickFolder = { folderLauncher.launch(null) },
+            onPickFolder = { folderLauncher.launch(com.ghadirb.aimusic.lyrics.StorageAccess.initialTreeUri(currentTrack.folderPath)) },
             onDiagnose = playerViewModel::diagnoseLyrics
         )
 
@@ -245,11 +246,12 @@ fun PlayerScreen(
             title = currentTrack.title,
             state = lyrics,
             positionMs = uiState.positionMs,
+            durationMs = uiState.durationMs,
             hasFolder = lyricsHasFolder,
             onDismiss = { showLyrics = false },
             onSeek = playerViewModel::seekTo,
             onImportFile = { importLauncher.launch(arrayOf("*/*")) },
-            onPickFolder = { folderLauncher.launch(null) },
+            onPickFolder = { folderLauncher.launch(com.ghadirb.aimusic.lyrics.StorageAccess.initialTreeUri(currentTrack.folderPath)) },
             onDiagnose = playerViewModel::diagnoseLyrics
         )
     }

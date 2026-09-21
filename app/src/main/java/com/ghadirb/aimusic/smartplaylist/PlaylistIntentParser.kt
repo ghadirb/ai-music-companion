@@ -29,6 +29,11 @@ object PlaylistIntentParser {
     private val persianWords = listOf("ایرانی", "فارسی", "persian", "iranian")
     private val foreignWords = listOf("خارجی", "انگلیسی", "english", "foreign")
     private val similarWords = listOf("شبیه", "مشابه", "similar")
+    private val partyWords = listOf("مهمانی", "پارتی", "party")
+    private val calmerWords = listOf("آرام‌تر", "آرام تر", "ملایم‌تر", "calmer", "slower", "softer", "mellower")
+    private val livelierWords = listOf("پرانرژی‌تر", "پرانرژی تر", "شادتر", "شاد تر", "تندتر", "تند تر", "faster", "more energetic", "livelier")
+    private val discoverWords = listOf("جدید", "کشف", "ناشناخته", "discover", "new music", "something new")
+    private val familiarWords = listOf("آشنا", "همیشگی", "familiar", "the usual")
 
     fun parse(text: String, context: ParseContext = ParseContext()): PlaylistIntent {
         val t = SearchText.normalize(text)
@@ -47,8 +52,18 @@ object PlaylistIntentParser {
         val moods = LinkedHashSet<String>()
         var energy: EnergyBand? = null
         val labels = ArrayList<String>()
+        val party = has(partyWords)
+        val similarRequested = has(similarWords)
+        // "similar to this one but calmer/livelier" is a relative request, not an absolute mood.
+        val energyShift = when {
+            similarRequested && has(calmerWords) -> -1
+            similarRequested && has(livelierWords) -> 1
+            else -> 0
+        }
 
         when {
+            energyShift != 0 -> labels += if (energyShift < 0) "مشابه ولی آرام‌تر" else "مشابه ولی پرانرژی‌تر"
+            party -> { moods += listOf("happy", "energetic"); energy = EnergyBand.HIGH; labels += "مهمانی" }
             workout -> { moods += "energetic"; energy = EnergyBand.HIGH; labels += "ورزش" }
             driving && night -> { moods += listOf("calm", "neutral", "happy"); energy = EnergyBand.MEDIUM; labels += "رانندگی شبانه" }
             driving -> { moods += listOf("energetic", "happy"); energy = EnergyBand.MEDIUM; labels += "رانندگی" }
@@ -77,7 +92,7 @@ object PlaylistIntentParser {
         artist?.let { labels += it }
         genre?.let { labels += it }
 
-        val similarTo = if (has(similarWords)) context.currentTrackId else null
+        val similarTo = if (similarRequested) context.currentTrackId else null
         if (similarTo != null) labels += "مشابه آهنگ فعلی"
 
         val duration = parseDurationMinutes(t)
@@ -100,7 +115,16 @@ object PlaylistIntentParser {
             similarToTrackId = similarTo,
             sort = if (lessPlayed) SmartSort.LEAST_PLAYED else SmartSort.BEST_MATCH,
             limit = count ?: PlaylistIntent.DEFAULT_LIMIT,
-            title = labels.takeIf { it.isNotEmpty() }?.let { "پلی‌لیست ${it.joinToString(" · ")}" }
+            title = labels.takeIf { it.isNotEmpty() }?.let { "پلی‌لیست ${it.joinToString(" · ")}" },
+            // A workout wants a driving tempo; nothing is assumed for other requests.
+            bpmMin = if (workout) 115 else null,
+            bpmMax = if (workout) 175 else null,
+            exploration = when {
+                has(discoverWords) -> Exploration.HIGH
+                has(familiarWords) -> Exploration.LOW
+                else -> null
+            },
+            energyShift = if (similarTo != null) energyShift else 0
         ).sanitized()
     }
 

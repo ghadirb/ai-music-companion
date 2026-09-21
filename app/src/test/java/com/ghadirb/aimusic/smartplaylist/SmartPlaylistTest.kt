@@ -133,4 +133,62 @@ class SmartPlaylistTest {
     @Test fun emptyLibraryIsSafe() {
         assertTrue(PlaylistGenerator.generate(PlaylistIntent(), emptyList(), emptyList(), NOW).tracks.isEmpty())
     }
+
+    // ---- AI Music Coach: richer intent (BPM range, exploration, relative energy) ----
+    @Test fun workoutRequestGetsDurationAndTempoRange() {
+        val i = PlaylistIntentParser.parse("برای ۳۰ دقیقه ورزش آهنگ بده")
+        assertEquals(30, i.durationMinutes)
+        assertEquals(EnergyBand.HIGH, i.energy)
+        assertEquals(115, i.bpmMin)
+        assertEquals(175, i.bpmMax)
+    }
+
+    @Test fun partyRequestIsHighEnergyAndHappy() {
+        val i = PlaylistIntentParser.parse("برای مهمانی آهنگ‌های پرانرژی انتخاب کن")
+        assertEquals(EnergyBand.HIGH, i.energy)
+        assertTrue("happy" in i.moods)
+    }
+
+    @Test fun similarButCalmerIsARelativeRequest() {
+        val i = PlaylistIntentParser.parse("آهنگ‌هایی شبیه این ولی کمی آرام‌تر پیدا کن", ParseContext(currentTrackId = 5))
+        assertEquals(5L, i.similarToTrackId)
+        assertEquals(-1, i.energyShift)
+        assertTrue(i.moods.isEmpty())        // not an absolute "calm" filter
+        assertNull(i.energy)
+        assertEquals(1, PlaylistIntentParser.parse("similar to this but more energetic", ParseContext(currentTrackId = 5)).energyShift)
+    }
+
+    @Test fun explorationWords() {
+        assertEquals(Exploration.HIGH, PlaylistIntentParser.parse("calm songs, something new").exploration)
+        assertEquals(Exploration.LOW, PlaylistIntentParser.parse("calm familiar songs").exploration)
+        assertNull(PlaylistIntentParser.parse("calm songs").exploration)
+    }
+
+    @Test fun generatorAppliesTempoAndRelativeEnergy() {
+        val ref = track(10, artist = "R", genre = "Pop", energy = 0.6f, mood = "neutral", bpm = 100)
+        val calmer = track(11, artist = "C", genre = "Pop", energy = 0.3f, mood = "calm", bpm = 90)
+        val livelier = track(12, artist = "L", genre = "Pop", energy = 0.9f, mood = "energetic", bpm = 150)
+        val lib = listOf(ref, calmer, livelier)
+        val down = PlaylistGenerator.generate(PlaylistIntent(similarToTrackId = 10, energyShift = -1), lib, emptyList(), NOW, zone = UTC)
+        assertEquals(listOf(11L), down.tracks.map { it.track.id })
+        val up = PlaylistGenerator.generate(PlaylistIntent(similarToTrackId = 10, energyShift = 1), lib, emptyList(), NOW, zone = UTC)
+        assertEquals(listOf(12L), up.tracks.map { it.track.id })
+        val tempo = PlaylistGenerator.generate(PlaylistIntent(bpmMin = 120, bpmMax = 170), lib, emptyList(), NOW, zone = UTC)
+        assertEquals(listOf(12L), tempo.tracks.map { it.track.id })
+    }
+
+    @Test fun highExplorationPrefersUnplayedTracks() {
+        val a = track(1, artist = "A1"); val b = track(2, artist = "A2")
+        val history = (1..4).map { play(1, it.toDouble() + 1) }
+        val g = PlaylistGenerator.generate(PlaylistIntent(exploration = Exploration.HIGH), listOf(a, b), history, NOW, zone = UTC)
+        assertEquals(2L, g.tracks.first().track.id)
+        val familiar = PlaylistGenerator.generate(PlaylistIntent(exploration = Exploration.LOW), listOf(a, b), history, NOW, zone = UTC)
+        assertEquals(1L, familiar.tracks.first().track.id)
+    }
+
+    @Test fun sanitiseClampsNewFields() {
+        val s = PlaylistIntent(bpmMin = 5, bpmMax = 9999, energyShift = 7).sanitized()
+        assertEquals(40, s.bpmMin); assertEquals(220, s.bpmMax); assertEquals(1, s.energyShift)
+        assertFalse(PlaylistIntent(energyShift = 1).isUnconstrained)
+    }
 }

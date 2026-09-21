@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ghadirb.aimusic.lyrics.LrcParser
+import com.ghadirb.aimusic.lyrics.LyricsOrigin
 import com.ghadirb.aimusic.lyrics.LyricsState
 import com.ghadirb.aimusic.lyrics.LyricsTimeline
 
@@ -34,16 +36,19 @@ import com.ghadirb.aimusic.lyrics.LyricsTimeline
 fun LyricsPanel(
     parsed: LrcParser.Parsed,
     positionMs: Long,
+    durationMs: Long,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
     large: Boolean = false
 ) {
     val lines = parsed.lines
-    val active = if (parsed.synced) LyricsTimeline.activeIndex(lines, positionMs) else -1
+    // Real timestamps drive the highlight; lyrics without timestamps follow the playback position approximately.
+    val active = if (parsed.synced) LyricsTimeline.activeIndex(lines, positionMs) else LyricsTimeline.estimatedIndex(lines, positionMs, durationMs)
     val listState = rememberLazyListState()
     LaunchedEffect(active) {
         if (active >= 0) listState.animateScrollToItem(active, scrollOffset = -(listState.layoutInfo.viewportSize.height / 3))
     }
+    LaunchedEffect(lines) { listState.scrollToItem(0) } // a new song starts at the top
     LazyColumn(
         state = listState,
         modifier = modifier,
@@ -78,11 +83,22 @@ fun LyricsPanel(
     }
 }
 
+private fun originLabel(state: LyricsState.Found): String {
+    val origin = when (state.origin) {
+        LyricsOrigin.IMPORTED -> "فایل واردشده"
+        LyricsOrigin.SIDECAR -> "فایل هم‌نام"
+        LyricsOrigin.EMBEDDED -> "تگ فایل صوتی"
+    }
+    val sync = if (state.parsed.synced) "همگام با آواز" else "بدون زمان‌بندی؛ حرکت تقریبی"
+    return "$origin · $sync"
+}
+
 /** Inline lyrics under the player controls. */
 @Composable
 fun LyricsCard(
     state: LyricsState,
     positionMs: Long,
+    durationMs: Long,
     hasFolder: Boolean,
     onExpand: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -90,17 +106,29 @@ fun LyricsCard(
     onPickFolder: () -> Unit,
     onDiagnose: () -> Unit
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     ElevatedCard(Modifier.fillMaxWidth().padding(top = 20.dp)) {
         Column {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("متن آهنگ", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text("متن آهنگ", style = MaterialTheme.typography.titleMedium)
+                    if (state is LyricsState.Found) Text(originLabel(state), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌های متن آهنگ") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("انتخاب فایل LRC (همگام) برای این آهنگ") }, onClick = { menuOpen = false; onImportFile() })
+                        DropdownMenuItem(text = { Text(if (hasFolder) "افزودن پوشهٔ متن‌ها/موسیقی" else "انتخاب پوشهٔ موسیقی برای شناسایی خودکار") }, onClick = { menuOpen = false; onPickFolder() })
+                        DropdownMenuItem(text = { Text("عیب‌یابی متن آهنگ") }, onClick = { menuOpen = false; onDiagnose() })
+                    }
+                }
                 IconButton(onClick = onExpand) { Icon(Icons.Filled.Fullscreen, contentDescription = "متن آهنگ در تمام صفحه") }
             }
             Box(Modifier.fillMaxWidth().height(230.dp), contentAlignment = Alignment.Center) {
                 when (state) {
                     LyricsState.Loading -> CircularProgressIndicator()
                     LyricsState.NotFound -> LyricsMissing(hasFolder, onImportFile, onPickFolder, onDiagnose, compact = true)
-                    is LyricsState.Found -> LyricsPanel(state.parsed, positionMs, onSeek, Modifier.fillMaxSize())
+                    is LyricsState.Found -> LyricsPanel(state.parsed, positionMs, durationMs, onSeek, Modifier.fillMaxSize())
                 }
             }
         }
@@ -141,6 +169,7 @@ fun LyricsFullScreen(
     title: String,
     state: LyricsState,
     positionMs: Long,
+    durationMs: Long,
     hasFolder: Boolean,
     onDismiss: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -159,7 +188,7 @@ fun LyricsFullScreen(
                     when (state) {
                         LyricsState.Loading -> CircularProgressIndicator()
                         LyricsState.NotFound -> LyricsMissing(hasFolder, onImportFile, onPickFolder, onDiagnose, compact = false)
-                        is LyricsState.Found -> LyricsPanel(state.parsed, positionMs, onSeek, Modifier.fillMaxSize(), large = true)
+                        is LyricsState.Found -> LyricsPanel(state.parsed, positionMs, durationMs, onSeek, Modifier.fillMaxSize(), large = true)
                     }
                 }
             }

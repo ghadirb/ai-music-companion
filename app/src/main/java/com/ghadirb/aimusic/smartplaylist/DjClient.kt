@@ -48,7 +48,16 @@ object DjIntentMapper {
             similarToTrackId = if (json.optBoolean("similar_to_current", false)) currentTrackId else null,
             sort = sort,
             limit = optIntOrNull("limit") ?: PlaylistIntent.DEFAULT_LIMIT,
-            title = optStringOrNull("title")
+            title = optStringOrNull("title"),
+            bpmMin = optIntOrNull("bpm_min"),
+            bpmMax = optIntOrNull("bpm_max"),
+            exploration = when (json.optString("exploration")) {
+                "low" -> Exploration.LOW
+                "medium" -> Exploration.MEDIUM
+                "high" -> Exploration.HIGH
+                else -> null
+            },
+            energyShift = json.optInt("energy_shift", 0)
         ).sanitized()
     }
 }

@@ -20,4 +20,26 @@ object LyricsTimeline {
         }
         return answer
     }
+
+    /**
+     * Approximate line for lyrics WITHOUT timestamps: the sung part of the song is assumed to span most of the track
+     * (short intro/outro skipped) and time is shared between lines in proportion to their length. It is an estimate,
+     * so the UI labels it as such; real .lrc timestamps always win.
+     */
+    fun estimatedIndex(lines: List<LrcLine>, positionMs: Long, durationMs: Long): Int {
+        if (lines.isEmpty() || durationMs <= 0) return -1
+        val intro = minOf(12_000L, (durationMs * 0.08).toLong())
+        val outro = minOf(10_000L, (durationMs * 0.06).toLong())
+        val span = (durationMs - intro - outro).coerceAtLeast(1L)
+        if (positionMs < intro) return -1
+        val weights = lines.map { it.text.length + 10 }
+        val total = weights.sum().toDouble()
+        val target = ((positionMs - intro).toDouble() / span).coerceIn(0.0, 1.0) * total
+        var cumulative = 0.0
+        for (i in lines.indices) {
+            cumulative += weights[i]
+            if (target < cumulative) return i
+        }
+        return lines.lastIndex
+    }
 }

@@ -14,6 +14,10 @@ export interface DjIntent {
   sort: "best_match" | "least_played" | "most_played" | "recently_added" | "random";
   limit: number;
   title: string | null;
+  bpm_min: number | null;
+  bpm_max: number | null;
+  exploration: "low" | "medium" | "high" | null;
+  energy_shift: -1 | 0 | 1;
 }
 
 const MOODS = new Set(["calm", "energetic", "neutral", "sad", "happy"]);
@@ -25,9 +29,12 @@ export const INTENT_SYSTEM_PROMPT = [
   "Schema: {\"moods\": array of \"calm\"|\"energetic\"|\"neutral\"|\"sad\"|\"happy\", \"energy\": \"low\"|\"medium\"|\"high\"|null,",
   "\"genre\": string|null, \"artist\": string|null, \"language\": \"persian\"|\"non_persian\"|null, \"duration_minutes\": integer|null,",
   "\"exclude_recent_days\": integer|null, \"favorite_only\": boolean, \"similar_to_current\": boolean,",
-  "\"sort\": \"best_match\"|\"least_played\"|\"most_played\"|\"recently_added\"|\"random\", \"limit\": integer 1-100, \"title\": short Persian title|null}.",
+  "\"sort\": \"best_match\"|\"least_played\"|\"most_played\"|\"recently_added\"|\"random\", \"limit\": integer 1-100, \"title\": short Persian title|null,",
+  "\"bpm_min\": integer|null, \"bpm_max\": integer|null, \"exploration\": \"low\"|\"medium\"|\"high\"|null, \"energy_shift\": -1|0|1}.",
   "Leave every field at its default unless the user explicitly asks for it. Defaults: moods [], energy null, genre null, artist null, language null,",
-  "duration_minutes null, exclude_recent_days null, favorite_only false, similar_to_current false, sort best_match, limit 25, title null.",
+  "duration_minutes null, exclude_recent_days null, favorite_only false, similar_to_current false, sort best_match, limit 25, title null,",
+  "bpm_min null, bpm_max null, exploration null, energy_shift 0.",
+  "energy_shift is -1 only for \"similar to this song but calmer/slower\", +1 for \"but more energetic\" (then similar_to_current must be true). Workout: bpm 115-175. Party: happy+energetic, high energy.",
   "language is set ONLY when the user explicitly asks for Persian/Iranian or for non-Persian/foreign music (the language of the request is NOT the language of the music).",
   "Set exclude_recent_days=14 and sort=least_played ONLY when the user says they want songs they have not heard or played recently.",
   "limit is a track count only if the user states one; a requested duration goes in duration_minutes.",
@@ -60,6 +67,10 @@ export function sanitizeIntent(raw: unknown): DjIntent {
     sort,
     limit: int(o.limit, 1, 100) ?? 25,
     title: str(o.title),
+    bpm_min: int(o.bpm_min, 40, 220),
+    bpm_max: int(o.bpm_max, 40, 220),
+    exploration: o.exploration === "low" || o.exploration === "medium" || o.exploration === "high" ? o.exploration : null,
+    energy_shift: o.energy_shift === -1 || o.energy_shift === 1 ? o.energy_shift : 0,
   };
 }
 

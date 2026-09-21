@@ -49,6 +49,8 @@ object PlaylistGenerator {
             if (genreFilter != null && !SearchText.normalize(t.genre).contains(genreFilter)) return@filter false
             if (!matchesLanguage(t, intent.language)) return@filter false
             if (!matchesMoodEnergy(t, intent)) return@filter false
+            if (!matchesTempo(t, intent)) return@filter false
+            if (!matchesEnergyShift(t, source, intent)) return@filter false
             intent.excludeRecentDays?.let { days ->
                 val last = stats.signals[t.id]?.lastPlayedAt
                 if (last != null && nowMs - last < days * DAY_MS) return@filter false
@@ -56,8 +58,18 @@ object PlaylistGenerator {
             true
         }
 
+        // Exploration: HIGH puts never/rarely played tracks ahead of familiar ones, LOW does the opposite.
+        // The bonus is on the same scale as the taste score (0..~12) so it can actually reorder the list.
+        fun explorationBonus(r: Recommendation): Double {
+            val plays = stats.signals[r.track.id]?.completedRaw ?: 0
+            return when (intent.exploration) {
+                Exploration.HIGH -> if (plays == 0) 12.0 else if (plays == 1) 6.0 else 0.0
+                Exploration.LOW -> if (plays >= 2) 5.0 else -2.0
+                else -> 0.0
+            }
+        }
         val ordered: List<Recommendation> = when {
-            source != null -> filtered.sortedByDescending { TrackSimilarity.score(source, it.track) }
+            source != null -> filtered.sortedByDescending { TrackSimilarity.score(source, it.track) + explorationBonus(it) }
             intent.sort == SmartSort.LEAST_PLAYED -> filtered.sortedWith(
                 compareBy<Recommendation> { stats.signals[it.track.id]?.plays ?: 0 }
                     .thenBy { stats.signals[it.track.id]?.lastPlayedAt ?: 0L }
@@ -66,7 +78,7 @@ object PlaylistGenerator {
             intent.sort == SmartSort.MOST_PLAYED -> filtered.sortedByDescending { stats.signals[it.track.id]?.completedRaw ?: 0 }
             intent.sort == SmartSort.RECENTLY_ADDED -> filtered.sortedByDescending { it.track.dateAdded }
             intent.sort == SmartSort.RANDOM -> filtered.shuffled(Random(seed))
-            else -> filtered
+            else -> if (intent.exploration != null) filtered.sortedByDescending { it.score + explorationBonus(it) } else filtered
         }
 
         val targetMs = intent.durationMinutes?.let { it * 60_000L }
@@ -85,6 +97,19 @@ object PlaylistGenerator {
         if (language == null) return true
         val persian = SearchText.hasPersianScript(t.title) || SearchText.hasPersianScript(t.artist)
         return if (language == LanguageFilter.PERSIAN) persian else !persian
+    }
+
+    private fun matchesTempo(t: TrackEntity, intent: PlaylistIntent): Boolean {
+        val bpm = t.bpm ?: return true // unknown tempo: don't exclude
+        return (intent.bpmMin == null || bpm >= intent.bpmMin) && (intent.bpmMax == null || bpm <= intent.bpmMax)
+    }
+
+    /** "Like this one but calmer/livelier": compare energy with the reference song (needs both values). */
+    private fun matchesEnergyShift(t: TrackEntity, source: TrackEntity?, intent: PlaylistIntent): Boolean {
+        val reference = source?.energyLevel
+        if (intent.energyShift == 0 || reference == null) return true
+        val energy = t.energyLevel ?: return false
+        return if (intent.energyShift < 0) energy <= reference - 0.05f else energy >= reference + 0.05f
     }
 
     /** Mood OR energy when both are requested (they describe the same feeling); tracks not yet analysed never match. */

@@ -324,8 +324,8 @@ class PlayerViewModel(
         _lyrics.value = LyricsState.Loading
         // File/SAF access happens off the main thread (the old code read the file on Main).
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-            val parsed = lyricsSource.load(track)
-            _lyrics.value = if (parsed != null) LyricsState.Found(parsed) else LyricsState.NotFound
+            val loaded = lyricsSource.load(track)
+            _lyrics.value = if (loaded != null) LyricsState.Found(loaded.parsed, loaded.origin) else LyricsState.NotFound
         }
     }
 

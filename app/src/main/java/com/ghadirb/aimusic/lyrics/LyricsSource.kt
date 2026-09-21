@@ -32,22 +32,38 @@ class LyricsSource(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    suspend fun load(track: TrackEntity): LrcParser.Parsed? = withContext(Dispatchers.IO) {
-        readRawText(track)?.let { LrcParser.parse(it) }?.takeUnless { it.isEmpty }
+    data class Loaded(val parsed: LrcParser.Parsed, val origin: LyricsOrigin)
+
+    suspend fun load(track: TrackEntity): Loaded? = withContext(Dispatchers.IO) {
+        readWithOrigin(track)?.let { (text, origin) ->
+            val parsed = LrcParser.parse(text)
+            if (parsed.isEmpty) null else Loaded(parsed, origin)
+        }
     }
 
     /** Raw decoded text of the best matching lyrics, or null. Blocking — call off the main thread. */
-    fun readRawText(track: TrackEntity): String? {
-        val sidecar = try { readBytes(track) } catch (e: Exception) {
+    fun readRawText(track: TrackEntity): String? = readWithOrigin(track)?.first
+
+    /**
+     * Priority: imported file > same-name .lrc (synced lyrics win over tag text) > lyrics embedded in the audio tags.
+     * If the .lrc exists but has no timestamps AND the tag has synced text, the synced text is preferred.
+     */
+    fun readWithOrigin(track: TrackEntity): Pair<String, LyricsOrigin>? {
+        val imported = importedFile(track.id).takeIf { it.isFile }?.let { runCatching { LrcParser.decode(it.inputStream().use(::readLimited)) }.getOrNull() }
+        if (imported != null) return imported to LyricsOrigin.IMPORTED
+        val sidecar = try { sidecarBytes(track) } catch (e: Exception) {
             Log.w(TAG, "Lyrics lookup failed: ${e.javaClass.simpleName}")
             null
+        }?.let { LrcParser.decode(it) }
+        val embedded = embeddedRead(track)
+        return when {
+            sidecar != null && (LrcParser.parse(sidecar).synced || embedded == null || !LrcParser.parse(embedded).synced) -> sidecar to LyricsOrigin.SIDECAR
+            embedded != null -> embedded to LyricsOrigin.EMBEDDED
+            else -> null
         }
-        if (sidecar != null) return LrcParser.decode(sidecar)
-        return embeddedRead(track)
     }
 
-    private fun readBytes(track: TrackEntity): ByteArray? {
-        importedFile(track.id).takeIf { it.isFile }?.let { return it.inputStream().use(::readLimited) }
+    private fun sidecarBytes(track: TrackEntity): ByteArray? {
         val keys = keysFor(track)
         safRead(track, keys)?.let { return it }
         return legacyDirectRead(track, keys)
@@ -69,8 +85,8 @@ class LyricsSource(context: Context) {
     }
 
     /** Remembers a folder the user granted (persisted permission). Call [refreshIndex] afterwards. */
-    fun addFolder(treeUri: Uri): Boolean = try {
-        appContext.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    fun addFolder(treeUri: Uri, persistPermission: Boolean = true): Boolean = try {
+        if (persistPermission) appContext.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         prefs.edit().putStringSet(KEY_TREES, folders() + treeUri.toString()).apply()
         memory.remove(treeUri.toString())
         true

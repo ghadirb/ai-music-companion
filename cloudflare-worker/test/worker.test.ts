@@ -291,6 +291,7 @@ describe("AI DJ intent", () => {
     expect(res.body.intent).toEqual({
       moods: ["calm"], energy: "low", genre: null, artist: null, language: null, duration_minutes: 60,
       exclude_recent_days: null, favorite_only: false, similar_to_current: false, sort: "best_match", limit: 100, title: "مطالعه",
+      bpm_min: null, bpm_max: null, exploration: null, energy_shift: 0,
     });
     const sent = h.fetchCalls[h.fetchCalls.length - 1].body;
     expect(JSON.stringify(sent)).not.toContain("sdcard");
