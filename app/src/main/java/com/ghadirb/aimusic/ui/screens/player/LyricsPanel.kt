@@ -1,8 +1,5 @@
 package com.ghadirb.aimusic.ui.screens.player
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
@@ -27,7 +24,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.ghadirb.aimusic.lyrics.LrcParser
 import com.ghadirb.aimusic.lyrics.LyricsState
 import com.ghadirb.aimusic.lyrics.LyricsTimeline
-import com.ghadirb.aimusic.lyrics.StorageAccess
 
 /**
  * Karaoke-style lyrics: the line being sung is highlighted (bigger, coloured), lines already sung fade,
@@ -88,11 +84,11 @@ fun LyricsCard(
     state: LyricsState,
     positionMs: Long,
     hasFolder: Boolean,
-    allFilesAccess: Boolean,
     onExpand: () -> Unit,
     onSeek: (Long) -> Unit,
     onImportFile: () -> Unit,
-    onPickFolder: () -> Unit
+    onPickFolder: () -> Unit,
+    onDiagnose: () -> Unit
 ) {
     ElevatedCard(Modifier.fillMaxWidth().padding(top = 20.dp)) {
         Column {
@@ -103,7 +99,7 @@ fun LyricsCard(
             Box(Modifier.fillMaxWidth().height(230.dp), contentAlignment = Alignment.Center) {
                 when (state) {
                     LyricsState.Loading -> CircularProgressIndicator()
-                    LyricsState.NotFound -> LyricsMissing(hasFolder, allFilesAccess, onImportFile, onPickFolder, compact = true)
+                    LyricsState.NotFound -> LyricsMissing(hasFolder, onImportFile, onPickFolder, onDiagnose, compact = true)
                     is LyricsState.Found -> LyricsPanel(state.parsed, positionMs, onSeek, Modifier.fillMaxSize())
                 }
             }
@@ -114,12 +110,11 @@ fun LyricsCard(
 @Composable
 fun LyricsMissing(
     hasFolder: Boolean,
-    allFilesAccess: Boolean,
     onImportFile: () -> Unit,
     onPickFolder: () -> Unit,
+    onDiagnose: () -> Unit,
     compact: Boolean
 ) {
-    val context = LocalContext.current
     Column(
         Modifier.fillMaxWidth().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -127,26 +122,16 @@ fun LyricsMissing(
     ) {
         Text("متن این آهنگ پیدا نشد", style = MaterialTheme.typography.titleSmall)
         Text(
-            if (StorageAccess.canRequestAllFilesAccess && !allFilesAccess)
-                "برای شناسایی خودکار فایل هم‌نامِ کنار آهنگ (مثلاً «نام آهنگ.lrc»)، یک‌بار دسترسی به فایل‌ها را فعال کنید. فقط روی همین دستگاه خوانده می‌شود."
-            else "فایل «نام آهنگ.lrc» را کنار آهنگ بگذارید یا برای همین آهنگ انتخاب کنید.",
-            style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, maxLines = if (compact) 4 else 8
+            if (!hasFolder) "برای شناسایی خودکار فایل هم‌نامِ کنار آهنگ (مثلاً «نام آهنگ.lrc»)، پوشهٔ موسیقی‌تان (مثلاً Music) را یک‌بار انتخاب کنید. فقط همان پوشه و فقط روی همین دستگاه خوانده می‌شود."
+            else "فایل هم‌نامی در پوشه‌های انتخاب‌شده پیدا نشد. می‌توانید فایل را برای همین آهنگ انتخاب کنید یا علت را ببینید.",
+            style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, maxLines = if (compact) 5 else 8
         )
-        if (StorageAccess.canRequestAllFilesAccess && !allFilesAccess) {
-            Button(onClick = { openAllFilesAccess(context) }, modifier = Modifier.fillMaxWidth()) { Text("فعال‌سازی شناسایی خودکار") }
-        }
+        if (!hasFolder) Button(onClick = onPickFolder, modifier = Modifier.fillMaxWidth()) { Text("انتخاب پوشهٔ موسیقی") }
         OutlinedButton(onClick = onImportFile, modifier = Modifier.fillMaxWidth()) { Text("انتخاب فایل LRC برای این آهنگ") }
-        TextButton(onClick = onPickFolder) { Text(if (hasFolder) "افزودن پوشهٔ دیگر" else "یا انتخاب پوشهٔ موسیقی") }
-    }
-}
-
-fun openAllFilesAccess(context: Context) {
-    try {
-        context.startActivity(StorageAccess.settingsIntent(context))
-    } catch (_: ActivityNotFoundException) {
-        try {
-            context.startActivity(android.content.Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        } catch (_: Exception) { /* no settings screen available */ }
+        Row {
+            if (hasFolder) TextButton(onClick = onPickFolder) { Text("افزودن پوشهٔ دیگر") }
+            TextButton(onClick = onDiagnose) { Text("چرا پیدا نشد؟") }
+        }
     }
 }
 
@@ -157,11 +142,11 @@ fun LyricsFullScreen(
     state: LyricsState,
     positionMs: Long,
     hasFolder: Boolean,
-    allFilesAccess: Boolean,
     onDismiss: () -> Unit,
     onSeek: (Long) -> Unit,
     onImportFile: () -> Unit,
-    onPickFolder: () -> Unit
+    onPickFolder: () -> Unit,
+    onDiagnose: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
@@ -173,7 +158,7 @@ fun LyricsFullScreen(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     when (state) {
                         LyricsState.Loading -> CircularProgressIndicator()
-                        LyricsState.NotFound -> LyricsMissing(hasFolder, allFilesAccess, onImportFile, onPickFolder, compact = false)
+                        LyricsState.NotFound -> LyricsMissing(hasFolder, onImportFile, onPickFolder, onDiagnose, compact = false)
                         is LyricsState.Found -> LyricsPanel(state.parsed, positionMs, onSeek, Modifier.fillMaxSize(), large = true)
                     }
                 }

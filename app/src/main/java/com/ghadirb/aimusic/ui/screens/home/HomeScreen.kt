@@ -17,7 +17,13 @@ import androidx.compose.foundation.lazy.items
 import com.ghadirb.aimusic.lyrics.StorageAccess
 import com.ghadirb.aimusic.mix.MixType
 import com.ghadirb.aimusic.recommendation.TimeBuckets
-import com.ghadirb.aimusic.ui.screens.player.openAllFilesAccess
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import com.ghadirb.aimusic.lyrics.LyricsSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -118,27 +124,31 @@ fun HomeScreen(
             }
         }
 
-        // One-time hint: lets the app find "<song name>.lrc" files next to the songs automatically.
+        // One-time hint: pick the music folder once so "<song name>.lrc" files are found automatically.
         val prefs = remember { context.getSharedPreferences("ui_preferences", android.content.Context.MODE_PRIVATE) }
         var hintDismissed by remember { mutableStateOf(prefs.getBoolean("lyrics_hint_dismissed", false)) }
-        var allFilesGranted by remember { mutableStateOf(StorageAccess.hasAllFilesAccess(context)) }
-        DisposableEffect(lifecycleOwner) {
-            val observer = LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) allFilesGranted = StorageAccess.hasAllFilesAccess(context)
+        val lyricsSource = remember { LyricsSource(context) }
+        var hasLyricsFolder by remember { mutableStateOf(lyricsSource.hasFolder()) }
+        val scope = rememberCoroutineScope()
+        val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null && lyricsSource.addFolder(uri)) {
+                hasLyricsFolder = true
+                scope.launch {
+                    val stats = withContext(Dispatchers.IO) { lyricsSource.refreshIndex() }
+                    viewModel.showMessage("${stats.files} فایل متن (lrc) در پوشهٔ انتخابی پیدا شد.")
+                }
             }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
-        if (StorageAccess.canRequestAllFilesAccess && !allFilesGranted && !hintDismissed) {
+        if (StorageAccess.needsFolderGrant && !hasLyricsFolder && !hintDismissed) {
             Card(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("🎤 شناسایی خودکار متن آهنگ‌ها", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "اگر کنار آهنگ‌ها فایل هم‌نام با پسوند lrc دارید (مثلاً «نام آهنگ.lrc»)، با یک‌بار دسترسی به فایل‌ها متن همگام با آواز خودکار نشان داده می‌شود. فقط روی همین دستگاه خوانده می‌شود.",
+                        "اگر کنار آهنگ‌ها فایل هم‌نام با پسوند lrc دارید (مثلاً «نام آهنگ.lrc»)، پوشهٔ موسیقی‌تان را یک‌بار انتخاب کنید تا متن همگام با آواز خودکار نشان داده شود. بدون هیچ دسترسی گسترده‌ای؛ فقط همان پوشه و فقط روی همین دستگاه.",
                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)
                     )
                     Row {
-                        TextButton(onClick = { openAllFilesAccess(context) }) { Text("فعال‌سازی") }
+                        TextButton(onClick = { folderLauncher.launch(null) }) { Text("انتخاب پوشهٔ موسیقی") }
                         TextButton(onClick = { prefs.edit().putBoolean("lyrics_hint_dismissed", true).apply(); hintDismissed = true }) { Text("بعداً") }
                     }
                 }

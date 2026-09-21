@@ -53,7 +53,11 @@ fun LibraryScreen(
     val viewModel: LibraryViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
-                LibraryViewModel(repository, onLibraryChanged = { AudioAnalysisWorker.enqueueNow(context.applicationContext) })
+                LibraryViewModel(repository, onLibraryChanged = {
+                    AudioAnalysisWorker.enqueueNow(context.applicationContext)
+                    // Pick up new .lrc files in the granted music folder(s) (off the main thread).
+                    Thread { runCatching { com.ghadirb.aimusic.lyrics.LyricsSource(context.applicationContext).takeIf { it.hasFolder() }?.refreshIndex() } }.start()
+                })
             }
         }
     )

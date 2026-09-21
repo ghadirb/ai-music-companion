@@ -180,25 +180,45 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
-        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-        var lyricsAccess by remember { mutableStateOf(com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(context)) }
-        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) lyricsAccess = com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(context)
+        val lyricsSource = remember { com.ghadirb.aimusic.lyrics.LyricsSource(context) }
+        val lyricsScope = androidx.compose.runtime.rememberCoroutineScope()
+        var lyricsFolders by remember { mutableStateOf(lyricsSource.folderCount()) }
+        var lyricsFiles by remember { mutableStateOf<Int?>(null) }
+        var lyricsBusy by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(lyricsFolders) {
+            lyricsFiles = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { lyricsSource.indexedFileCount() }
+        }
+        val lyricsFolderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+        ) { uri ->
+            if (uri != null && lyricsSource.addFolder(uri)) {
+                lyricsFolders = lyricsSource.folderCount()
+                lyricsBusy = true
+                lyricsScope.launch {
+                    lyricsFiles = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { lyricsSource.refreshIndex().files }
+                    lyricsBusy = false
+                }
             }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
         ListItem(
             headlineContent = { Text("شناسایی خودکار متن آهنگ‌ها") },
             supportingContent = {
                 Column {
                     Text(
-                        if (lyricsAccess) "فعال است: فایل هم‌نام «نام آهنگ.lrc» کنار هر آهنگ (و متن داخل تگ فایل) خودکار پیدا می‌شود."
-                        else "برای پیداکردن خودکار فایل‌های lrc کنار آهنگ‌ها، یک‌بار دسترسی به فایل‌ها را فعال کنید. فقط روی همین دستگاه خوانده می‌شود و چیزی ارسال نمی‌شود. متن داخل تگ MP3/FLAC بدون این دسترسی هم شناسایی می‌شود."
+                        if (lyricsFolders == 0) "پوشهٔ موسیقی‌تان را یک‌بار انتخاب کنید تا فایل‌های هم‌نام «نام آهنگ.lrc» خودکار پیدا شوند. بدون دسترسی گسترده به حافظه؛ فقط همان پوشه و فقط روی همین دستگاه. متن داخل تگ MP3/FLAC بدون انتخاب پوشه هم شناسایی می‌شود."
+                        else "پوشه‌های انتخاب‌شده: $lyricsFolders — فایل متن پیداشده: ${lyricsFiles ?: "…"}"
                     )
-                    if (!lyricsAccess && com.ghadirb.aimusic.lyrics.StorageAccess.canRequestAllFilesAccess) {
-                        TextButton(onClick = { com.ghadirb.aimusic.ui.screens.player.openAllFilesAccess(context) }) { Text("فعال‌سازی دسترسی") }
+                    Row {
+                        TextButton(onClick = { lyricsFolderLauncher.launch(null) }) { Text(if (lyricsFolders == 0) "انتخاب پوشهٔ موسیقی" else "افزودن پوشه") }
+                        if (lyricsFolders > 0) {
+                            TextButton(enabled = !lyricsBusy, onClick = {
+                                lyricsBusy = true
+                                lyricsScope.launch {
+                                    lyricsFiles = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { lyricsSource.refreshIndex().files }
+                                    lyricsBusy = false
+                                }
+                            }) { Text(if (lyricsBusy) "در حال بررسی…" else "بازبینی فایل‌های متن") }
+                        }
                     }
                 }
             }

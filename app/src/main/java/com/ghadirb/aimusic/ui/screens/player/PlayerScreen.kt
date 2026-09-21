@@ -55,7 +55,7 @@ fun PlayerScreen(
     val similarTracks by playerViewModel.similarTracks.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
     val lyricsHasFolder by playerViewModel.lyricsHasFolder.collectAsState()
-    val allFilesAccess by playerViewModel.allFilesAccess.collectAsState()
+    val diagnosis by playerViewModel.diagnosis.collectAsState()
     val onlineAiMessage by playerViewModel.onlineAiMessage.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
     val sleepState by playerViewModel.sleepTimer.collectAsState()
@@ -69,16 +69,6 @@ fun PlayerScreen(
     }
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) playerViewModel.addLyricsFolder(uri)
-    }
-
-    // Returning from the system "All files access" screen: re-check and reload lyrics automatically.
-    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) playerViewModel.refreshStorageAccess()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Poll playback position while this screen is visible (display only).
@@ -212,11 +202,11 @@ fun PlayerScreen(
             state = lyrics,
             positionMs = uiState.positionMs,
             hasFolder = lyricsHasFolder,
-            allFilesAccess = allFilesAccess,
             onExpand = { showLyrics = true },
             onSeek = playerViewModel::seekTo,
             onImportFile = { importLauncher.launch(arrayOf("*/*")) },
-            onPickFolder = { folderLauncher.launch(null) }
+            onPickFolder = { folderLauncher.launch(null) },
+            onDiagnose = playerViewModel::diagnoseLyrics
         )
 
         if (similarTracks.isNotEmpty()) {
@@ -245,11 +235,19 @@ fun PlayerScreen(
             state = lyrics,
             positionMs = uiState.positionMs,
             hasFolder = lyricsHasFolder,
-            allFilesAccess = allFilesAccess,
             onDismiss = { showLyrics = false },
             onSeek = playerViewModel::seekTo,
             onImportFile = { importLauncher.launch(arrayOf("*/*")) },
-            onPickFolder = { folderLauncher.launch(null) }
+            onPickFolder = { folderLauncher.launch(null) },
+            onDiagnose = playerViewModel::diagnoseLyrics
+        )
+    }
+    diagnosis?.let { text ->
+        AlertDialog(
+            onDismissRequest = playerViewModel::dismissDiagnosis,
+            title = { Text("عیب‌یابی متن آهنگ") },
+            text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(text, style = MaterialTheme.typography.bodySmall) } },
+            confirmButton = { TextButton(onClick = playerViewModel::dismissDiagnosis) { Text("بستن") } }
         )
     }
     if (showSleepTimer) {

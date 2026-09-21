@@ -68,9 +68,9 @@ class PlayerViewModel(
     private val _lyricsHasFolder = MutableStateFlow(lyricsSource.hasFolder())
     val lyricsHasFolder: StateFlow<Boolean> = _lyricsHasFolder.asStateFlow()
     private var lyricsJob: Job? = null
-    private val _allFilesAccess = MutableStateFlow(com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(application))
-    /** Whether plain .lrc files next to the songs can be read (Android 11+: "All files access"). */
-    val allFilesAccess: StateFlow<Boolean> = _allFilesAccess.asStateFlow()
+    private val _diagnosis = MutableStateFlow<String?>(null)
+    /** Explanation of why lyrics were not found (shown on request). */
+    val diagnosis: StateFlow<String?> = _diagnosis.asStateFlow()
 
     private val _onlineAiMessage = MutableStateFlow<String?>(null)
     val onlineAiMessage: StateFlow<String?> = _onlineAiMessage.asStateFlow()
@@ -262,14 +262,12 @@ class PlayerViewModel(
         }
     }
 
-    /** Called when the screen resumes (e.g. back from system settings): pick up a newly granted permission. */
-    fun refreshStorageAccess() {
-        val granted = com.ghadirb.aimusic.lyrics.StorageAccess.hasAllFilesAccess(getApplication())
-        if (granted != _allFilesAccess.value) {
-            _allFilesAccess.value = granted
-            if (_lyrics.value !is LyricsState.Found) loadLyrics(_uiState.value.currentTrack)
-        }
+    fun diagnoseLyrics() {
+        val track = _uiState.value.currentTrack ?: return
+        viewModelScope.launch(Dispatchers.IO) { _diagnosis.value = lyricsSource.diagnose(track) }
     }
+
+    fun dismissDiagnosis() { _diagnosis.value = null }
 
     /** The user picked a .lrc file for the current track. */
     fun importLyrics(uri: Uri) {
@@ -282,8 +280,11 @@ class PlayerViewModel(
 
     /** The user granted a music/lyrics folder so .lrc files can be found automatically. */
     fun addLyricsFolder(uri: Uri) {
-        if (lyricsSource.addFolder(uri)) {
-            _lyricsHasFolder.value = true
+        if (!lyricsSource.addFolder(uri)) return
+        _lyricsHasFolder.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val stats = lyricsSource.refreshIndex()
+            _onlineAiMessage.value = "${stats.files} فایل متن (lrc) در پوشهٔ انتخابی پیدا شد."
             loadLyrics(_uiState.value.currentTrack)
         }
     }

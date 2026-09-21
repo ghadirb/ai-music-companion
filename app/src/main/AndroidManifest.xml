@@ -12,10 +12,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Optional, user-granted: lets the app find "<song name>.lrc" next to the song on Android 11+.
-         Used only to read those lyrics files locally; nothing is uploaded. -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
     <uses-permission android:name="${marketPermission}" />
 
     <application
