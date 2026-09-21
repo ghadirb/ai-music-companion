@@ -362,6 +362,10 @@ fun TrackRow(
                                     text = { Text("افزودن به صف پخش") },
                                     onClick = { queueActions.addToQueue(track); menuOpen = false }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("📻 رادیو از این آهنگ") },
+                                    onClick = { queueActions.startRadio(listOf(track), track.title); menuOpen = false }
+                                )
                             }
                             if (onAddToPlaylistClick != null) {
                                 DropdownMenuItem(

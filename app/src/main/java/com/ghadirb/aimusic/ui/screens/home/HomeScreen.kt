@@ -67,6 +67,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val access = LocalPremiumAccess.current
+    val queueActions = com.ghadirb.aimusic.ui.components.LocalQueueActions.current
     val tuning = remember { TuningStore(context) }
     val viewModel: HomeViewModel = viewModel(
         factory = viewModelFactory {
@@ -209,6 +210,7 @@ fun HomeScreen(
                 title = selected.type.titleFa,
                 actions = {
                     TextButton(onClick = { selected.tracks.firstOrNull()?.let { onTrackClick(it.track, selected.trackList) } }) { Text("پخش همه") }
+                    TextButton(onClick = { queueActions?.startRadio(selected.trackList, selected.type.titleFa) }) { Text("📻 رادیو") }
                     TextButton(onClick = { viewModel.saveMixAsPlaylist(selected) }) { Text("ذخیره") }
                 }
             )
@@ -223,6 +225,7 @@ fun HomeScreen(
                 title = mix.type.titleFa,
                 actions = {
                     TextButton(onClick = { mix.tracks.firstOrNull()?.let { onTrackClick(it.track, mix.trackList) } }) { Text("پخش همه") }
+                    TextButton(onClick = { queueActions?.startRadio(mix.trackList, mix.type.titleFa) }) { Text("📻 رادیو") }
                     TextButton(onClick = { viewModel.saveMixAsPlaylist(mix) }) { Text("ذخیره") }
                 }
             )

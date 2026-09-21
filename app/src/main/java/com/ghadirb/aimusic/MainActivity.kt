@@ -238,10 +238,12 @@ private fun MainScaffold(
         openPlayerScreen()
     }
 
-    val queueActions = remember(playerViewModel) {
+    val queueActions = remember(playerViewModel, premiumAccess) {
         QueueActions(
             playNext = { playerViewModel.playNext(it) },
-            addToQueue = { playerViewModel.addToQueue(it) }
+            addToQueue = { playerViewModel.addToQueue(it) },
+            // The ONLY place Smart Radio is gated: every entry point (song, artist, album, playlist, favourites, mix) goes through here.
+            startRadio = { seeds, label -> premiumAccess.require(PremiumFeature.SMART_RADIO) { playerViewModel.startRadio(seeds, label) } }
         )
     }
 

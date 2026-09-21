@@ -58,6 +58,8 @@ fun PlayerScreen(
     val diagnosis by playerViewModel.diagnosis.collectAsState()
     val onlineAiMessage by playerViewModel.onlineAiMessage.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
+    val radio by playerViewModel.radio.collectAsState()
+    val queueActions = com.ghadirb.aimusic.ui.components.LocalQueueActions.current
     val sleepState by playerViewModel.sleepTimer.collectAsState()
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showSleepTimer by rememberSaveable { mutableStateOf(false) }
@@ -156,6 +158,15 @@ fun PlayerScreen(
             )
             Spacer(Modifier.width(8.dp))
             Text(if (currentTrack.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
+        }
+
+        radio?.let { session ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                Text("📻 رادیو: ${session.label}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                TextButton(onClick = playerViewModel::stopRadio) { Text("توقف رادیو") }
+            }
+        } ?: OutlinedButton(onClick = { queueActions?.startRadio(listOf(currentTrack), currentTrack.title) }, modifier = Modifier.padding(top = 8.dp)) {
+            Text("📻 رادیو از این آهنگ")
         }
 
         Spacer(Modifier.height(12.dp))

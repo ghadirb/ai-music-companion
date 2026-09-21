@@ -28,6 +28,7 @@ fun ArtistDetailScreen(
         list == null -> LoadingState()
         list.isEmpty() -> EmptyState(Icons.Filled.MusicOff, "آهنگی پیدا نشد")
         else -> LazyColumn {
+            item { com.ghadirb.aimusic.ui.components.RadioStartButton(list, artistName) }
             items(list, key = { it.id }) { track ->
                 TrackRow(
                     track = track,

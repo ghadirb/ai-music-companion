@@ -37,6 +37,7 @@ fun PlaylistDetailScreen(
     }
 
     LazyColumn {
+        item { com.ghadirb.aimusic.ui.components.RadioStartButton(tracks, "این پلی‌لیست") }
         items(tracks, key = { it.id }) { track ->
             ListItem(
                 headlineContent = { Text(track.title) },

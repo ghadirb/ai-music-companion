@@ -27,6 +27,7 @@ fun FavoritesScreen(
         list == null -> LoadingState()
         list.isEmpty() -> EmptyState(Icons.Filled.FavoriteBorder, "هنوز علاقه‌مندی‌ای ندارید", "روی قلب کنار هر آهنگ بزنید تا اینجا جمع شود.")
         else -> LazyColumn {
+            item { com.ghadirb.aimusic.ui.components.RadioStartButton(list, "علاقه‌مندی‌ها") }
             items(list, key = { it.id }) { track ->
                 TrackRow(
                     track = track,

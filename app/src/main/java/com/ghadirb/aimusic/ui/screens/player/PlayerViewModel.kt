@@ -3,6 +3,7 @@ package com.ghadirb.aimusic.ui.screens.player
 import android.app.Application
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -18,13 +19,19 @@ import com.ghadirb.aimusic.playback.PlaybackStateStore
 import com.ghadirb.aimusic.playback.PlayerController
 import com.ghadirb.aimusic.playback.SleepTimerController
 import com.ghadirb.aimusic.playback.SleepTimerState
+import com.ghadirb.aimusic.radio.RadioConfig
+import com.ghadirb.aimusic.radio.RadioEngine
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
+import com.ghadirb.aimusic.recommendation.TuningStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** An active Smart Radio: the queue keeps refilling itself from the library. */
+data class RadioSession(val seeds: List<TrackEntity>, val label: String)
 
 data class PlayerUiState(
     val currentTrack: TrackEntity? = null,
@@ -77,6 +84,11 @@ class PlayerViewModel(
 
     val sleepTimer: StateFlow<SleepTimerState> = SleepTimerController.state
 
+    private val tuningStore = TuningStore(application)
+    private val _radio = MutableStateFlow<RadioSession?>(null)
+    val radio: StateFlow<RadioSession?> = _radio.asStateFlow()
+    private var radioExtending = false
+
     private var syncJob: Job? = null
     private var derivedJob: Job? = null
 
@@ -126,6 +138,7 @@ class PlayerViewModel(
     // ---- Playback ----
 
     fun playQueue(queue: List<TrackEntity>, startTrack: TrackEntity) {
+        _radio.value = null // an explicit queue replaces the radio
         rememberTracks(queue)
         if (controller.currentMediaId() == startTrack.id.toString()) {
             if (!controller.isPlaying()) controller.togglePlayPause()
@@ -160,9 +173,62 @@ class PlayerViewModel(
     fun clearUpcoming() = controller.clearUpcoming()
 
     fun clearQueue() {
+        _radio.value = null
         controller.stopAndClear()
         _uiState.update { it.copy(currentTrack = null, isPlaying = false, positionMs = 0L, durationMs = 0L) }
         _queue.value = emptyList()
+    }
+
+    // ---- Smart Radio ----
+
+    /**
+     * Starts an endless radio from [seeds]. The first item is one of the seeds (so an album/playlist radio starts with
+     * the user's own music), then RadioEngine fills the Media3 queue and tops it up before it runs out.
+     */
+    fun startRadio(seeds: List<TrackEntity>, label: String) {
+        if (seeds.isEmpty()) return
+        viewModelScope.launch {
+            val config = RadioConfig.forTuning(tuningStore.selected)
+            val library = repository.allTracksSnapshot()
+            val history = repository.recentHistory(3000)
+            val now = System.currentTimeMillis()
+            val first = if (seeds.size == 1) seeds.first() else seeds.shuffled(java.util.Random(now)).first()
+            val batch = withContext(Dispatchers.Default) {
+                RadioEngine.nextBatch(seeds, listOf(first.id), library, history, now, config.batchSize, config)
+            }.map { it.track }
+            val queue = listOf(first) + batch
+            rememberTracks(queue)
+            _uiState.update { it.copy(currentTrack = first, positionMs = 0L) }
+            controller.playTrack(first, queue)
+            _radio.value = RadioSession(seeds, label)
+            _onlineAiMessage.value = if (batch.isEmpty()) "برای این رادیو آهنگ مشابه کافی در کتابخانه پیدا نشد." else null
+        }
+    }
+
+    fun stopRadio() { _radio.value = null }
+
+    private fun maybeExtendRadio() {
+        val session = _radio.value ?: return
+        if (radioExtending) return
+        val config = RadioConfig.forTuning(tuningStore.selected)
+        val queued = controller.queueIds()
+        val remaining = queued.size - 1 - controller.currentIndex()
+        if (remaining > config.prefetchThreshold) return
+        radioExtending = true
+        viewModelScope.launch {
+            try {
+                val library = repository.allTracksSnapshot()
+                val history = repository.recentHistory(3000)
+                val now = System.currentTimeMillis()
+                val more = withContext(Dispatchers.Default) {
+                    RadioEngine.nextBatch(session.seeds, queued, library, history, now, config.batchSize, config)
+                }.map { it.track }
+                // The radio may have been stopped or replaced while we were computing.
+                if (_radio.value === session) more.forEach { rememberTracks(listOf(it)); controller.addLast(it) }
+            } finally {
+                radioExtending = false
+            }
+        }
     }
 
     // ---- Sleep timer (runs inside the playback service process; survives this ViewModel) ----
@@ -239,6 +305,7 @@ class PlayerViewModel(
     }
 
     private fun onCurrentItemChanged(id: Long?) {
+        maybeExtendRadio()
         derivedJob?.cancel()
         derivedJob = viewModelScope.launch {
             val track = id?.let { resolve(it) }
