@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- DEBUG BUILDS ONLY (never in release): a fake Storage Access Framework provider used by instrumented tests. -->
         <provider
             android:name="com.ghadirb.aimusic.FakeDocumentsProvider"
             android:authorities="com.ghadirb.aimusic.test.fakedocs"

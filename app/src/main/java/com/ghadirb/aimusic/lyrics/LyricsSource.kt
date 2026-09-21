@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 class LyricsSource(context: Context) {
 
     data class IndexStats(val folders: Int, val files: Int)
-    private class TreeIndex(val builtAt: Long, val entries: Map<String, List<String>>)
+    private class TreeIndex(val builtAt: Long, val entries: Map<String, List<String>>, val error: String? = null)
 
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -184,6 +184,7 @@ class LyricsSource(context: Context) {
 
     private fun buildIndex(tree: Uri): TreeIndex {
         val entries = HashMap<String, MutableList<String>>()
+        var error: String? = null
         try {
             val stack = ArrayDeque<Pair<String, Int>>()
             stack.addLast(DocumentsContract.getTreeDocumentId(tree) to 0)
@@ -214,9 +215,10 @@ class LyricsSource(context: Context) {
                 }
             }
         } catch (e: Exception) {
+            error = "${e.javaClass.simpleName}: ${e.message?.take(120)}"
             Log.w(TAG, "Could not index lyrics folder: ${e.javaClass.simpleName}")
         }
-        return TreeIndex(System.currentTimeMillis(), entries)
+        return TreeIndex(System.currentTimeMillis(), entries, error)
     }
 
     private fun indexFile() = File(appContext.filesDir, "lyrics_index_v1.json")
@@ -270,6 +272,7 @@ class LyricsSource(context: Context) {
             ensureIndexes(trees)
             val total = trees.sumOf { t -> memory[t]?.entries?.values?.sumOf { it.size } ?: 0 }
             sb.appendLine("تعداد فایل lrc پیداشده در پوشه‌های انتخابی: $total")
+            trees.mapNotNull { memory[it]?.error }.firstOrNull()?.let { sb.appendLine("خطا هنگام خواندن پوشه: $it (دسترسی پوشه را دوباره بدهید)") }
             if (total == 0) sb.appendLine("← در پوشهٔ انتخابی هیچ فایل .lrc دیده نشد. مطمئن شوید پوشهٔ بالاتر (مثلاً Music) را انتخاب کرده‌اید نه پوشهٔ دیگری.")
             else {
                 val found = lookup(trees, keys, track)
