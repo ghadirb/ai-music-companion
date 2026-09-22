@@ -1,7 +1,7 @@
 # شرایط استفاده — AI Music Companion
 # Terms of Service — AI Music Companion
 
-آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: **[ایمیل پشتیبانی را پیش از انتشار اینجا وارد کنید / insert support e-mail before publishing]**
+آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: maliar.pro@zohomail.com
 
 1. **خدمت / Service.** پخش‌کنندهٔ آفلاین موسیقی با پیشنهادهای شخصی‌سازی‌شده روی دستگاه شما. قابلیت‌های ابری اختیاری‌اند. / An offline music player with on-device personalisation. Cloud features are optional.
 2. **محتوای شما / Your content.** شما مسئول قانونی‌بودن فایل‌های موسیقی و متن‌هایی هستید که استفاده می‌کنید. برنامه فایلی را آپلود، توزیع یا بازنویسی نمی‌کند. / You are responsible for the legality of the music and lyrics you use. The app never uploads or redistributes your files.
@@ -11,4 +11,4 @@
 6. **استفادهٔ ممنوع / Prohibited use.** دور زدن سهمیه یا خرید، مهندسی معکوس سرویس، ارسال درخواست‌های خودکار یا مخرب به سرور. / Circumventing quotas or purchases, attacking or automating the service.
 7. **سلب مسئولیت / Disclaimer.** برنامه «همان‌طور که هست» ارائه می‌شود. مسئولیت ما در حد قانون و حداکثر برابر مبلغ پرداختی شماست. / Provided "as is"; liability is limited to the extent permitted by law and to the amount you paid.
 8. **حریم خصوصی / Privacy.** طبق [PRIVACY_POLICY.md](PRIVACY_POLICY.md). / See the Privacy Policy.
-9. **تغییرات و قانون حاکم / Changes & governing law.** شرایط ممکن است به‌روزرسانی شود. قانون حاکم و مرجع رسیدگی: **[پیش از انتشار مشخص شود / to be set before publishing]**.
+9. **تغییرات و قانون حاکم / Changes & governing law.** شرایط ممکن است به‌روزرسانی شود. قانون حاکم و مرجع رسیدگی: جمهوری اسلامی ایران (بازار مایکت) / Islamic Republic of Iran (Myket marketplace).

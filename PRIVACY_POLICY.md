@@ -1,7 +1,7 @@
 # سیاست حریم خصوصی — AI Music Companion
 # Privacy Policy — AI Music Companion
 
-آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: **[ایمیل پشتیبانی را پیش از انتشار اینجا وارد کنید / insert support e-mail before publishing]**
+آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: maliar.pro@zohomail.com
 
 ## خلاصه / Summary
 برنامه به‌صورت پیش‌فرض **همه‌چیز را روی دستگاه شما** نگه می‌دارد و **هیچ حساب کاربری، تبلیغ یا ابزار ردیابی** ندارد. ارسال هر داده‌ای به سرور فقط برای قابلیت‌های اختیاریِ زیر و پس از اقدام یا رضایت شماست.
