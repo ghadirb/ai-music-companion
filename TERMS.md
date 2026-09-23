@@ -2,6 +2,7 @@
 # Terms of Service — AI Music Companion
 
 آخرین به‌روزرسانی / Last updated: 2026-09-20 · تماس / Contact: maliar.pro@zohomail.com
+ناشر / Publisher: گروه نرم‌افزاری مالیار · [صفحهٔ ناشر در مایکت / Myket publisher page](https://myket.ir/developer/dev-106203)
 
 1. **خدمت / Service.** پخش‌کنندهٔ آفلاین موسیقی با پیشنهادهای شخصی‌سازی‌شده روی دستگاه شما. قابلیت‌های ابری اختیاری‌اند. / An offline music player with on-device personalisation. Cloud features are optional.
 2. **محتوای شما / Your content.** شما مسئول قانونی‌بودن فایل‌های موسیقی و متن‌هایی هستید که استفاده می‌کنید. برنامه فایلی را آپلود، توزیع یا بازنویسی نمی‌کند. / You are responsible for the legality of the music and lyrics you use. The app never uploads or redistributes your files.

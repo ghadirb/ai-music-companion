@@ -18,9 +18,11 @@ To rotate the signing key: `node scripts/generate-entitlement-keys.mjs`, `npx wr
 * No code changes are required.
 
 ## 4. Before publishing
-* Fill the support e-mail and governing law in `PRIVACY_POLICY.md` / `TERMS.md`; host them at a stable URL and update the two links in `SettingsScreen.kt` if you move them.
+* Support e-mail (`maliar.pro@zohomail.com`) and publisher (گروه نرم‌افزاری مالیار, https://myket.ir/developer/dev-106203) are filled in `PRIVACY_POLICY.md` / `TERMS.md`. Governing law is still generic ("طبق قوانین و سیاست‌های فروشگاه مایکت") — replace only if you want a specific jurisdiction named.
 * Add store screenshots to `docs/screenshots/`.
 * Manual QA on real devices (Android 8, 10, 12, 13, 14, 15): playback in background, headphone unplug, incoming call, sleep timer, resume after kill, LRC import/folder grant, backup/restore on a second device, Premium purchase + restore after reinstall (needs real Myket credentials).
+* **Android Auto (new, item 9)**: `PlaybackService` is now a `MediaLibraryService` with a browse tree (Favorites/Recent/Playlists/Smart Mixes/Smart Radio) in `playback/BrowseTree.kt`. This touches the phone player's session-building code path, so before shipping: build once (`./gradlew assembleDebug` — could not be compiled in the environment this was written in, no Android SDK there), then verify on a phone that playback, queueing and lock-screen/Bluetooth controls still work exactly as before, and ideally test browsing once with [Android Auto's desktop head unit simulator](https://developer.android.com/training/cars/testing) or a real car/phone-screen mirror.
+* **Smart Library Watch (new, item 7)**: off by default, one switch in Settings ("بررسی خودکار موسیقی‌های جدید"); no new permission. Sanity-check once with the switch on: add a music file, wait for the periodic/immediate check, confirm the "N آهنگ جدید پیدا شد" summary appears in Settings.
 * Revoke every token that was pasted into chats or project files.
 
 ## 5. Permissions review
