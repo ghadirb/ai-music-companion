@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -66,6 +70,8 @@ fun LibraryScreen(
     val scanError by viewModel.scanError.collectAsState()
     var trackForPlaylistPicker by remember { mutableStateOf<TrackEntity?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
 
     Scaffold(
         floatingActionButton = {
@@ -92,24 +98,44 @@ fun LibraryScreen(
                 }
                 is LibraryUiState.Ready -> Column {
                     Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it; viewModel.setQuery(it) },
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = ""; viewModel.setQuery("") }) {
-                                        Icon(Icons.Filled.Close, contentDescription = "پاک‌کردن جست‌وجو")
+                        if (searchExpanded) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it; viewModel.setQuery(it) },
+                                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    IconButton(onClick = {
+                                        if (searchQuery.isNotEmpty()) {
+                                            searchQuery = ""; viewModel.setQuery("")
+                                        } else {
+                                            searchExpanded = false
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "پاک‌کردن یا بستن جست‌وجو")
                                     }
-                                }
-                            },
-                            label = { Text("جست‌وجو: آهنگ، خواننده، آلبوم، سبک، پلی‌لیست") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                                },
+                                placeholder = { Text("جست‌وجو در کتابخانه", maxLines = 1) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(searchFocusRequester)
+                            )
+                            LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
+                        } else {
+                            IconButton(onClick = { searchExpanded = true }) {
+                                Icon(Icons.Filled.Search, contentDescription = "جست‌وجو در کتابخانه")
+                            }
+                            Text(
+                                "کتابخانه",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                         SortMenu(current.sort, onSelect = viewModel::setSort)
                     }
                     FilterRow(current, onChange = viewModel::setFilter)
