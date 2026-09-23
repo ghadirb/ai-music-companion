@@ -13,8 +13,18 @@ To re-deploy: `cd cloudflare-worker && npm ci --include=dev && npm test && npx w
 To rotate the signing key: `node scripts/generate-entitlement-keys.mjs`, `npx wrangler secret put ENTITLEMENT_SIGNING_JWK`, update `ENTITLEMENT_PUBLIC_KEY`, ship a new app build.
 
 ## 3. Myket (only real values are missing)
-* Worker: `wrangler secret put MYKET_ACCESS_TOKEN`; `MYKET_PACKAGE_NAME` in `wrangler.toml [vars]`.
-* App: Gradle property `MYKET_IAB_PUBLIC_KEY` (public key from the Myket panel). SKUs: `premium_lifetime` (add `premium_monthly`/`premium_yearly` to `MYKET_PREMIUM_SKUS` and to the Myket panel when needed).
+* Worker: `wrangler secret put MYKET_ACCESS_TOKEN`; `MYKET_PACKAGE_NAME` in `wrangler.toml [vars]` (already set to `com.ghadirb.aimusic`).
+* App: Gradle property `MYKET_IAB_PUBLIC_KEY` — now set in `gradle.properties` with the real key from the Myket panel (it's a public key, not a secret, same as `ENTITLEMENT_PUBLIC_KEY`).
+* SKUs offered: `MYKET_PREMIUM_SKUS=premium_monthly,premium_yearly` (set in `gradle.properties`). No code changes needed — the buy screen/dialog builds its buttons straight from this list.
+
+### 3.1 Creating the in-app products in the Myket panel
+Do this once, before submitting the release, in the Myket developer panel → your app → بخش «محصولات درون‌برنامه‌ای» (In-app products):
+1. «افزودن محصول جدید» (Add new product) → type: اشتراک/subscription if Myket offers a subscription product type, otherwise a regular consumable/non-consumable product used as a subscription (Myket's IAB is receipt-based; the server already treats `premium_monthly` as 31 days and `premium_yearly` as 366 days regardless of the Myket product type).
+2. **Product 1** — شناسه (SKU/Product ID): `premium_monthly` — must match exactly (case-sensitive) — عنوان: «Premium ماهانه» — قیمت: ۳۹٬۰۰۰ تومان.
+3. **Product 2** — شناسه (SKU/Product ID): `premium_yearly` — عنوان: «Premium سالانه» — قیمت: ۲۹۹٬۰۰۰ تومان.
+4. Publish/activate both products in the panel (a product left in draft won't be purchasable).
+5. Sanity check the SKU spelling against `gradle.properties` (`MYKET_PREMIUM_SKUS`) and the worker's `PREMIUM_SKUS` table in `wrangler.toml` — all three must use the identical strings `premium_monthly` / `premium_yearly`.
+6. Once `MYKET_ACCESS_TOKEN` is set on the Worker (step above) and the app is installed from Myket, test one real purchase of each plan and confirm "بازیابی خرید" restores it after a reinstall.
 * No code changes are required.
 
 ## 4. Before publishing
