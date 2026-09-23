@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="${marketPermission}" />
 
+    <!-- Android Auto / Automotive (spec item 9): the phone-only build still installs fine —
+         "required=false" just lets the app also show up on car head units and Assistant. -->
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
+
     <application
         android:name=".AiMusicApp"
         android:allowBackup="false"
@@ -22,6 +26,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AiMusicCompanion"
         tools:targetApi="34">
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
 
         <activity
             android:name=".MainActivity"
@@ -40,6 +48,8 @@
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <!-- Legacy action Android Auto / Assistant use to discover a browsable media app. -->
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 
