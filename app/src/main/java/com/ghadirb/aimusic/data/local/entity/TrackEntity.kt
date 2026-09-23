@@ -29,5 +29,8 @@ data class TrackEntity(
     /** One of MoodTag.* (see AudioAnalyzer) — heuristic label combining energy + tempo (+ lyrics if found). */
     val moodTag: String? = null,
     /** True once AudioAnalyzer has processed this file (success or inconclusive) — avoids re-analyzing every worker run. */
-    val analyzed: Boolean = false
+    val analyzed: Boolean = false,
+    // --- v6: explicit negative feedback (see recommendation/RecommendationScorer.kt) ---
+    /** User said "not interested" — excluded from all smart suggestions/mixes but stays visible in the Library. */
+    val notInterested: Boolean = false
 )

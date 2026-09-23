@@ -135,6 +135,9 @@ class PlayerController(private val context: Context) {
             }
         }
     }
+    /** 1.0f = normal speed. Pitch is left unchanged (Media3/ExoPlayer default). */
+    fun setPlaybackSpeed(speed: Float) { controller?.setPlaybackSpeed(speed) }
+    fun playbackSpeed(): Float = controller?.playbackParameters?.speed ?: 1f
     fun pause() { controller?.pause() }
 
     fun currentPosition(): Long = controller?.currentPosition ?: 0L

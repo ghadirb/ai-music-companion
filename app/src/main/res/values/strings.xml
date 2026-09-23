@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">نواسا</string>
+    <!-- Home-screen widget (v1.1 item 5) -->
+    <string name="widget_subtitle_idle">چیزی در حال پخش نیست</string>
+    <string name="widget_action_play_pause">پخش یا توقف</string>
+    <string name="widget_action_next">آهنگ بعدی</string>
+    <string name="widget_action_previous">آهنگ قبلی</string>
     <string name="nav_home">خانه</string>
     <string name="nav_library">کتابخانه</string>
     <string name="nav_artists">خواننده‌ها</string>

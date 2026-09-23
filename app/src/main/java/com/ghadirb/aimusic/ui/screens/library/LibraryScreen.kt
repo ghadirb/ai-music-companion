@@ -182,7 +182,8 @@ fun LibraryScreen(
                                             isCurrentTrack = track.id == currentTrackId,
                                             onClick = { onTrackClick(track, search.tracks) },
                                             onFavoriteClick = { viewModel.toggleFavorite(track) },
-                                            onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                                            onAddToPlaylistClick = { trackForPlaylistPicker = track },
+                                            onNotInterestedClick = { viewModel.toggleNotInterested(track) }
                                         )
                                     }
                                 }
@@ -197,7 +198,8 @@ fun LibraryScreen(
                                     isCurrentTrack = track.id == currentTrackId,
                                     onClick = { onTrackClick(track, current.tracks) },
                                     onFavoriteClick = { viewModel.toggleFavorite(track) },
-                                    onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                                    onAddToPlaylistClick = { trackForPlaylistPicker = track },
+                                    onNotInterestedClick = { viewModel.toggleNotInterested(track) }
                                 )
                             }
                         }
@@ -344,6 +346,7 @@ fun TrackRow(
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     onAddToPlaylistClick: (() -> Unit)? = null,
+    onNotInterestedClick: (() -> Unit)? = null,
     isCurrentTrack: Boolean = false
 ) {
     ListItem(
@@ -373,7 +376,7 @@ fun TrackRow(
                         contentDescription = if (track.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها"
                     )
                 }
-                if (onAddToPlaylistClick != null || queueActions != null) {
+                if (onAddToPlaylistClick != null || queueActions != null || onNotInterestedClick != null) {
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌های بیشتر")
@@ -397,6 +400,12 @@ fun TrackRow(
                                 DropdownMenuItem(
                                     text = { Text("افزودن به پلی‌لیست") },
                                     onClick = { onAddToPlaylistClick(); menuOpen = false }
+                                )
+                            }
+                            if (onNotInterestedClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text(if (track.notInterested) "برداشتن «علاقه‌ای ندارم»" else "علاقه‌ای ندارم") },
+                                    onClick = { onNotInterestedClick(); menuOpen = false }
                                 )
                             }
                         }

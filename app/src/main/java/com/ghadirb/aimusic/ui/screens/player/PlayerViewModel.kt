@@ -40,6 +40,7 @@ data class PlayerUiState(
     val durationMs: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
+    val playbackSpeed: Float = 1f,
     val queueIndex: Int = 0,
     val isConnected: Boolean = false
 )
@@ -105,6 +106,10 @@ class PlayerViewModel(
             _uiState.update { it.copy(repeatMode = repeatMode) }
         }
 
+        override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+            _uiState.update { it.copy(playbackSpeed = playbackParameters.speed) }
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             onCurrentItemChanged(mediaItem?.mediaId?.toLongOrNull())
         }
@@ -122,7 +127,8 @@ class PlayerViewModel(
                     isConnected = true,
                     isPlaying = mediaController.isPlaying,
                     shuffleEnabled = mediaController.shuffleModeEnabled,
-                    repeatMode = mediaController.repeatMode
+                    repeatMode = mediaController.repeatMode,
+                    playbackSpeed = mediaController.playbackParameters.speed
                 )
             }
             if (mediaController.mediaItemCount > 0) {
@@ -154,6 +160,14 @@ class PlayerViewModel(
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
     fun setShuffle(enabled: Boolean) = controller.setShuffle(enabled)
     fun cycleRepeatMode() = controller.cycleRepeatMode()
+    /** Cycles 1x -> 1.25x -> 1.5x -> 2x -> 0.75x -> 1x, matching common player conventions. */
+    fun cyclePlaybackSpeed() {
+        val speeds = listOf(1f, 1.25f, 1.5f, 2f, 0.75f)
+        val current = _uiState.value.playbackSpeed
+        val next = speeds.getOrElse(speeds.indexOf(current) + 1) { speeds.first() }
+        controller.setPlaybackSpeed(next)
+        _uiState.update { it.copy(playbackSpeed = next) }
+    }
 
     // ---- Queue ----
 

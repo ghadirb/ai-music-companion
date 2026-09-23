@@ -48,8 +48,15 @@ interface TrackDao {
     @Query("DELETE FROM tracks WHERE path IN (:paths)")
     suspend fun deleteByPaths(paths: List<String>)
 
-    @Query("UPDATE tracks SET isFavorite = :isFavorite WHERE id = :trackId")
+    /** Liking and "not interested" are mutually exclusive; favoriting a track clears "not interested". */
+    @Query("UPDATE tracks SET isFavorite = :isFavorite, notInterested = CASE WHEN :isFavorite THEN 0 ELSE notInterested END WHERE id = :trackId")
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean)
+
+    // --- v6: explicit negative feedback ---
+
+    /** Liking and "not interested" are mutually exclusive; setting one clears the other. */
+    @Query("UPDATE tracks SET notInterested = :notInterested, isFavorite = CASE WHEN :notInterested THEN 0 ELSE isFavorite END WHERE id = :trackId")
+    suspend fun setNotInterested(trackId: Long, notInterested: Boolean)
 
     @Query("SELECT * FROM tracks WHERE id = :trackId LIMIT 1")
     suspend fun getById(trackId: Long): TrackEntity?

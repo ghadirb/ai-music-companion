@@ -99,6 +99,9 @@ class MusicRepository(
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =
         trackDao.setFavorite(trackId, isFavorite)
 
+    suspend fun setNotInterested(trackId: Long, notInterested: Boolean) =
+        trackDao.setNotInterested(trackId, notInterested)
+
 
     suspend fun getTrack(trackId: Long): TrackEntity? = trackDao.getById(trackId)
 

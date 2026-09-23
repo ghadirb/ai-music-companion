@@ -170,7 +170,9 @@ object RecommendationScorer {
         val energyPref = stats.preferredEnergyByBucket[bucket] ?: stats.preferredEnergy
         val usingBucketEnergy = stats.preferredEnergyByBucket.containsKey(bucket)
 
-        return tracks.map { track -> scoreOne(track, stats, config, nowMs, energyPref, usingBucketEnergy) }
+        // "Not interested" tracks are excluded from every suggestion surface (Home picks, smart
+        // mixes, smart playlists) but stay untouched in the Library itself.
+        return tracks.filterNot { it.notInterested }.map { track -> scoreOne(track, stats, config, nowMs, energyPref, usingBucketEnergy) }
             .sortedWith(compareByDescending<Recommendation> { it.score }.thenByDescending { it.track.dateAdded }.thenBy { it.track.title })
     }
 

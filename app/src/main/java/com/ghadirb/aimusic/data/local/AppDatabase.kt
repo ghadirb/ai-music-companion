@@ -26,6 +26,7 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
  * "night"/"driving" Home cards and real user libraries may already exist on
  * devices running v2, this is a real Migration (not destructive) so local
  * history/favorites/playlists are preserved across the upgrade.
+ * v6 adds `tracks.notInterested` (explicit negative feedback, v1.1).
  */
 @Database(
     entities = [
@@ -35,7 +36,7 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
         PlaylistEntity::class,
         PlaylistTrackCrossRef::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -62,6 +63,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tracks ADD COLUMN notInterested INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tracks ADD COLUMN energyLevel REAL")
@@ -83,7 +90,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ai_music_companion.db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     // v1 predates any real install (never released), so the only
                     // gap we can't hand-migrate is v1->v2; destructive fallback
                     // only kicks in for that very old case.

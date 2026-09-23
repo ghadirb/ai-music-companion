@@ -130,4 +130,8 @@ class LibraryViewModel(
     fun toggleFavorite(track: TrackEntity) {
         viewModelScope.launch { repository.setFavorite(track.id, !track.isFavorite) }
     }
+
+    fun toggleNotInterested(track: TrackEntity) {
+        viewModelScope.launch { repository.setNotInterested(track.id, !track.notInterested) }
+    }
 }

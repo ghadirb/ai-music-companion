@@ -47,8 +47,14 @@ class PlaybackService : MediaLibraryService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val persistListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) { if (!isPlaying) persist() }
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = persist()
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (!isPlaying) persist()
+            com.ghadirb.aimusic.widget.MusicWidgetProvider.refresh(this@PlaybackService, com.ghadirb.aimusic.widget.WidgetState.from(player))
+        }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            persist()
+            com.ghadirb.aimusic.widget.MusicWidgetProvider.refresh(this@PlaybackService, com.ghadirb.aimusic.widget.WidgetState.from(player))
+        }
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = persist()
         override fun onRepeatModeChanged(repeatMode: Int) = persist()
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {

@@ -193,6 +193,13 @@ fun PlayerScreen(
                     tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else LocalContentColor.current
                 )
             }
+            IconButton(onClick = { playerViewModel.cyclePlaybackSpeed() }) {
+                Text(
+                    "×${if (uiState.playbackSpeed == uiState.playbackSpeed.toInt().toFloat()) uiState.playbackSpeed.toInt().toString() else uiState.playbackSpeed.toString()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (uiState.playbackSpeed != 1f) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
+            }
             IconButton(onClick = { showLyrics = true }) {
                 Icon(Icons.Filled.Lyrics, contentDescription = "متن آهنگ")
             }
