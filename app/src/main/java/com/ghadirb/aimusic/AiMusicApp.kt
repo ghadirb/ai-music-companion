@@ -12,6 +12,8 @@ import com.ghadirb.aimusic.billing.PurchaseRepository
 import com.ghadirb.aimusic.cloud.CloudApi
 import com.ghadirb.aimusic.cloud.CloudConsent
 import com.ghadirb.aimusic.data.local.AppDatabase
+import com.ghadirb.aimusic.library.LibraryWatchStore
+import com.ghadirb.aimusic.library.LibraryWatchWorker
 import com.ghadirb.aimusic.premium.EntitlementRepository
 import com.ghadirb.aimusic.premium.EntitlementTokenVerifier
 import com.ghadirb.aimusic.data.repository.MusicRepository
@@ -52,6 +54,9 @@ class AiMusicApp : Application() {
         )
         scheduleTasteProfileRefresh()
         scheduleAudioAnalysis()
+        // Opt-in only (spec item 7) — nothing scheduled unless the user already turned it on
+        // in Settings; re-arming here just survives process death / device reboot.
+        if (LibraryWatchStore(this).enabled) LibraryWatchWorker.schedule(this)
     }
 
     /**

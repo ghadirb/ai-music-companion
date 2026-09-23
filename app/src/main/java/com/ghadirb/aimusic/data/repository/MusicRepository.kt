@@ -58,8 +58,13 @@ class MusicRepository(
      * inserts new tracks, removes ones that no longer exist on disk.
      * Existing favorite flags / ids for unchanged tracks are preserved
      * because we only insert paths we don't already have.
+     *
+     * @return the newly-inserted tracks (with their generated ids), for callers that
+     * want to react to "what's new" — e.g. [com.ghadirb.aimusic.library.LibraryWatchWorker].
+     * Most existing callers just discard this (a manual rescan from Library only cares
+     * that it ran, not what changed).
      */
-    suspend fun rescanLibrary() {
+    suspend fun rescanLibrary(): List<TrackEntity> {
         val scanned = scanner.scan()
         val existingPaths = trackDao.getAllPaths().toSet()
         val scannedPaths = scanned.map { it.path }.toSet()
@@ -69,8 +74,9 @@ class MusicRepository(
         // An empty scan is treated as a provider glitch: never wipe the library (and favourites) because of it.
         val removedPaths = if (scanned.isEmpty()) emptyList() else existingPaths.filter { it !in scannedPaths }
 
+        var insertedIds: List<Long> = emptyList()
         val applyChanges: suspend () -> Unit = {
-            if (newTracks.isNotEmpty()) trackDao.insertAll(newTracks)
+            if (newTracks.isNotEmpty()) insertedIds = trackDao.insertAll(newTracks)
             // A re-scan also repairs legacy labels already saved in the database.
             existingTracks.forEach { track ->
                 trackDao.updateMetadata(
@@ -85,6 +91,9 @@ class MusicRepository(
         }
         // One transaction: faster on big libraries and never leaves a half-applied scan.
         if (database != null) database.withTransaction { applyChanges() } else applyChanges()
+
+        return if (insertedIds.isEmpty()) emptyList()
+        else newTracks.mapIndexedNotNull { index, track -> insertedIds.getOrNull(index)?.let { track.copy(id = it) } }
     }
 
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =

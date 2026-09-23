@@ -225,6 +225,45 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        val libraryWatchStore = remember { com.ghadirb.aimusic.library.LibraryWatchStore(context) }
+        var libraryWatchEnabled by remember { mutableStateOf(libraryWatchStore.enabled) }
+        var libraryWatchSummary by remember { mutableStateOf(libraryWatchStore.pendingSummary) }
+        ListItem(
+            headlineContent = { Text("بررسی خودکار موسیقی‌های جدید") },
+            supportingContent = {
+                Column {
+                    Text("هر چند ساعت یک‌بار، در پس‌زمینه و کاملاً روی دستگاه، کتابخانه را برای فایل‌های تازه بررسی می‌کند — بدون دسترسی جدید به حافظه.")
+                    libraryWatchSummary?.let { summary ->
+                        Row(modifier = Modifier.padding(top = 4.dp)) {
+                            Text(summary, style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = {
+                            libraryWatchStore.pendingSummary = null
+                            libraryWatchSummary = null
+                        }) { Text("متوجه شدم") }
+                    }
+                }
+            },
+            trailingContent = {
+                Switch(
+                    checked = libraryWatchEnabled,
+                    onCheckedChange = { enabled ->
+                        libraryWatchEnabled = enabled
+                        libraryWatchStore.enabled = enabled
+                        if (enabled) {
+                            com.ghadirb.aimusic.library.LibraryWatchWorker.schedule(context)
+                            com.ghadirb.aimusic.library.LibraryWatchWorker.enqueueNow(context)
+                        } else {
+                            com.ghadirb.aimusic.library.LibraryWatchWorker.cancel(context)
+                            libraryWatchStore.pendingSummary = null
+                            libraryWatchSummary = null
+                        }
+                    }
+                )
+            }
+        )
+        HorizontalDivider()
+
         ListItem(
             headlineContent = { Text("حریم خصوصی") },
             supportingContent = {
