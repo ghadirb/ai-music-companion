@@ -44,7 +44,7 @@ object BrowseTree {
             )
             .build()
 
-    fun root(): MediaItem = folder(ROOT_ID, "AI Music Companion")
+    fun root(): MediaItem = folder(ROOT_ID, "نواسا")
 
     /**
      * Children of [parentId], or null if [parentId] isn't one of ours (unknown browse node).

@@ -37,7 +37,7 @@ object CrashLogger {
         val trace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
         val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         return scrub(
-            "AI Music Companion crash report\nTime: $time\nVersion: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
+            "نواسا crash report\nTime: $time\nVersion: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
                 "Android: ${Build.VERSION.SDK_INT}  Device: ${Build.MANUFACTURER} ${Build.MODEL}\nThread: $threadName\n\n$trace"
         )
     }

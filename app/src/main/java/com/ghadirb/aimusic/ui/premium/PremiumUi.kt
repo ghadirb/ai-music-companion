@@ -141,7 +141,7 @@ fun PremiumScreen(viewModel: PremiumViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Text("  AI Music Companion Premium", style = MaterialTheme.typography.headlineSmall)
+            Text("  پرمیوم نواسا", style = MaterialTheme.typography.headlineSmall)
         }
         Text(
             "آفلاین، خصوصی و شخصی‌سازی‌شده. پرمیوم فقط قابلیت‌های هوشمند پیشرفته را اضافه می‌کند.",

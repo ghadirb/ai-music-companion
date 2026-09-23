@@ -57,10 +57,7 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          ./gradlew assembleRelease bundleRelease \
-            -PVERSION_CODE="$VERSION_CODE" \
-            -PMYKET_IAB_PUBLIC_KEY="${{ secrets.MYKET_IAB_PUBLIC_KEY }}" \
-            --stacktrace 2>&1 | tee build-release.log
+          ./gradlew assembleRelease bundleRelease -PVERSION_CODE="$VERSION_CODE" --stacktrace 2>&1 | tee build-release.log
 
       - name: Verify release signature (apksigner)
         run: |
