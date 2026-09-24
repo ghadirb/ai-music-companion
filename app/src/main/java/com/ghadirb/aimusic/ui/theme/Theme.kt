@@ -5,28 +5,53 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 
 /**
  * The doc explicitly asks for Material 3 + Dark Mode as the primary look, so
- * dark is the default scheme even on light-mode devices; light is still wired
- * up for completeness.
+ * dark is the default scheme even on light-mode devices; Light is fully
+ * independent below (not just Dark's colors inverted).
+ *
+ * Elevation hierarchy: background -> surface -> surfaceVariant/elevated
+ * follows the token scale defined in Color.kt for both schemes.
  */
 private val DarkScheme = darkColorScheme(
-    primary = PurplePrimary,
-    secondary = Teal,
+    primary = AccentGold,
+    onPrimary = BackgroundDark,
+    primaryContainer = SurfaceElevatedDark,
+    onPrimaryContainer = AccentGoldBright,
+    secondary = AccentTeal,
+    onSecondary = BackgroundDark,
     background = BackgroundDark,
+    onBackground = OnBackgroundDark,
     surface = SurfaceDark,
-    surfaceVariant = SurfaceDark,
-    secondaryContainer = Color(0xFF4A4232),
-    onBackground = OnDark,
-    onSurface = OnDark
+    onSurface = OnBackgroundDark,
+    surfaceVariant = SurfaceElevatedDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    secondaryContainer = SurfaceElevatedDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineDark,
+    error = ErrorDark,
+    onError = BackgroundDark
 )
 
 private val LightScheme = lightColorScheme(
-    primary = PurplePrimary,
-    secondary = Teal,
-    surfaceVariant = Color(0xFFF1E9DD)
+    primary = AccentGoldDeep,
+    onPrimary = SurfaceLight,
+    primaryContainer = SurfaceElevatedLight,
+    onPrimaryContainer = AccentGoldDeep,
+    secondary = AccentTealDeep,
+    onSecondary = SurfaceLight,
+    background = BackgroundLight,
+    onBackground = OnBackgroundLight,
+    surface = SurfaceLight,
+    onSurface = OnBackgroundLight,
+    surfaceVariant = SurfaceElevatedLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    secondaryContainer = SurfaceElevatedLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineLight,
+    error = ErrorLight,
+    onError = SurfaceLight
 )
 
 @Composable
@@ -38,6 +63,7 @@ fun AiMusicCompanionTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = MaterialTheme.typography,
+        shapes = AppShapes,
         content = content
     )
 }

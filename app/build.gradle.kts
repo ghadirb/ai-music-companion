@@ -149,6 +149,9 @@ dependencies {
     // Image loading (album art)
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Dominant-color extraction from album artwork, for the Dynamic Artwork Theme
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // Permissions helper (Accompanist)
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
