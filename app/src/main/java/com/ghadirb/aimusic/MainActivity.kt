@@ -391,7 +391,7 @@ private fun MainScaffold(
             composable(ROUTE_HISTORY) {
                 HistoryScreen(
                     repository = repository,
-                    currentTrackId = playerUiState.currentTrack?.id,
+                    currentTrack = playerUiState.currentTrack,
                     onTrackClick = ::openPlayer
                 )
             }

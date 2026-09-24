@@ -72,11 +72,12 @@ private suspend fun loadHistory(repository: MusicRepository): HistoryState.Ready
 @Composable
 fun HistoryScreen(
     repository: MusicRepository,
-    currentTrackId: Long?,
+    currentTrack: TrackEntity?,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
     var state by remember { mutableStateOf<HistoryState>(HistoryState.Loading) }
     var tab by remember { mutableStateOf(HistoryTab.RECENT) }
+    val currentTrackId = currentTrack?.id
 
     LaunchedEffect(Unit) {
         state = try {
@@ -108,7 +109,10 @@ fun HistoryScreen(
             )
             is HistoryState.Ready -> {
                 val rows = if (tab == HistoryTab.RECENT) s.recent else s.top
-                if (rows.isEmpty()) {
+                // The track being played right now is only written to history when its session ends
+                // (next track / finished / skipped), so show it live at the top of the recent list.
+                val live = if (tab == HistoryTab.RECENT) currentTrack else null
+                if (rows.isEmpty() && live == null) {
                     EmptyState(
                         Icons.Filled.History,
                         "هنوز آهنگی پخش نکرده‌اید",
@@ -118,6 +122,16 @@ fun HistoryScreen(
                     val now = System.currentTimeMillis()
                     val queue = rows.map { it.track }.distinctBy { it.id }
                     LazyColumn(Modifier.fillMaxSize()) {
+                        if (live != null) {
+                            item(key = "live") {
+                                ListItem(
+                                    headlineContent = { Text(live.title, maxLines = 1) },
+                                    supportingContent = { Text("اکنون در حال پخش • پس از پایان یا رد کردن در تاریخچه ثبت می‌شود", maxLines = 2) },
+                                    leadingContent = { Icon(Icons.Filled.PlayArrow, contentDescription = "در حال پخش") },
+                                    modifier = Modifier.clickable { onTrackClick(live, listOf(live)) }
+                                )
+                            }
+                        }
                         itemsIndexed(rows, key = { index, row -> "${index}_${row.track.id}" }) { _, row ->
                             HistoryRow(
                                 row = row,
@@ -140,6 +154,7 @@ private fun HistoryRow(row: HistoryEntry, now: Long, showPlayCount: Boolean, isC
     val details = listOfNotNull(
         track.artist.takeUnless { it == "Unknown artist" },
         if (showPlayCount) "${row.plays} بار پخش".faDigits() else null,
+        if (row.partial) "${(row.completedPercentage * 100).toInt()}٪ شنیده شد".faDigits() else null,
         "آخرین پخش: ${formatWhen(row.lastPlayedAt, now)}"
     ).joinToString(" • ")
     ListItem(

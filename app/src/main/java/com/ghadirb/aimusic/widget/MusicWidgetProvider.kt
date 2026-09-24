@@ -58,8 +58,31 @@ class MusicWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        // Paint immediately with what we know, so the widget is never left blank.
         appWidgetIds.forEach { id ->
             appWidgetManager.updateAppWidget(id, buildViews(context, WidgetState.last))
+        }
+        // Cold widget (app process just started / nothing played yet): show the last track that was
+        // playing instead of the idle text, read from the same saved state "continue playback" uses.
+        if (WidgetState.last.title == null) {
+            val pending = goAsync()
+            val appContext = context.applicationContext
+            CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+                try {
+                    val saved = PlaybackStateStore(appContext).load()
+                    val id = saved?.trackIds?.getOrNull(saved.index)
+                    val track = if (id != null) (appContext as? AiMusicApp)?.repository?.getTrack(id) else null
+                    if (track != null && WidgetState.last.title == null) {
+                        val state = WidgetState(track.title, track.artist, false)
+                        WidgetState.last = state
+                        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, buildViews(appContext, state)) }
+                    }
+                } catch (e: Exception) {
+                    // Best effort only; the idle layout is already shown.
+                } finally {
+                    pending.finish()
+                }
+            }
         }
     }
 
@@ -135,7 +158,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             ids.forEach { manager.updateAppWidget(it, views) }
         }
 
-        private fun buildViews(context: Context, state: WidgetState): RemoteViews {
+        internal fun buildViews(context: Context, state: WidgetState): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_music_player)
             views.setTextViewText(R.id.widget_title, state.title ?: context.getString(R.string.app_name))
             views.setTextViewText(R.id.widget_artist, state.artist ?: context.getString(R.string.widget_subtitle_idle))
