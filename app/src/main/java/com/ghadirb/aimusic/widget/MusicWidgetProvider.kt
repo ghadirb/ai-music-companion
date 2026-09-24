@@ -21,9 +21,9 @@ import com.ghadirb.aimusic.playback.PlaybackService
  * No extra dependency (Glance etc.) — plain RemoteViews, matching the "no heavy
  * dependencies" constraint. Transport buttons briefly connect a [MediaController] to the
  * existing [PlaybackService] session (the same mechanism PlayerController already uses for
- * the in-app UI) and release it once the command is sent; the widget itself is refreshed by
- * [WidgetUpdates] from inside the service whenever playback state actually changes, so it
- * never has to keep a connection open.
+ * the in-app UI) and release it once the command is sent; the widget itself is refreshed via
+ * [refresh] from inside the service whenever playback state actually changes, so it never has
+ * to keep a connection open.
  */
 @UnstableApi
 class MusicWidgetProvider : AppWidgetProvider() {
@@ -31,12 +31,18 @@ class MusicWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_TOGGLE, ACTION_NEXT, ACTION_PREV -> {
-                withController(context) { controller ->
-                    when (intent.action) {
-                        ACTION_TOGGLE -> if (controller.isPlaying) controller.pause() else controller.play()
-                        ACTION_NEXT -> controller.seekToNextMediaItem()
-                        ACTION_PREV -> controller.seekToPreviousMediaItem()
-                    }
+                // BroadcastReceiver.onReceive gets a *restricted* Context — calling
+                // MediaController.Builder(...).buildAsync() on it throws
+                // ReceiverCallNotAllowedException (bindService isn't allowed from a receiver),
+                // crashing the whole app process since the receiver runs in-process. Use
+                // applicationContext instead. goAsync() then keeps this receiver (and, if the
+                // app wasn't already running, its process) alive long enough for the async
+                // Binder connection + command to actually complete — without it, Android is
+                // free to kill the process the instant onReceive() returns, before the
+                // (inherently async) controller connection resolves.
+                val pendingResult = goAsync()
+                withController(context.applicationContext, intent.action) {
+                    pendingResult.finish()
                 }
                 return
             }
@@ -50,17 +56,31 @@ class MusicWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    private fun withController(context: Context, action: (MediaController) -> Unit) {
-        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-        val future = MediaController.Builder(context, token).buildAsync()
-        future.addListener(
-            {
-                val controller = runCatching { future.get() }.getOrNull() ?: return@addListener
-                runCatching { action(controller) }
-                controller.release()
-            },
-            ContextCompat.getMainExecutor(context)
-        )
+    private fun withController(appContext: Context, action: String?, onDone: () -> Unit) {
+        try {
+            val token = SessionToken(appContext, ComponentName(appContext, PlaybackService::class.java))
+            val future = MediaController.Builder(appContext, token).buildAsync()
+            future.addListener(
+                {
+                    val controller = runCatching { future.get() }.getOrNull()
+                    if (controller != null) {
+                        runCatching {
+                            when (action) {
+                                ACTION_TOGGLE -> if (controller.isPlaying) controller.pause() else controller.play()
+                                ACTION_NEXT -> controller.seekToNextMediaItem()
+                                ACTION_PREV -> controller.seekToPreviousMediaItem()
+                            }
+                        }
+                        controller.release()
+                    }
+                    onDone()
+                },
+                ContextCompat.getMainExecutor(appContext)
+            )
+        } catch (e: Exception) {
+            // Never let a widget tap take the app down — worst case the tap is a no-op.
+            onDone()
+        }
     }
 
     companion object {

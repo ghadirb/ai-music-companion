@@ -57,8 +57,7 @@ class DatabaseMigrationTest {
 
     @Test fun migrate5To6AddsNotInterestedColumnDefaultedToFalse() {
         createV4WithData()
-        helper.runMigrationsAndValidate(DB, 5, true, AppDatabase.MIGRATION_4_5).close()
-        val db = helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_5_6)
+        val db = helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
         db.query("SELECT notInterested FROM tracks WHERE id = 1").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
     }
 
