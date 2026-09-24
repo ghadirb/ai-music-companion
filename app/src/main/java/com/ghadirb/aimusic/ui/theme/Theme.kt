@@ -62,7 +62,7 @@ fun AiMusicCompanionTheme(
     val colorScheme = if (darkTheme) DarkScheme else LightScheme
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = MaterialTheme.typography,
+        typography = AppTypography,
         shapes = AppShapes,
         content = content
     )
