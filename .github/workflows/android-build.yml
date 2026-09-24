@@ -88,7 +88,7 @@ jobs:
           if-no-files-found: ignore
       # Plain-text report branch (latest run only) so failures can be read without downloading artifacts.
       - name: Publish CI report branch
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         run: |
           rm -rf /tmp/report && mkdir -p /tmp/report
           for f in unit-tests.log lint.log build-debug.log build-release.log apksigner.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
@@ -153,7 +153,7 @@ jobs:
           path: app/build/outputs/androidTest-results/**
           if-no-files-found: ignore
       - name: Publish instrumented report branch
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         run: |
           rm -rf /tmp/rep && mkdir -p /tmp/rep
           find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} /tmp/rep/ \; 2>/dev/null || true
@@ -190,7 +190,7 @@ jobs:
           disable-animations: true
           script: bash .github/scripts/release-smoke.sh
       - name: Publish smoke report branch
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         run: |
           rm -rf /tmp/smoke && mkdir -p /tmp/smoke
           cp screenshot-*.png /tmp/smoke/ 2>/dev/null || true
