@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -58,6 +59,7 @@ fun MiniPlayerBar(
                         model = track.albumArtUri,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        error = rememberVectorPainter(Icons.Filled.MusicNote),
                         modifier = Modifier.size(44.dp)
                     )
                 } else {

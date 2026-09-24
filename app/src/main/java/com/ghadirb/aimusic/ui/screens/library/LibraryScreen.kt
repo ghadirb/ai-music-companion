@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -41,6 +42,8 @@ import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -361,9 +364,15 @@ fun TrackRow(
         },
         leadingContent = {
             if (track.albumArtUri != null) {
-                AsyncImage(track.albumArtUri, contentDescription = track.album, modifier = Modifier.size(56.dp))
+                AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = track.album,
+                    contentScale = ContentScale.Crop,
+                    error = rememberVectorPainter(Icons.Filled.MusicNote),
+                    modifier = Modifier.size(56.dp)
+                )
             } else {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Icon(Icons.Filled.MusicNote, contentDescription = null)
             }
         },
         trailingContent = {

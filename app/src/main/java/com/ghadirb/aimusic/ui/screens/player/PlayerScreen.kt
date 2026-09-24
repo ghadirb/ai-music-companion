@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -113,7 +114,8 @@ fun PlayerScreen(
                     model = currentTrack.albumArtUri,
                     contentDescription = "جلد آلبوم ${currentTrack.album}",
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    error = rememberVectorPainter(Icons.Filled.MusicNote)
                 )
             } else {
                 Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(96.dp))
