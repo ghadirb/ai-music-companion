@@ -12,9 +12,16 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.ghadirb.aimusic.AiMusicApp
 import com.ghadirb.aimusic.MainActivity
 import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.playback.PlaybackService
+import com.ghadirb.aimusic.playback.PlaybackStateStore
+import com.ghadirb.aimusic.playback.toMediaItem
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Home-screen widget (spec v1.1 item 5): track title/artist + play-pause/prev/next.
@@ -63,17 +70,33 @@ class MusicWidgetProvider : AppWidgetProvider() {
             future.addListener(
                 {
                     val controller = runCatching { future.get() }.getOrNull()
-                    if (controller != null) {
-                        runCatching {
-                            when (action) {
-                                ACTION_TOGGLE -> if (controller.isPlaying) controller.pause() else controller.play()
-                                ACTION_NEXT -> controller.seekToNextMediaItem()
-                                ACTION_PREV -> controller.seekToPreviousMediaItem()
+                    if (controller == null) {
+                        onDone()
+                    } else {
+                        // Cold start: when the app was closed (process killed, or the service was
+                        // stopped after the task was swiped away while paused) the freshly created
+                        // service has an EMPTY player, so play()/next()/previous() would silently do
+                        // nothing. Media3's onPlaybackResumption() is only used for media-button
+                        // events, not for plain controller commands, so rebuild the last saved queue
+                        // here first, exactly like the in-app "continue playback" does.
+                        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
+                            try {
+                                if (controller.mediaItemCount == 0) restoreLastQueue(appContext, controller)
+                                if (controller.mediaItemCount > 0) {
+                                    when (action) {
+                                        ACTION_TOGGLE -> if (controller.isPlaying) controller.pause() else controller.play()
+                                        ACTION_NEXT -> controller.seekToNextMediaItem()
+                                        ACTION_PREV -> controller.seekToPreviousMediaItem()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Never let a widget tap take the app down.
+                            } finally {
+                                runCatching { controller.release() }
+                                onDone()
                             }
                         }
-                        controller.release()
                     }
-                    onDone()
                 },
                 ContextCompat.getMainExecutor(appContext)
             )
@@ -81,6 +104,20 @@ class MusicWidgetProvider : AppWidgetProvider() {
             // Never let a widget tap take the app down — worst case the tap is a no-op.
             onDone()
         }
+    }
+
+    /** Re-creates the last saved queue (same data PlaybackService.onPlaybackResumption uses). */
+    private suspend fun restoreLastQueue(appContext: Context, controller: MediaController) {
+        val saved = PlaybackStateStore(appContext).load() ?: return
+        val repository = (appContext as AiMusicApp).repository
+        val tracks = saved.trackIds.mapNotNull { repository.getTrack(it) }
+        if (tracks.isEmpty()) return
+        val currentId = saved.trackIds.getOrNull(saved.index)
+        val index = tracks.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
+        controller.shuffleModeEnabled = saved.shuffle
+        controller.repeatMode = saved.repeatMode
+        controller.setMediaItems(tracks.map { it.toMediaItem() }, index, saved.positionMs)
+        controller.prepare()
     }
 
     companion object {
