@@ -1,5 +1,10 @@
 package com.ghadirb.aimusic.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,10 +81,21 @@ fun MiniPlayerBar(
                 }
             }
             IconButton(onClick = onToggle) {
-                Icon(
-                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "توقف" else "پخش"
-                )
+                // Tiny scale-swap micro-interaction instead of an instant icon flip,
+                // matching the "Play -> Pause" motion asked for in the design spec.
+                AnimatedContent(
+                    targetState = isPlaying,
+                    transitionSpec = {
+                        (scaleIn(animationSpec = spring(stiffness = 500f), initialScale = 0.6f)) togetherWith
+                            (scaleOut(animationSpec = spring(stiffness = 500f), targetScale = 0.6f))
+                    },
+                    label = "miniPlayPauseIcon"
+                ) { playing ->
+                    Icon(
+                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) "توقف" else "پخش"
+                    )
+                }
             }
             IconButton(onClick = onNext) {
                 Icon(Icons.Filled.SkipNext, contentDescription = "آهنگ بعدی")

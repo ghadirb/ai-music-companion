@@ -3,9 +3,16 @@ package com.ghadirb.aimusic.ui.screens.player
 import android.app.Application
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -102,23 +110,56 @@ fun PlayerScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Swipe right -> previous track, swipe left -> next track. A soft threshold
+        // avoids accidental skips from small drags/scrolls; only a clear, deliberate
+        // swipe triggers a track change.
+        var dragAccumX by remember { mutableStateOf(0f) }
         Box(
             modifier = Modifier
                 .size(280.dp)
                 .graphicsLayer { scaleX = coverScale; scaleY = coverScale }
-                .clip(RoundedCornerShape(30.dp)),
+                .clip(RoundedCornerShape(30.dp))
+                .pointerInput(currentTrack.id) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragAccumX = 0f },
+                        onDragEnd = {
+                            val threshold = 90f
+                            if (dragAccumX <= -threshold) {
+                                playerViewModel.skipNext()
+                            } else if (dragAccumX >= threshold) {
+                                playerViewModel.skipPrevious()
+                            }
+                            dragAccumX = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmount -> dragAccumX += dragAmount }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
-            if (currentTrack.albumArtUri != null) {
-                AsyncImage(
-                    model = currentTrack.albumArtUri,
-                    contentDescription = "جلد آلبوم ${currentTrack.album}",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    error = rememberVectorPainter(Icons.Filled.MusicNote)
-                )
-            } else {
-                Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(96.dp))
+            // Crossfade the cover on track change instead of a hard cut, per the
+            // "smooth transition on track change" requirement. Cheap (opacity-only),
+            // no layout thrash, no heavy blur.
+            AnimatedContent(
+                targetState = currentTrack,
+                transitionSpec = {
+                    (fadeIn(animationSpec = spring(stiffness = 380f))) togetherWith
+                        (fadeOut(animationSpec = spring(stiffness = 380f)))
+                },
+                label = "coverCrossfade"
+            ) { track ->
+                if (track.albumArtUri != null) {
+                    AsyncImage(
+                        model = track.albumArtUri,
+                        contentDescription = "جلد آلبوم ${track.album}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        error = rememberVectorPainter(Icons.Filled.MusicNote)
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(96.dp))
+                    }
+                }
             }
         }
 
@@ -153,11 +194,20 @@ fun PlayerScreen(
             }
             Spacer(Modifier.width(16.dp))
             FilledIconButton(onClick = { playerViewModel.togglePlayPause() }, modifier = Modifier.size(64.dp)) {
-                Icon(
-                    imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (uiState.isPlaying) "توقف" else "پخش",
-                    modifier = Modifier.size(36.dp)
-                )
+                AnimatedContent(
+                    targetState = uiState.isPlaying,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = 500f)) + scaleIn(initialScale = 0.6f, animationSpec = spring(stiffness = 500f))) togetherWith
+                            (fadeOut(animationSpec = spring(stiffness = 500f)) + scaleOut(targetScale = 0.6f, animationSpec = spring(stiffness = 500f)))
+                    },
+                    label = "playPauseIcon"
+                ) { playing ->
+                    Icon(
+                        imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) "توقف" else "پخش",
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
             Spacer(Modifier.width(16.dp))
             IconButton(onClick = { playerViewModel.skipNext() }, modifier = Modifier.size(56.dp)) {
