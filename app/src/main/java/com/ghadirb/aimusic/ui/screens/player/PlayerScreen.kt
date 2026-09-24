@@ -3,6 +3,8 @@ package com.ghadirb.aimusic.ui.screens.player
 import android.app.Application
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -81,6 +84,13 @@ fun PlayerScreen(
         }
     }
 
+    // Simple, cheap animation: the cover gently "breathes" out when playing and settles back when paused.
+    val coverScale by animateFloatAsState(
+        targetValue = if (uiState.isPlaying) 1f else 0.88f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 250f),
+        label = "coverScale"
+    )
+
     if (currentTrack == null) {
         EmptyPlayer()
         return
@@ -92,7 +102,10 @@ fun PlayerScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Box(
-            modifier = Modifier.size(280.dp).clip(RoundedCornerShape(30.dp)),
+            modifier = Modifier
+                .size(280.dp)
+                .graphicsLayer { scaleX = coverScale; scaleY = coverScale }
+                .clip(RoundedCornerShape(30.dp)),
             contentAlignment = Alignment.Center
         ) {
             if (currentTrack.albumArtUri != null) {

@@ -78,7 +78,9 @@ Architecture is complete: billing abstraction → nonce → checkout → server 
 See [cloudflare-worker/README.md](cloudflare-worker/README.md): endpoints, security model, secrets (`GAPGPT_API_KEY`, `JWT_SIGNING_SECRET`, `MYKET_ACCESS_TOKEN`, `ENTITLEMENT_SIGNING_JWK`), configuration and tests (`npm test`).
 
 ## Roadmap
-Phase 2: home-screen widget, Android Auto browse/playback, licensed online lyrics (provider abstraction exists), Google Play billing as a second `BillingGateway`, account-based restore.
+Shipped in v1.1: home-screen widget (works even when the app is closed), Android Auto browsing, listening-history screen, cover animation and graceful handling of missing audio files.
+
+Next: licensed online lyrics (provider abstraction exists), Google Play billing as a second `BillingGateway`, account-based restore.
 
 ## License
 Proprietary — all rights reserved. See [LICENSE](LICENSE). Not open source; no permission is granted to copy, redistribute or use the code commercially without the owner's written consent.

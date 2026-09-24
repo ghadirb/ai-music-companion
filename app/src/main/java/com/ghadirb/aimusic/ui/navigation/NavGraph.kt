@@ -29,6 +29,7 @@ sealed class Screen(val route: String, val labelRes: Int, val icon: ImageVector)
 const val ROUTE_PLAYER = "player"
 const val ROUTE_PREMIUM = "premium"
 const val ROUTE_STATS = "stats"
+const val ROUTE_HISTORY = "history"
 const val ROUTE_TASTE = "taste_evolution"
 const val ROUTE_SMART_PLAYLIST = "smart_playlist"
 const val ROUTE_ARTIST_DETAIL = "artist/{artistName}"

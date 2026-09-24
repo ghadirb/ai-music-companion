@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
@@ -24,7 +25,10 @@ import com.ghadirb.aimusic.radio.RadioEngine
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
 import com.ghadirb.aimusic.recommendation.TuningStore
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -64,6 +68,10 @@ class PlayerViewModel(
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+    /** One-shot, user-facing playback problems (shown as a snackbar by MainActivity). */
+    private val _playbackErrors = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val playbackErrors: SharedFlow<String> = _playbackErrors.asSharedFlow()
+
     private val _queue = MutableStateFlow<List<TrackEntity>>(emptyList())
     val queue: StateFlow<List<TrackEntity>> = _queue.asStateFlow()
 
@@ -96,6 +104,19 @@ class PlayerViewModel(
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.update { it.copy(isPlaying = isPlaying) }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            val fileProblem = when (error.errorCode) {
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+                PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> true
+                else -> false
+            }
+            _playbackErrors.tryEmit(
+                if (fileProblem) "فایل این آهنگ پیدا نشد؛ شاید حذف یا جابه‌جا شده باشد. از بخش کتابخانه دوباره اسکن کنید."
+                else "پخش این آهنگ با خطا مواجه شد."
+            )
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {

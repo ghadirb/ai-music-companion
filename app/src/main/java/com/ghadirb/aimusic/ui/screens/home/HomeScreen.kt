@@ -64,6 +64,7 @@ fun HomeScreen(
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
     onOpenSmartPlaylist: () -> Unit = {},
     onOpenStats: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
     onOpenPremium: () -> Unit = {},
     onOpenTaste: () -> Unit = {}
 ) {
@@ -114,6 +115,7 @@ fun HomeScreen(
 
         Row(Modifier.padding(bottom = 16.dp).horizontalScroll(rememberScrollState())) {
             AssistChip(onClick = onOpenSmartPlaylist, label = { Text("پلی‌لیست هوشمند") }, modifier = Modifier.padding(end = 8.dp))
+            AssistChip(onClick = onOpenHistory, label = { Text("تاریخچه") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenStats, label = { Text("آمار") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenTaste, label = { Text("تکامل سلیقه") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenPremium, label = { Text("پرمیوم") })

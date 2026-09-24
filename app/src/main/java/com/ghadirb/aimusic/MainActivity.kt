@@ -65,6 +65,8 @@ import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYER
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PREMIUM
 import com.ghadirb.aimusic.ui.navigation.ROUTE_SMART_PLAYLIST
 import com.ghadirb.aimusic.ui.navigation.ROUTE_STATS
+import com.ghadirb.aimusic.ui.navigation.ROUTE_HISTORY
+import com.ghadirb.aimusic.ui.screens.history.HistoryScreen
 import com.ghadirb.aimusic.ui.navigation.ROUTE_TASTE
 import com.ghadirb.aimusic.ui.screens.stats.TasteEvolutionScreen
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYLIST_DETAIL
@@ -254,6 +256,7 @@ private fun MainScaffold(
         currentRoute == ROUTE_PLAYER -> "در حال پخش"
         currentRoute == ROUTE_PREMIUM -> "پرمیوم"
         currentRoute == ROUTE_STATS -> "آمار"
+        currentRoute == ROUTE_HISTORY -> "تاریخچهٔ پخش"
         currentRoute == ROUTE_TASTE -> "تکامل سلیقه"
         currentRoute == ROUTE_SMART_PLAYLIST -> "پلی‌لیست هوشمند"
         currentRoute == ROUTE_PLAYLIST_DETAIL ->
@@ -271,7 +274,14 @@ private fun MainScaffold(
     val showBackButton = currentRoute != null &&
         Screen.bottomBarScreens.none { it.route == currentRoute }
 
+    // Playback problems (e.g. the audio file was deleted/moved) surface as a snackbar on any screen.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(playerViewModel) {
+        playerViewModel.playbackErrors.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(screenTitle) },
@@ -324,6 +334,7 @@ private fun MainScaffold(
                     onTrackClick = ::openPlayer,
                     onOpenSmartPlaylist = { navController.navigate(ROUTE_SMART_PLAYLIST) { launchSingleTop = true } },
                     onOpenStats = { navController.navigate(ROUTE_STATS) { launchSingleTop = true } },
+                    onOpenHistory = { navController.navigate(ROUTE_HISTORY) { launchSingleTop = true } },
                     onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } },
                     // Gated centrally through PremiumAccess (no scattered checks in the UI).
                     onOpenTaste = { premiumAccess.require(PremiumFeature.TASTE_EVOLUTION) { navController.navigate(ROUTE_TASTE) { launchSingleTop = true } } }
@@ -377,6 +388,13 @@ private fun MainScaffold(
             }
             composable(ROUTE_PREMIUM) { PremiumScreen(premiumViewModel) }
             composable(ROUTE_STATS) { StatisticsScreen(repository) }
+            composable(ROUTE_HISTORY) {
+                HistoryScreen(
+                    repository = repository,
+                    currentTrackId = playerUiState.currentTrack?.id,
+                    onTrackClick = ::openPlayer
+                )
+            }
             composable(ROUTE_TASTE) { TasteEvolutionScreen(repository) }
             composable(ROUTE_SMART_PLAYLIST) {
                 SmartPlaylistScreen(

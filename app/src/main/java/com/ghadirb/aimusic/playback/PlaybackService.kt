@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -46,8 +47,22 @@ class PlaybackService : MediaLibraryService() {
     private var recorder: ListeningRecorder? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    /** Consecutive unplayable items; guards against an endless skip loop (e.g. repeat-all with every file missing). */
+    private var consecutiveErrors = 0
+
     private val persistListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            // A missing/unreadable file must not leave the player stuck: move on to the next track.
+            consecutiveErrors++
+            if (consecutiveErrors <= MAX_CONSECUTIVE_ERRORS && player.hasNextMediaItem()) {
+                player.seekToNextMediaItem()
+                player.prepare()
+                player.play()
+            }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) consecutiveErrors = 0
             if (!isPlaying) persist()
             com.ghadirb.aimusic.widget.MusicWidgetProvider.refresh(this@PlaybackService, com.ghadirb.aimusic.widget.WidgetState.from(player))
         }
@@ -276,5 +291,6 @@ class PlaybackService : MediaLibraryService() {
 
     private companion object {
         const val PERSIST_INTERVAL_MS = 15_000L
+        const val MAX_CONSECUTIVE_ERRORS = 5
     }
 }
