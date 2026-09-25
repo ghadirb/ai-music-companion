@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.ghadirb.aimusic.DatabaseMigrationTest" tests="15" failures="0" errors="0" skipped="0" time="1.41" timestamp="2026-09-25T18:52:47" hostname="localhost">
+  <properties>
+    <property name="device" value="emulator-5554 - 11" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="migrate5To6AddsNotInterestedColumnDefaultedToFalse" classname="com.ghadirb.aimusic.DatabaseMigrationTest" time="0.083" />
+  <testcase name="migrate4To5KeepsDataAndAddsProfileColumns" classname="com.ghadirb.aimusic.DatabaseMigrationTest" time="0.018" />
+  <testcase name="openingAnOldDatabaseWithTheRealBuilderPreservesUserData" classname="com.ghadirb.aimusic.DatabaseMigrationTest" time="0.056" />
+  <testcase name="indexIsCachedOnDiskAndSurvivesAFreshInstance" classname="com.ghadirb.aimusic.LyricsSourceInstrumentedTest" time="0.005" />
+  <testcase name="indexesTheGrantedFolderRecursivelyAndFindsSameNameLyrics" classname="com.ghadirb.aimusic.LyricsSourceInstrumentedTest" time="0.029" />
+  <testcase name="withoutAGrantedFolderNothingIsFoundAndDiagnosisSaysSo" classname="com.ghadirb.aimusic.LyricsSourceInstrumentedTest" time="0.0" />
+  <testcase name="unknownSongIsNotFoundAndDiagnosisExplainsWhy" classname="com.ghadirb.aimusic.LyricsSourceInstrumentedTest" time="0.001" />
+  <testcase name="decodesLegacyWindows1256LyricsFiles" classname="com.ghadirb.aimusic.LyricsSourceInstrumentedTest" time="0.026" />
+  <testcase name="matchesPersianNamesAcrossArabicLetterVariantsAndCase" classname="com.ghadirb.aimusic.LyricsSourceInstrumentedTest" time="0.005" />
+  <testcase name="favoritesToggle" classname="com.ghadirb.aimusic.RepositoryDaoTest" time="0.026" />
+  <testcase name="playlistsKeepOrderAndAllowRemoval" classname="com.ghadirb.aimusic.RepositoryDaoTest" time="0.031" />
+  <testcase name="restorePlanIsAppliedAtomicallyAndMergesPlaylists" classname="com.ghadirb.aimusic.RepositoryDaoTest" time="0.002" />
+  <testcase name="historyIsStoredAndAggregated" classname="com.ghadirb.aimusic.RepositoryDaoTest" time="0.029" />
+  <testcase name="createPlaylistWithTracksMakesNamesUnique" classname="com.ghadirb.aimusic.RepositoryDaoTest" time="0.003" />
+  <testcase name="widgetLayoutInflatesInIdleAndPlayingStates" classname="com.ghadirb.aimusic.WidgetInflationTest" time="0.027" />
+</testsuite>
