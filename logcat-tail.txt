@@ -1,0 +1,300 @@
+09-25 18:57:50.315  1569  1946 I MediaProvider: End Intent { act=android.intent.action.MEDIA_MOUNTED dat=file:///storage/emulated/0 flg=0x5000010 cmp=com.android.providers.media.module/com.android.providers.media.MediaService (has extras) }
+09-25 18:57:50.315  1569  1946 I MediaProvider: Begin Intent { act=android.intent.action.MEDIA_MOUNTED dat=file:///storage/emulated/0 flg=0x5000010 cmp=com.android.providers.media.module/com.android.providers.media.MediaService (has extras) }
+09-25 18:57:50.316  1569  1946 W ModernMediaScanner: Failed to visit /system/media: java.nio.file.NoSuchFileException: /system/media
+09-25 18:57:50.317  1569  1946 I MediaProvider: Scanned internal due to REASON_MOUNTED, found 0 items in 0ms, 0 inserts 0 updates 0 deletes
+09-25 18:57:50.317  1569  1946 W ModernMediaScanner: Failed to visit /oem/media: java.nio.file.NoSuchFileException: /oem/media
+09-25 18:57:50.317  1569  1946 I MediaProvider: Scanned internal due to REASON_MOUNTED, found 0 items in 0ms, 0 inserts 0 updates 0 deletes
+09-25 18:57:50.953   504   536 I DropBoxManagerService: add tag=system_app_strictmode isTagEnabled=true flags=0x2
+09-25 18:57:51.405  1569  1946 I MediaProvider: Scanned internal due to REASON_MOUNTED, found 230 items in 1087ms, 0 inserts 223 updates 0 deletes
+09-25 18:57:51.414  1569  1946 I MediaProvider: Scanned external_primary due to REASON_MOUNTED, found 14 items in 6ms, 0 inserts 0 updates 0 deletes
+09-25 18:57:51.415  1569  1946 I MediaProvider: End Intent { act=android.intent.action.MEDIA_MOUNTED dat=file:///storage/emulated/0 flg=0x5000010 cmp=com.android.providers.media.module/com.android.providers.media.MediaService (has extras) }
+09-25 18:57:51.556   504  1102 W OverlayManager: service 'idmap' died
+09-25 18:57:51.758     0     0 I init    : Sending signal 9 to service 'idmap2d' (pid 426) process group...
+09-25 18:57:51.765     0     0 I libprocessgroup: Successfully killed process cgroup uid 1000 pid 426 in 5ms
+09-25 18:57:51.767     0     0 I init    : Control message: Processed ctl.stop for 'idmap2d' from pid: 504 (system_server)
+09-25 18:57:51.770     0     0 I init    : Service 'idmap2d' (pid 426) received signal 9
+09-25 18:57:51.627  2335  2337 I cmd     : oneway function results will be dropped but finished with status OK and parcel size 4
+09-25 18:57:51.637   419   419 I perfetto: probes_producer.cc:329  Producer stop (id=2)
+09-25 18:57:51.640   421   421 I perfetto: ng_service_impl.cc:1948 Tracing session 2 ended, total sessions:1
+09-25 18:57:52.522   504  1408 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+09-25 18:57:52.644  1433  1433 V MultiDispActionReceiver: startService
+09-25 18:57:52.644  1433  1433 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.startService:1669 android.content.ContextWrapper.startService:720 android.content.ContextWrapper.startService:720 com.android.emulator.multidisplay.MultiDisplayServiceReceiver.onReceive:33 android.app.ActivityThread.handleReceiver:4032 
+09-25 18:57:52.646  1433  2345 I android_emulator_multidisplay_JNI: multidisplay pipe connected!!!
+09-25 18:57:52.646  1433  2345 D MultiDisplayService: received 1
+09-25 18:57:52.646  1433  2345 D MultiDisplayService: received 0
+09-25 18:57:52.646  1433  2345 D MultiDisplayService: received 320
+09-25 18:57:52.646  1433  2345 D MultiDisplayService: received 640
+09-25 18:57:52.646  1433  2345 D MultiDisplayService: received 0
+09-25 18:57:52.646  1433  2345 D MultiDisplayService: received 0
+09-25 18:57:52.646  1433  2345 E MultiDisplayService: invalid parameters for add/modify display
+09-25 18:57:53.072   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.073   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.messaging
+09-25 18:57:53.074   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.074   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AG4
+09-25 18:57:53.075   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.075   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.camera2
+09-25 18:57:53.075   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.075   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.stk
+09-25 18:57:53.075   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.075   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.provision
+09-25 18:57:53.075   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.075   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.calendar
+09-25 18:57:53.075   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.075   694   694 D AvrcpMediaPlayerList: Name of package changed: com.ghadirb.aimusic
+09-25 18:57:53.075   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.076   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.077   731  2245 I PermissionControllerServiceImpl: Updating user sensitive for uid 10102
+09-25 18:57:53.080   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.080   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.gallery3d
+09-25 18:57:53.085   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.085   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AG8
+09-25 18:57:53.086   731  2245 I PermissionControllerServiceImpl: Updating user sensitive for uid 10110
+09-25 18:57:53.087   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.087   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.087   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.inputmethod.latin
+09-25 18:57:53.087   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHA
+09-25 18:57:53.088   731  2245 I PermissionControllerServiceImpl: Updating user sensitive for uid 1001
+09-25 18:57:53.091   731   748 I PermissionControllerServiceImpl: Updating user sensitive for uid 10118
+09-25 18:57:53.092   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHE
+09-25 18:57:53.097   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.097   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.097   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.cellbroadcastreceiver.module
+09-25 18:57:53.098  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.099   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHI
+09-25 18:57:53.100   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHM
+09-25 18:57:53.101   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.101   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.settings
+09-25 18:57:53.101   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.102   504   542 W VoiceInteractionManager: no available voice interaction services found for user 0
+09-25 18:57:53.103   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHQ
+09-25 18:57:53.103   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.103   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.systemui
+09-25 18:57:53.103   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.103   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.permissioncontroller
+09-25 18:57:53.104   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.104   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.106   694   694 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+09-25 18:57:53.106   694   694 D AvrcpMediaPlayerList: Name of package changed: com.android.traceur
+09-25 18:57:53.106   504   596 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+09-25 18:57:53.106   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHU
+09-25 18:57:53.107   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHY
+09-25 18:57:53.108   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHc
+09-25 18:57:53.109   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHg
+09-25 18:57:53.109   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHk
+09-25 18:57:53.109   504   504 I Telecom : DefaultDialerCache: Refreshing default dialer for user 0: now com.android.dialer: DDC.oR@AHo
+09-25 18:57:53.113  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.123   504   542 W VoiceInteractionManager: no available voice interaction services found for user 0
+09-25 18:57:53.124   731  2348 I PermissionControllerServiceImpl: Updating user sensitive for uid 10108
+09-25 18:57:53.124   731  2245 I PermissionControllerServiceImpl: Updating user sensitive for uid 10130
+09-25 18:57:53.124   731  2245 I PermissionControllerServiceImpl: Updating user sensitive for uid 10112
+09-25 18:57:53.130   731  2348 I PermissionControllerServiceImpl: Updating user sensitive for uid 10106
+09-25 18:57:53.130   731  2348 I PermissionControllerServiceImpl: Updating user sensitive for uid 10125
+09-25 18:57:53.130   731   750 I PermissionControllerServiceImpl: Updating user sensitive for uid 1000
+09-25 18:57:53.130   731   750 I PermissionControllerServiceImpl: Updating user sensitive for uid 10121
+09-25 18:57:53.130   731   750 I PermissionControllerServiceImpl: Updating user sensitive for uid 10122
+09-25 18:57:53.130   731   750 I PermissionControllerServiceImpl: Updating user sensitive for uid 10095
+09-25 18:57:53.135  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.149  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.152   731  2349 I PermissionControllerServiceImpl: Updating user sensitive for user 0
+09-25 18:57:53.153   731   769 I UserPackageInfos: updating UserPackageInfosLiveData for user 0
+09-25 18:57:53.153   731   771 I LancherPackagesLiveData: updating LauncherPackageLiveData
+09-25 18:57:53.162  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.163   504   784 I system_server: oneway function results will be dropped but finished with status OK and parcel size 4
+09-25 18:57:53.164   504   784 I system_server: oneway function results will be dropped but finished with status OK and parcel size 4
+09-25 18:57:53.168  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.227  1048  1048 I chatty  : uid=1001(radio) com.android.phone identical 6 lines
+09-25 18:57:53.234  1048  1048 D CarrierSvcBindHelper: No carrier app for: 0
+09-25 18:57:53.242  1333  1333 I InputAttributes: InputType.TYPE_NULL is specified
+09-25 18:57:53.242   317   317 I android.hardware.vibrator-service.example: Vibrator reporting capabilities
+09-25 18:57:53.242   899   943 D ModelWriter: removing items from db 
+09-25 18:57:53.242   899   943 D ModelWriter: java.lang.Exception
+09-25 18:57:53.242   899   943 D ModelWriter: 	at com.android.launcher3.model.ModelWriter.deleteItemsFromDatabase(ModelWriter.java:272)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at com.android.launcher3.model.ModelWriter.deleteItemsFromDatabase(ModelWriter.java:262)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at com.android.launcher3.model.BaseModelUpdateTask.deleteAndBindComponentsRemoved(BaseModelUpdateTask.java:111)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at com.android.launcher3.model.PackageUpdatedTask.execute(PackageUpdatedTask.java:323)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at com.android.launcher3.model.BaseModelUpdateTask.run(BaseModelUpdateTask.java:67)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at android.os.Handler.handleCallback(Handler.java:938)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at android.os.Looper.loop(Looper.java:223)
+09-25 18:57:53.242   899   943 D ModelWriter: 	at android.os.HandlerThread.run(HandlerThread.java:67)
+09-25 18:57:53.248   504   542 E system_server: No package ID 7f found for ID 0x7f080271.
+09-25 18:57:53.248   504   542 E system_server: No package ID 7f found for ID 0x7f1212ec.
+09-25 18:57:53.248   504   542 E system_server: No package ID 7f found for ID 0x7f080270.
+09-25 18:57:53.248   504   542 E system_server: No package ID 7f found for ID 0x7f120592.
+09-25 18:57:53.248   504   542 E system_server: No package ID 7f found for ID 0x7f08026f.
+09-25 18:57:53.248   504   542 E system_server: No package ID 7f found for ID 0x7f120c2b.
+09-25 18:57:53.281  1947  1967 I viders.calenda: Waiting for a blocking GC ProfileSaver
+09-25 18:57:53.530  2028  2047 I ndroid.contact: Waiting for a blocking GC ProfileSaver
+09-25 18:57:53.585  2053  2072 I droid.dynsyste: Waiting for a blocking GC ProfileSaver
+09-25 18:57:53.597  2073  2092 I droid.gallery3: Waiting for a blocking GC ProfileSaver
+09-25 18:57:53.733  2158  2176 I m.android.shel: Waiting for a blocking GC ProfileSaver
+09-25 18:57:53.786  2179  2197 I android.traceu: Waiting for a blocking GC ProfileSaver
+09-25 18:57:54.256  2208  2231 I .localtranspor: Waiting for a blocking GC ProfileSaver
+09-25 18:57:54.488   419   419 I perfetto: probes_producer.cc:329  Producer stop (id=3)
+09-25 18:57:54.489   419   419 I perfetto: ftrace_procfs.cc:183    disabled ftrace
+09-25 18:57:54.490   421   421 I perfetto: ng_service_impl.cc:1948 Tracing session 3 ended, total sessions:0
+09-25 18:57:54.693     0     0 W perfetto: disabled ftrace
+09-25 18:57:53.253   504   542 I chatty  : uid=1000(system) android.bg identical 10 lines
+09-25 18:57:53.253   504   542 W VoiceInteractionManager: no available voice interaction services found for user 0
+09-25 18:57:54.491   430  2266 I iorapd  : Perfetto TraceBuffer saved to file: /data/misc/iorapd/com.ghadirb.aimusic/50/com.ghadirb.aimusic.MainActivity/raw_traces/1790362674491488111.perfetto_trace.pb
+09-25 18:57:55.276  1333  1333 I LatinIME: Timeout waiting for dictionary load
+09-25 18:57:55.893   694   694 D AvrcpBrowsablePlayerConnector: Received a message: msg.what=2
+09-25 18:57:55.894   694   694 V AvrcpBrowsablePlayerConnector: Timed out waiting for players
+09-25 18:57:55.894   694   694 I AvrcpBrowsablePlayerConnector: Successfully connected to 0 browsable players.
+09-25 18:57:55.894   694   694 I AvrcpMediaPlayerList: init: Browsable Player list size is 0
+09-25 18:57:55.894   694   694 D AvrcpMediaPlayerList: Initializing list of current media players
+09-25 18:57:55.894   694   694 D AvrcpMediaPlayerList: Already have a controller for the player: com.ghadirb.aimusic, updating instead
+09-25 18:57:55.895   694   694 D AvrcpMediaPlayerList: setActivePlayer(): setting player to com.ghadirb.aimusic
+09-25 18:57:55.895   694   694 D AvrcpMediaPlayerList: sendMediaUpdate
+09-25 18:57:55.895   694   694 I AvrcpMediaPlayerList: sendMediaUpdate: Creating a one item queue for a player with no queue
+09-25 18:57:55.895   694   694 D AvrcpMediaPlayerList: sendMediaUpdate state=PlaybackState {state=0, position=0, buffered position=0, speed=0.0, updated=25509, actions=7339655, custom actions=[], active item id=0, error=null}
+09-25 18:57:55.895   694   694 D AvrcpTargetService: onMediaUpdated: track_changed=true state=true queue=true
+09-25 18:57:55.895   694   694 D AvrcpNativeInterface: sendMediaUpdate: metadata=true playStatus=true queue=true
+09-25 18:57:55.895   694   694 D AvrcpTargetJni: sendMediaUpdateNative
+09-25 18:57:55.895   694   694 I bt_stack: [INFO:avrcp_service.cc(346)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=1 :  play_state=1 :  queue=1
+09-25 18:57:59.472   504   647 D WifiConfigStore: Writing to stores completed in 2 ms.
+09-25 18:58:00.001   703   703 D KeyguardClockSwitch: Updating clock: 658
+09-25 18:58:00.327  1250  1250 D CompatibilityChangeReporter: Compat change id reported: 150939131; UID 10105; state: DISABLED
+09-25 18:58:04.895  1280  1280 D CellBroadcastReceiver: onReceive Intent { act=android.intent.action.SERVICE_STATE flg=0x1000010 cmp=com.android.cellbroadcastreceiver.module/com.android.cellbroadcastreceiver.CellBroadcastReceiver (has extras) }
+09-25 18:58:04.897  1048  1048 I Telephony: isRttCurrentlySupported -- regular acct, hasVoiceAvailability: false
+09-25 18:58:04.897  1048  1048 I Telephony:  isRttSupported: false
+09-25 18:58:04.897  1048  1048 I Telephony:  isRoaming: false
+09-25 18:58:04.897  1048  1048 I Telephony:  isOnWfc: false
+09-25 18:58:05.245   504  1039 I ActivityManager: Killing 1979:com.android.calendar/u0a108 (adj 975): empty #17
+09-25 18:58:05.262   279   279 I Zygote  : Process 1979 exited due to signal 9 (Killed)
+09-25 18:58:05.289   504   545 I libprocessgroup: Successfully killed process cgroup uid 10108 pid 1979 in 43ms
+09-25 18:58:06.340   158   158 I BpBinder: onLastStrongRef automatically unlinking death recipients: <uncached descriptor>
+09-25 18:58:06.541     0     0 I AidlLazyServiceRegistrar: Trying to shut down the service. No clients in use for any service in process.
+09-25 18:58:06.544     0     0 I AidlLazyServiceRegistrar: Unregistered all clients and exiting
+09-25 18:58:06.547     0     0 I init    : Service 'apexd' (pid 213) exited with status 0 oneshot service took 30.865999 seconds in background
+09-25 18:58:06.549     0     0 I init    : Sending signal 9 to service 'apexd' (pid 213) process group...
+09-25 18:58:06.551     0     0 I libprocessgroup: Successfully killed process cgroup uid 0 pid 213 in 0ms
+09-25 18:58:09.746     0     0 D logd    : logdr: UID=2000 GID=2000 PID=2355 n tail=0 logMask=99 pid=0 start=0ns timeout=0ns
+09-25 18:58:09.585   299  1831 D goldfish-address-space: claimShared: Ask to claim region [0x3fd694000 0x3fd75c000]
+09-25 18:58:09.710   162   162 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device manifest.
+09-25 18:58:09.710  2360  2360 I Gralloc4: mapper 4.x is not supported
+09-25 18:58:09.714  2360  2360 D HostConnection: createUnique: call
+09-25 18:58:09.715  2360  2360 D HostConnection: HostConnection::get() New Host Connection established 0x780eeb72d350, tid 2360
+09-25 18:58:09.715  2360  2360 D goldfish-address-space: allocate: Ask for block of size 0x100
+09-25 18:58:09.715  2360  2360 D goldfish-address-space: allocate: ioctl allocate returned offset 0x3fbffe000 size 0x2000
+09-25 18:58:09.723  2360  2360 D HostConnection: HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object GL_KHR_texture_compression_astc_ldr ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_0 
+09-25 18:58:09.750  2364  2366 I cmd     : oneway function results will be dropped but finished with status OK and parcel size 4
+09-25 18:58:09.761  2369  2371 I cmd     : oneway function results will be dropped but finished with status OK and parcel size 4
+09-25 18:58:09.827  2372  2372 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+09-25 18:58:09.824  2372  2372 W app_process: type=1400 audit(0.0:35): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:09.828  2372  2372 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.profilebootclasspath"
+09-25 18:58:09.828  2372  2372 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+09-25 18:58:09.828  2372  2372 I AndroidRuntime: Using default boot image
+09-25 18:58:09.828  2372  2372 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+09-25 18:58:09.828  2372  2372 I AndroidRuntime: Leaving lock profiling enabled
+09-25 18:58:09.828  2372  2372 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+09-25 18:58:09.829  2372  2372 I app_process: Core platform API reporting enabled, enforcing=false
+09-25 18:58:09.824  2372  2372 W app_process: type=1400 audit(0.0:36): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:09.824  2372  2372 I chatty  : uid=2000(shell) app_process identical 1 line
+09-25 18:58:09.824  2372  2372 W app_process: type=1400 audit(0.0:38): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:09.859  2372  2372 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+09-25 18:58:09.859  2372  2372 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt66l.dat
+09-25 18:58:09.861  2372  2372 W app_process: Unexpected CPU variant for X86 using defaults: x86_64
+09-25 18:58:09.861  2372  2372 I app_process: The ClassLoaderContext is a special shared library.
+09-25 18:58:09.866  2372  2372 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+09-25 18:58:09.868  2372  2372 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+09-25 18:58:09.875  2372  2372 D AndroidRuntime: Shutting down VM
+09-25 18:58:10.058   504   647 E WifiHealthMonitor:  Hit PackageManager exception
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: android.content.pm.PackageManager$NameNotFoundException: com.google.android.wifi
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.extractCurrentSoftwareBuildInfo(WifiHealthMonitor.java:545)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.postBootSwBuildCheck(WifiHealthMonitor.java:477)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.postBootDetectionHandler(WifiHealthMonitor.java:468)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.access$200(WifiHealthMonitor.java:70)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor$2.onAlarm(WifiHealthMonitor.java:163)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.app.AlarmManager$ListenerWrapper.run(AlarmManager.java:239)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.os.Handler.handleCallback(Handler.java:938)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.os.Looper.loop(Looper.java:223)
+09-25 18:58:10.058   504   647 E WifiHealthMonitor: 	at android.os.HandlerThread.run(HandlerThread.java:67)
+09-25 18:58:10.093   504   784 D WifiNl80211Manager: Scan result ready event
+09-25 18:58:10.093   504   784 D WifiNative: Scan result ready event
+09-25 18:58:13.347  2387  2387 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+09-25 18:58:13.348  2387  2387 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.profilebootclasspath"
+09-25 18:58:13.348  2387  2387 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+09-25 18:58:13.348  2387  2387 I AndroidRuntime: Using default boot image
+09-25 18:58:13.348  2387  2387 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+09-25 18:58:13.348  2387  2387 I AndroidRuntime: Leaving lock profiling enabled
+09-25 18:58:13.348  2387  2387 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+09-25 18:58:13.349  2387  2387 I app_process: Core platform API reporting enabled, enforcing=false
+09-25 18:58:13.344  2387  2387 W app_process: type=1400 audit(0.0:39): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:13.344  2387  2387 I chatty  : uid=2000(shell) app_process identical 2 lines
+09-25 18:58:13.344  2387  2387 W app_process: type=1400 audit(0.0:42): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:13.379  2387  2387 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+09-25 18:58:13.379  2387  2387 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt66l.dat
+09-25 18:58:13.381  2387  2387 W app_process: Unexpected CPU variant for X86 using defaults: x86_64
+09-25 18:58:13.381  2387  2387 I app_process: The ClassLoaderContext is a special shared library.
+09-25 18:58:13.386  2387  2387 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+09-25 18:58:13.388  2387  2387 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+09-25 18:58:13.393  2387  2387 D AndroidRuntime: Shutting down VM
+09-25 18:58:16.866  2401  2401 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+09-25 18:58:16.867  2401  2401 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.profilebootclasspath"
+09-25 18:58:16.867  2401  2401 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+09-25 18:58:16.867  2401  2401 I AndroidRuntime: Using default boot image
+09-25 18:58:16.867  2401  2401 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+09-25 18:58:16.867  2401  2401 I AndroidRuntime: Leaving lock profiling enabled
+09-25 18:58:16.867  2401  2401 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+09-25 18:58:16.868  2401  2401 I app_process: Core platform API reporting enabled, enforcing=false
+09-25 18:58:16.864  2401  2401 W app_process: type=1400 audit(0.0:43): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:16.864  2401  2401 I chatty  : uid=2000(shell) app_process identical 2 lines
+09-25 18:58:16.864  2401  2401 W app_process: type=1400 audit(0.0:46): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:16.898  2401  2401 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+09-25 18:58:16.898  2401  2401 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt66l.dat
+09-25 18:58:16.899  2401  2401 W app_process: Unexpected CPU variant for X86 using defaults: x86_64
+09-25 18:58:16.900  2401  2401 I app_process: The ClassLoaderContext is a special shared library.
+09-25 18:58:16.904  2401  2401 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+09-25 18:58:16.906  2401  2401 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+09-25 18:58:16.909  2401  2401 D AndroidRuntime: Shutting down VM
+09-25 18:58:19.232   504   651 D ConnectivityService: handleLingerComplete for [100 CELLULAR]
+09-25 18:58:20.383  2414  2414 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+09-25 18:58:20.380  2414  2414 W app_process: type=1400 audit(0.0:47): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:20.384  2414  2414 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.profilebootclasspath"
+09-25 18:58:20.384  2414  2414 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+09-25 18:58:20.384  2414  2414 I AndroidRuntime: Using default boot image
+09-25 18:58:20.384  2414  2414 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+09-25 18:58:20.384  2414  2414 I AndroidRuntime: Leaving lock profiling enabled
+09-25 18:58:20.384  2414  2414 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+09-25 18:58:20.385  2414  2414 I app_process: Core platform API reporting enabled, enforcing=false
+09-25 18:58:20.380  2414  2414 W app_process: type=1400 audit(0.0:48): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:20.380  2414  2414 I chatty  : uid=2000(shell) app_process identical 1 line
+09-25 18:58:20.380  2414  2414 W app_process: type=1400 audit(0.0:50): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:20.414  2414  2414 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+09-25 18:58:20.414  2414  2414 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt66l.dat
+09-25 18:58:20.416  2414  2414 W app_process: Unexpected CPU variant for X86 using defaults: x86_64
+09-25 18:58:20.416  2414  2414 I app_process: The ClassLoaderContext is a special shared library.
+09-25 18:58:20.421  2414  2414 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+09-25 18:58:20.423  2414  2414 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+09-25 18:58:20.427  2414  2414 D AndroidRuntime: Shutting down VM
+09-25 18:58:23.900  2428  2428 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+09-25 18:58:23.901  2428  2428 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.profilebootclasspath"
+09-25 18:58:23.901  2428  2428 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+09-25 18:58:23.901  2428  2428 I AndroidRuntime: Using default boot image
+09-25 18:58:23.901  2428  2428 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+09-25 18:58:23.901  2428  2428 I AndroidRuntime: Leaving lock profiling enabled
+09-25 18:58:23.901  2428  2428 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+09-25 18:58:23.902  2428  2428 I app_process: Core platform API reporting enabled, enforcing=false
+09-25 18:58:23.900  2428  2428 W app_process: type=1400 audit(0.0:51): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:23.900  2428  2428 I chatty  : uid=2000(shell) app_process identical 2 lines
+09-25 18:58:23.900  2428  2428 W app_process: type=1400 audit(0.0:54): avc: denied { read } for name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=8384 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+09-25 18:58:23.932  2428  2428 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+09-25 18:58:23.932  2428  2428 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt66l.dat
+09-25 18:58:23.934  2428  2428 W app_process: Unexpected CPU variant for X86 using defaults: x86_64
+09-25 18:58:23.934  2428  2428 I app_process: The ClassLoaderContext is a special shared library.
+09-25 18:58:23.939  2428  2428 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+09-25 18:58:23.941  2428  2428 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+09-25 18:58:23.945  2428  2428 D AndroidRuntime: Shutting down VM
+09-25 18:58:27.386   299  1831 D goldfish-address-space: claimShared: Ask to claim region [0x3fd694000 0x3fd75c000]
+09-25 18:58:27.389   162   162 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device manifest.
+09-25 18:58:27.389  2444  2444 I Gralloc4: mapper 4.x is not supported
+09-25 18:58:27.391  2444  2444 D HostConnection: createUnique: call
+09-25 18:58:27.392  2444  2444 D HostConnection: HostConnection::get() New Host Connection established 0x7ac806456450, tid 2444
+09-25 18:58:27.392  2444  2444 D goldfish-address-space: allocate: Ask for block of size 0x100
+09-25 18:58:27.392  2444  2444 D goldfish-address-space: allocate: ioctl allocate returned offset 0x3fbffe000 size 0x2000
+09-25 18:58:27.399  2444  2444 D HostConnection: HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object GL_KHR_texture_compression_astc_ldr ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_0 
+09-25 18:58:27.625     0     0 D logd    : logdr: UID=2000 GID=2000 PID=2446 n tail=0 logMask=99 pid=0 start=0ns timeout=0ns
