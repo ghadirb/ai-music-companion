@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -117,7 +118,7 @@ fun HomeScreen(
                 // Spec §18: a brand-new user shouldn't see a blank/broken-looking Home —
                 // a real CTA (library rescan), not a decorative dead button.
                 com.ghadirb.aimusic.ui.components.EmptyState(
-                    icon = androidx.compose.material.icons.Icons.Filled.LibraryMusic,
+                    icon = androidx.compose.material.icons.Icons.Filled.PlayArrow,
                     title = "موسیقی‌ات را پیدا کن و نواسا را شروع کن",
                     subtitle = stringResource(R.string.empty_library),
                     // EmptyState defaults to fillMaxSize(), which breaks inside this
@@ -229,7 +230,7 @@ fun HomeScreen(
                     ) {
                         Column(Modifier.padding(14.dp)) {
                             Icon(
-                                androidx.compose.material.icons.Icons.Filled.QueueMusic,
+                                androidx.compose.material.icons.Icons.Filled.PlayArrow,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
@@ -367,7 +368,7 @@ private fun MusicCard(track: TrackEntity, reason: String?, onClick: () -> Unit) 
             } else {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                     Icon(
-                        androidx.compose.material.icons.Icons.Filled.MusicNote,
+                        androidx.compose.material.icons.Icons.Filled.PlayArrow,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

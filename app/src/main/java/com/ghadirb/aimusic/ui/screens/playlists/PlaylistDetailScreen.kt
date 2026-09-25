@@ -63,7 +63,7 @@ fun PlaylistDetailScreen(
                         val shuffled = list.shuffled()
                         shuffled.firstOrNull()?.let { onTrackClick(it, shuffled) }
                     },
-                    onStartRadio = { queueActions?.startRadio(list, playlistName ?: "این پلی‌لیست") }
+                    onStartRadio = { queueActions?.startRadio?.invoke(list, playlistName ?: "این پلی‌لیست") }
                 )
             }
             items(list, key = { it.id }) { track ->
