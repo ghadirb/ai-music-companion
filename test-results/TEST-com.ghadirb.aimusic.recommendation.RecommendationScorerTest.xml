@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.008">
+  <properties/>
+  <testcase name="likedArtistBoostsUnplayedTracksAndExplainsWhy" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.004"/>
+  <testcase name="recentPlaysWeighMoreThanOldOnes" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.0"/>
+  <testcase name="completedPlaysRaiseScoreAndSkipsLowerIt" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.0"/>
+  <testcase name="replaysAddScore" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.001"/>
+  <testcase name="reasonTextIsPersian" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.0"/>
+  <testcase name="favoriteOutranksUnplainedTrack" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.0"/>
+  <testcase name="isDeterministic" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.002"/>
+  <testcase name="genreAffinityIsExplained" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.0"/>
+  <testcase name="oldLikedTrackGetsRediscoveryReason" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.0"/>
+  <testcase name="timeOfDayEnergyMatchWins" classname="com.ghadirb.aimusic.recommendation.RecommendationScorerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

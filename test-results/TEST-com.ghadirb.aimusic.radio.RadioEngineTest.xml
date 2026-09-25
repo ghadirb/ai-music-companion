@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.radio.RadioEngineTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.023">
+  <properties/>
+  <testcase name="helperCompatibilityFunctionsAreBounded" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.003"/>
+  <testcase name="sameArtistIsNotPlayedBackToBackWhenAlternativesExist" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.004"/>
+  <testcase name="energyFlowsInSmallSteps" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.0"/>
+  <testcase name="repeatedlySkippedTracksAreAvoidedUntilNothingElseIsLeft" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.0"/>
+  <testcase name="relaxationStillFillsTheBatchForUnrelatedLibraries" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.002"/>
+  <testcase name="similarTracksBeatUnrelatedOnes" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.002"/>
+  <testcase name="emptyInputsAreSafe" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.0"/>
+  <testcase name="explorationInjectsNeverPlayedTracksButIsDeterministic" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.01"/>
+  <testcase name="favoritesAreBoostedAndRecentlyPlayedAreDemoted" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.001"/>
+  <testcase name="coefficientsAreConfigurable" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.0"/>
+  <testcase name="neverRepeatsQueuedOrSeedTracks" classname="com.ghadirb.aimusic.radio.RadioEngineTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

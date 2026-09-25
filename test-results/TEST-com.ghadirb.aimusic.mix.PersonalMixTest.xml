@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.mix.PersonalMixTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.006">
+  <properties/>
+  <testcase name="hiddenGemsAreRarelyHeardTracksThatMatchTheTaste" classname="com.ghadirb.aimusic.mix.PersonalMixTest" time="0.005"/>
+  <testcase name="morningMixAdaptsToWhenTheUserReallyListens" classname="com.ghadirb.aimusic.mix.PersonalMixTest" time="0.0"/>
+  <testcase name="persianMixUsesOnlyPersianScriptTracks" classname="com.ghadirb.aimusic.mix.PersonalMixTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

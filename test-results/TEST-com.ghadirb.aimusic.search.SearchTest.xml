@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.search.SearchTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.014">
+  <properties/>
+  <testcase name="ranksTitleMatchBeforeArtistMatch" classname="com.ghadirb.aimusic.search.SearchTest" time="0.009"/>
+  <testcase name="blankQueryIsEmpty" classname="com.ghadirb.aimusic.search.SearchTest" time="0.001"/>
+  <testcase name="findsPersianWithArabicKeyboardVariant" classname="com.ghadirb.aimusic.search.SearchTest" time="0.0"/>
+  <testcase name="normalizesDigitsCaseAndWhitespace" classname="com.ghadirb.aimusic.search.SearchTest" time="0.0"/>
+  <testcase name="groupsArtistsAlbumsGenresAndPlaylists" classname="com.ghadirb.aimusic.search.SearchTest" time="0.001"/>
+  <testcase name="normalizesArabicLettersAndZwnj" classname="com.ghadirb.aimusic.search.SearchTest" time="0.001"/>
+  <testcase name="toleratesCommonTypos" classname="com.ghadirb.aimusic.search.SearchTest" time="0.001"/>
+  <testcase name="shortWordsMustBeExact" classname="com.ghadirb.aimusic.search.SearchTest" time="0.0"/>
+  <testcase name="requiresAllTokensAcrossFields" classname="com.ghadirb.aimusic.search.SearchTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

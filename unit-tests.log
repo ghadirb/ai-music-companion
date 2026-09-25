@@ -1,0 +1,63 @@
+Downloading https://services.gradle.org/distributions/gradle-8.7-bin.zip
+............10%.............20%.............30%.............40%............50%.............60%.............70%.............80%.............90%............100%
+
+Welcome to Gradle 8.7!
+
+Here are the highlights of this release:
+ - Compiling and testing with Java 22
+ - Cacheable Groovy script compilation
+ - New methods in lazy collection properties
+
+For more details see https://docs.gradle.org/8.7/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:checkDebugAarMetadata
+> Task :app:generateDebugResValues
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugResources
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:97:5 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:141:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:193:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/navigation/NavGraph.kt:19:86 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:377:31 'Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:582:43 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:64:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:67:5 Parameter 'repository' is never used
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:317:35 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:52:33 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:152:60 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:156:30 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:47:37 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:127:39 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:kspDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1790362055207.json
+
+BUILD SUCCESSFUL in 3m 12s
+27 actionable tasks: 27 executed

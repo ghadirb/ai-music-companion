@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.037">
+  <properties/>
+  <testcase name="lessPlayedRequestExcludesRecentAndSortsByLeastPlayed" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.005"/>
+  <testcase name="englishAndKnownArtistsAndCount" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="sanitizeClampsUntrustedValues" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.0"/>
+  <testcase name="emptyLibraryIsSafe" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="unknownTextIsUnconstrained" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.002"/>
+  <testcase name="durationTargetStopsFilling" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="durationPhraseIsNotMistakenForTrackCount" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="highExplorationPrefersUnplayedTracks" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="limitAndSimilarity" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="excludeRecentRemovesRecentlyPlayed" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.0"/>
+  <testcase name="filtersByMoodAndIgnoresUnanalysedTracks" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.0"/>
+  <testcase name="happySongsRequest" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="similarButCalmerIsARelativeRequest" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.002"/>
+  <testcase name="happyPersianNotRecentlyPlayed" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.002"/>
+  <testcase name="explorationWords" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.002"/>
+  <testcase name="studyRequestIsCalmAndLowEnergy" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="similarToCurrentTrack" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.002"/>
+  <testcase name="partyRequestIsHighEnergyAndHappy" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="sanitiseClampsNewFields" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.0"/>
+  <testcase name="oneHourOfStudyMusic" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.002"/>
+  <testcase name="favoriteOnlyAndArtistAndLanguageFilters" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="generatorAppliesTempoAndRelativeEnergy" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.0"/>
+  <testcase name="nightDrivingIsMediumEnergy" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="workoutRequestGetsDurationAndTempoRange" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <testcase name="leastPlayedComesFirst" classname="com.ghadirb.aimusic.smartplaylist.SmartPlaylistTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.mix.OccasionMixTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.022">
+  <properties/>
+  <testcase name="happyAndSadFollowMood" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.005"/>
+  <testcase name="everyOccasionHasAPersianTitleAndEmoji" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.007"/>
+  <testcase name="unanalysedTracksNeverAppearInOccasionMixes" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.005"/>
+  <testcase name="morningIsGentleButAwake" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.003"/>
+  <testcase name="suggestedOccasionFollowsTimeOfDay" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.0"/>
+  <testcase name="drivingWantsMidTempoTracksOfReasonableLength" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.0"/>
+  <testcase name="workoutIsHighEnergyNotSadAndLongEnough" classname="com.ghadirb.aimusic.mix.OccasionMixTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

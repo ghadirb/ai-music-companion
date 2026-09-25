@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.premium.EntitlementTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.206">
+  <properties/>
+  <testcase name="premiumUserUnlocksAllUntilExpiry" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.02"/>
+  <testcase name="rejectsAnAlgNoneStyleTokenAndWrongKey" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.031"/>
+  <testcase name="derConversionRoundTripsOnJcaSignatures" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.136"/>
+  <testcase name="rejectsExpiredWrongSubjectAndTamperedTokens" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.014"/>
+  <testcase name="everyFeatureHasAnExplicitPlanAndCopy" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.001"/>
+  <testcase name="verifiesTokenSignedByTheWorker" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.002"/>
+  <testcase name="unconfiguredVerifierNeverGrantsPremium" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.0"/>
+  <testcase name="freeUserIsBlockedFromPremiumFeaturesButNotFromCore" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

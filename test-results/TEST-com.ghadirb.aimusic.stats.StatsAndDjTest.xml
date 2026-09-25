@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.stats.StatsAndDjTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.008">
+  <properties/>
+  <testcase name="mapsServerIntentAndSanitises" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.001"/>
+  <testcase name="basicTotalsTopAndSkipRate" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.001"/>
+  <testcase name="emptyHistoryIsSafe" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.0"/>
+  <testcase name="languageFilterOnlyWhenTheUserExplicitlyAsksForIt" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.001"/>
+  <testcase name="ignoresHistoryForDeletedTracks" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.0"/>
+  <testcase name="junkIntentBecomesUnconstrainedDefaults" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.0"/>
+  <testcase name="rangeFilterOnlyCountsRecentSessions" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.001"/>
+  <testcase name="advancedBreakdowns" classname="com.ghadirb.aimusic.stats.StatsAndDjTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

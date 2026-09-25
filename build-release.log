@@ -1,0 +1,86 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs NO-SOURCE
+> Task :app:stripReleaseDebugSymbols NO-SOURCE
+> Task :app:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:buildKotlinToolingMetadata
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateReleaseBuildConfig
+> Task :app:generateReleaseResValues
+> Task :app:checkReleaseAarMetadata
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:parseReleaseLocalResources
+> Task :app:processReleaseManifestForPackage
+> Task :app:javaPreCompileRelease
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:processApplicationManifestReleaseForBundle
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:generateReleaseFeatureMetadata
+> Task :app:configureReleaseDependencies
+> Task :app:parseReleaseIntegrityConfig
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseResources
+> Task :app:bundleReleaseResources
+> Task :app:kspReleaseKotlin
+
+> Task :app:compileReleaseKotlin
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:97:5 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:141:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:193:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/navigation/NavGraph.kt:19:86 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:377:31 'Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:582:43 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:64:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:67:5 Parameter 'repository' is never used
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:317:35 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:52:33 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:152:60 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:156:30 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:47:37 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:127:39 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:minifyReleaseWithR8
+> Task :app:buildReleasePreBundle
+> Task :app:compileReleaseArtProfile
+> Task :app:packageReleaseBundle
+> Task :app:shrinkReleaseRes
+> Task :app:convertReleaseProtoResources
+> Task :app:optimizeReleaseResources
+> Task :app:shrinkBundleReleaseResources
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+> Task :app:signReleaseBundle
+> Task :app:produceReleaseBundleIdeListingFile
+> Task :app:createReleaseBundleListingFileRedirect
+> Task :app:bundleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_6-1790362403757.json
+
+BUILD SUCCESSFUL in 2m 38s
+56 actionable tasks: 55 executed, 1 up-to-date

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.037">
+  <properties/>
+  <testcase name="comparesGenreSharesAndDiscovery" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.004"/>
+  <testcase name="todayAllAndGregorianMonthAndYear" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.002"/>
+  <testcase name="convertsKnownDates" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.001"/>
+  <testcase name="roundTripsEveryDayOfSeveralYears" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.02"/>
+  <testcase name="discoveryPeakAndSkippedInsights" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.008"/>
+  <testcase name="jalaliMonthAndYearBoundaries" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.001"/>
+  <testcase name="refusesToInventNumbersWithoutEnoughData" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.0"/>
+  <testcase name="gregorianWeekStartsOnMonday" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.0"/>
+  <testcase name="persianWeekStartsOnSaturday" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.0"/>
+  <testcase name="currentPeriodShownWithoutComparisonWhenPreviousIsTooSmall" classname="com.ghadirb.aimusic.stats.CalendarAndEvolutionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.lyrics.LrcParserTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.063">
+  <properties/>
+  <testcase name="decodesLegacyWindows1256" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.053"/>
+  <testcase name="appliesOffsetHeader" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.0"/>
+  <testcase name="decodesUtf16WithBom" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <testcase name="emptyOrGarbageGivesEmpty" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.0"/>
+  <testcase name="decodesUtf8Bom" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <testcase name="plainLyricsWithoutStampsAreReturnedUnsynced" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <testcase name="handlesCrLfAndBom" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <testcase name="stripsEnhancedWordTimestampsAndSkipsEmptyLines" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <testcase name="parsesPersianSyncedLyrics" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <testcase name="supportsMultipleStampsPerLineAndSorts" classname="com.ghadirb.aimusic.lyrics.LrcParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-09-25T18:50:37" hostname="runnervmtr4k5" time="0.011">
+  <properties/>
+  <testcase name="nightIncludesCalmAndLowEnergy" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <testcase name="generateAllSkipsEmptyMixesAndHandlesEmptyLibrary" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.002"/>
+  <testcase name="randomMixIsDeterministicPerDayAndBounded" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <testcase name="rediscoverContainsLikedTracksNotPlayedForLong" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <testcase name="focusNeedsCalmishMidLowEnergyAndLength" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <testcase name="myFavoritesContainsOnlyFavorites" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.0"/>
+  <testcase name="recentlyLovedNeedsRecentCompletions" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <testcase name="energeticIsHighEnergyOrEnergeticMood" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <testcase name="chillIsLowEnergyOrCalm" classname="com.ghadirb.aimusic.mix.SmartMixGeneratorTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
