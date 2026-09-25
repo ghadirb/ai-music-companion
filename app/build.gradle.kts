@@ -30,8 +30,9 @@ android {
         minSdk = 26
         targetSdk = 35
         // CI passes -PVERSION_CODE=<run number>; -PVERSION_NAME sets the marketing version.
+        // Bumped for the v1.1 smart-features / redesign release (previous Myket release was 1.0.0).
         versionCode = providers.gradleProperty("VERSION_CODE").orElse("1").get().toInt()
-        versionName = providers.gradleProperty("VERSION_NAME").orElse("1.0.0").get()
+        versionName = providers.gradleProperty("VERSION_NAME").orElse("1.1.0").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
