@@ -422,6 +422,7 @@ fun TrackRow(
                         }
                     }
                 }
+                trailingExtra?.invoke()
             }
         },
         modifier = Modifier.clickable(onClick = onClick)
