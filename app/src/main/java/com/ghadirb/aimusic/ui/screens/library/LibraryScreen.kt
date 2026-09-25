@@ -350,7 +350,9 @@ fun TrackRow(
     onFavoriteClick: () -> Unit,
     onAddToPlaylistClick: (() -> Unit)? = null,
     onNotInterestedClick: (() -> Unit)? = null,
-    isCurrentTrack: Boolean = false
+    isCurrentTrack: Boolean = false,
+    /** Extra trailing action rendered before the favourite/menu icons (e.g. "remove from playlist"). */
+    trailingExtra: (@Composable () -> Unit)? = null
 ) {
     ListItem(
         headlineContent = {
