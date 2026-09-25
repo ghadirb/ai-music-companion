@@ -101,6 +101,23 @@ class HomeViewModel(
     fun dismissMessage() { _message.value = null }
     fun showMessage(text: String) { _message.value = text }
 
+    /**
+     * Spec §18: the new-user empty state's CTA does a real library rescan (never a fake/no-op
+     * action). [hasLibrary] flips to true automatically once [refresh] observes new tracks.
+     */
+    fun scanLibraryNow() {
+        viewModelScope.launch {
+            _isReanalyzing.value = true
+            try {
+                repository.rescanLibrary()
+            } catch (e: Exception) {
+                _message.value = "اسکن کتابخانه انجام نشد. دوباره تلاش کنید."
+            } finally {
+                _isReanalyzing.value = false
+            }
+        }
+    }
+
     fun reanalyzeLibrary() {
         viewModelScope.launch {
             _isReanalyzing.value = true

@@ -1,5 +1,6 @@
 package com.ghadirb.aimusic.ui.screens.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -107,7 +108,22 @@ fun HomeScreen(
                 return@Column
             }
             false -> {
-                Text(stringResource(R.string.empty_library), style = MaterialTheme.typography.bodyMedium)
+                // Spec §18: a brand-new user shouldn't see a blank/broken-looking Home —
+                // a real CTA (library rescan), not a decorative dead button.
+                com.ghadirb.aimusic.ui.components.EmptyState(
+                    icon = androidx.compose.material.icons.Icons.Filled.LibraryMusic,
+                    title = "موسیقی‌ات را پیدا کن و نواسا را شروع کن",
+                    subtitle = stringResource(R.string.empty_library),
+                    // EmptyState defaults to fillMaxSize(), which breaks inside this
+                    // screen's unbounded-height scrolling Column — bound it here instead.
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Button(onClick = viewModel::scanLibraryNow, enabled = !isReanalyzing) {
+                        Text(if (isReanalyzing) "در حال جستجوی موسیقی…" else "انتخاب موسیقی")
+                    }
+                }
                 return@Column
             }
             true -> Unit
@@ -265,11 +281,32 @@ private fun RecommendationRail(items: List<Recommendation>, onTrackClick: (Track
     LazyRow {
         items(items, key = { it.track.id }) { rec ->
             Card(
-                modifier = Modifier.padding(end = 12.dp).width(168.dp).height(118.dp),
+                modifier = Modifier.padding(end = 12.dp).width(168.dp),
                 shape = RoundedCornerShape(16.dp),
                 onClick = { onTrackClick(rec.track) }
             ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                // Spec §3/§9: recommendation cards should read as a real music card
+                // (artwork + text), not a bare list row — using the track's own art,
+                // never a placeholder/fake cover.
+                Box(Modifier.fillMaxWidth().height(96.dp)) {
+                    if (rec.track.albumArtUri != null) {
+                        coil.compose.AsyncImage(
+                            model = rec.track.albumArtUri,
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Filled.MusicNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(rec.track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
                         if (rec.track.artist != "Unknown artist") {
@@ -277,7 +314,7 @@ private fun RecommendationRail(items: List<Recommendation>, onTrackClick: (Track
                         }
                     }
                     ReasonText.best(rec)?.let {
-                        Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }
