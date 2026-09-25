@@ -337,7 +337,9 @@ private fun MainScaffold(
                     onOpenHistory = { navController.navigate(ROUTE_HISTORY) { launchSingleTop = true } },
                     onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } },
                     // Gated centrally through PremiumAccess (no scattered checks in the UI).
-                    onOpenTaste = { premiumAccess.require(PremiumFeature.TASTE_EVOLUTION) { navController.navigate(ROUTE_TASTE) { launchSingleTop = true } } }
+                    onOpenTaste = { premiumAccess.require(PremiumFeature.TASTE_EVOLUTION) { navController.navigate(ROUTE_TASTE) { launchSingleTop = true } } },
+                    onOpenPlaylist = { id, name -> navController.navigate(playlistDetailRoute(id, name)) },
+                    onOpenPlaylists = { navController.navigate(Screen.Playlists.route) { launchSingleTop = true } }
                 )
             }
             composable(Screen.Library.route) {

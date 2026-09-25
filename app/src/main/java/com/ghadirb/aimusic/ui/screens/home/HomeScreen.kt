@@ -67,7 +67,9 @@ fun HomeScreen(
     onOpenStats: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onOpenPremium: () -> Unit = {},
-    onOpenTaste: () -> Unit = {}
+    onOpenTaste: () -> Unit = {},
+    onOpenPlaylist: (Long, String) -> Unit = { _, _ -> },
+    onOpenPlaylists: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val access = LocalPremiumAccess.current
@@ -88,6 +90,10 @@ fun HomeScreen(
     }
     val picks by viewModel.picks.collectAsState()
     val mixes by viewModel.mixes.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
+    val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
+    val recentlyAdded by viewModel.recentlyAdded.collectAsState()
+    val userPlaylists by repository.observePlaylists().collectAsState(initial = emptyList())
     val hasLibrary by viewModel.hasLibrary.collectAsState()
     val isReanalyzing by viewModel.isReanalyzing.collectAsState()
     val progress by viewModel.analysisProgress.collectAsState()
@@ -194,6 +200,49 @@ fun HomeScreen(
             }
         }
 
+        // These rails are derived only from the user's local library/history.
+        // They are intentionally hidden until they have real content.
+        if (recentlyPlayed.isNotEmpty()) {
+            SectionHeader(emoji = "🕘", title = "اخیراً پخش‌شده")
+            TrackRail(recentlyPlayed) { onTrackClick(it, recentlyPlayed) }
+            Spacer(Modifier.height(24.dp))
+        }
+
+        if (favorites.isNotEmpty()) {
+            SectionHeader(emoji = "♥", title = "علاقه‌مندی‌ها")
+            TrackRail(favorites) { onTrackClick(it, favorites) }
+            Spacer(Modifier.height(24.dp))
+        }
+
+        if (userPlaylists.isNotEmpty()) {
+            SectionHeader(
+                emoji = "☷",
+                title = "پلی‌لیست‌های شما",
+                actions = { TextButton(onClick = onOpenPlaylists) { Text("همه") } }
+            )
+            LazyRow {
+                items(userPlaylists, key = { it.id }) { playlist ->
+                    Card(
+                        modifier = Modifier.width(156.dp).padding(end = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        onClick = { onOpenPlaylist(playlist.id, playlist.name) }
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.height(20.dp))
+                            Text(playlist.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+
         SectionHeader(emoji = "🎧", title = stringResource(R.string.card_today_pick))
         if (picks.isEmpty()) {
             Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
@@ -253,6 +302,12 @@ fun HomeScreen(
             RecommendationRail(mix.tracks) { onTrackClick(it, mix.trackList) }
         }
 
+        if (recentlyAdded.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionHeader(emoji = "✦", title = "تازه اضافه‌شده")
+            TrackRail(recentlyAdded) { onTrackClick(it, recentlyAdded) }
+        }
+
         Spacer(Modifier.height(24.dp))
         OutlinedButton(
             onClick = viewModel::reanalyzeLibrary,
@@ -280,43 +335,52 @@ private fun RecommendationRail(items: List<Recommendation>, onTrackClick: (Track
     if (items.isEmpty()) return
     LazyRow {
         items(items, key = { it.track.id }) { rec ->
-            Card(
-                modifier = Modifier.padding(end = 12.dp).width(168.dp),
-                shape = RoundedCornerShape(16.dp),
-                onClick = { onTrackClick(rec.track) }
-            ) {
-                // Spec §3/§9: recommendation cards should read as a real music card
-                // (artwork + text), not a bare list row — using the track's own art,
-                // never a placeholder/fake cover.
-                Box(Modifier.fillMaxWidth().height(96.dp)) {
-                    if (rec.track.albumArtUri != null) {
-                        coil.compose.AsyncImage(
-                            model = rec.track.albumArtUri,
-                            contentDescription = null,
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                            Icon(
-                                androidx.compose.material.icons.Icons.Filled.MusicNote,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            MusicCard(rec.track, ReasonText.best(rec), onClick = { onTrackClick(rec.track) })
+        }
+    }
+}
+
+@Composable
+private fun TrackRail(tracks: List<TrackEntity>, onTrackClick: (TrackEntity) -> Unit) {
+    LazyRow {
+        items(tracks, key = { it.id }) { track ->
+            MusicCard(track, reason = null, onClick = { onTrackClick(track) })
+        }
+    }
+}
+
+@Composable
+private fun MusicCard(track: TrackEntity, reason: String?, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.padding(end = 12.dp).width(168.dp),
+        shape = RoundedCornerShape(16.dp),
+        onClick = onClick
+    ) {
+        Box(Modifier.fillMaxWidth().height(96.dp)) {
+            if (track.albumArtUri != null) {
+                coil.compose.AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text(rec.track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                        if (rec.track.artist != "Unknown artist") {
-                            Text(rec.track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    ReasonText.best(rec)?.let {
-                        Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
-                    }
-                }
+            }
+        }
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+            if (track.artist != "Unknown artist") {
+                Text(track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+            }
+            reason?.let {
+                Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

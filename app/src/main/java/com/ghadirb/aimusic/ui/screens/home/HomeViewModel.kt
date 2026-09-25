@@ -2,6 +2,7 @@ package com.ghadirb.aimusic.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.mix.SmartMix
 import com.ghadirb.aimusic.mix.SmartMixGenerator
@@ -35,6 +36,16 @@ class HomeViewModel(
 
     private val _mixes = MutableStateFlow<List<SmartMix>>(emptyList())
     val mixes: StateFlow<List<SmartMix>> = _mixes.asStateFlow()
+
+    private val _favorites = MutableStateFlow<List<TrackEntity>>(emptyList())
+    /** Actual favourites, newest additions and listening history for the Home dashboard. */
+    val favorites: StateFlow<List<TrackEntity>> = _favorites.asStateFlow()
+
+    private val _recentlyPlayed = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val recentlyPlayed: StateFlow<List<TrackEntity>> = _recentlyPlayed.asStateFlow()
+
+    private val _recentlyAdded = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val recentlyAdded: StateFlow<List<TrackEntity>> = _recentlyAdded.asStateFlow()
 
     // Unknown until the first load completes — NOT "true", otherwise the screen flashes the full
     // layout and then collapses to the empty-library message.
@@ -71,10 +82,21 @@ class HomeViewModel(
             if (count == 0) {
                 _picks.value = emptyList()
                 _mixes.value = emptyList()
+                _favorites.value = emptyList()
+                _recentlyPlayed.value = emptyList()
+                _recentlyAdded.value = emptyList()
             } else {
                 val tracks = repository.observeTracks().first()
                 val history = repository.recentHistory(3000)
                 val now = System.currentTimeMillis()
+                val tracksById = tracks.associateBy { it.id }
+                _favorites.value = tracks.filter { it.isFavorite }.sortedByDescending { it.dateAdded }.take(HOME_RAIL_SIZE)
+                _recentlyAdded.value = tracks.sortedByDescending { it.dateAdded }.take(HOME_RAIL_SIZE)
+                _recentlyPlayed.value = history.asSequence()
+                    .mapNotNull { tracksById[it.trackId] }
+                    .distinctBy { it.id }
+                    .take(HOME_RAIL_SIZE)
+                    .toList()
                 _picks.value = engine.recommend(limit = 8, nowMs = now)
                 _mixes.value = withContext(Dispatchers.Default) { SmartMixGenerator.generateAll(tracks, history, now, limit = 30, config = config) }
             }
@@ -127,5 +149,9 @@ class HomeViewModel(
                 _isReanalyzing.value = false
             }
         }
+    }
+
+    private companion object {
+        const val HOME_RAIL_SIZE = 8
     }
 }

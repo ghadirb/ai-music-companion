@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +76,21 @@ fun LibraryScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
+    val searchHistoryPreferences = remember(context) {
+        context.getSharedPreferences("ui_preferences", android.content.Context.MODE_PRIVATE)
+    }
+    var recentSearches by remember { mutableStateOf(readSearchHistory(searchHistoryPreferences)) }
+
+    // Save only deliberate, settled queries. This is real local search history,
+    // not a fabricated discovery feed, and remains useful offline.
+    LaunchedEffect(searchQuery) {
+        val query = searchQuery.trim()
+        if (query.length < 2) return@LaunchedEffect
+        delay(650)
+        val updated = (listOf(query) + recentSearches.filterNot { it.equals(query, ignoreCase = true) }).take(6)
+        recentSearches = updated
+        writeSearchHistory(searchHistoryPreferences, updated)
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -150,7 +166,21 @@ fun LibraryScreen(
                     }
                     val search = current.search
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        if (search != null) {
+                        if (searchExpanded && search == null) {
+                            item {
+                                SearchStartContent(
+                                    recentSearches = recentSearches,
+                                    onSearch = { query ->
+                                        searchQuery = query
+                                        viewModel.setQuery(query)
+                                    },
+                                    onClearHistory = {
+                                        recentSearches = emptyList()
+                                        writeSearchHistory(searchHistoryPreferences, emptyList())
+                                    }
+                                )
+                            }
+                        } else if (search != null) {
                             if (search.isEmpty) {
                                 item { EmptyResult() }
                             } else {
@@ -226,7 +256,74 @@ fun LibraryScreen(
 
 @Composable
 private fun EmptyResult() {
-    Text("نتیجه‌ای پیدا نشد.", modifier = Modifier.padding(24.dp))
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        Text("نتیجه‌ای پیدا نشد.", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "نام آهنگ، خواننده، آلبوم یا پلی‌لیست را با املای دیگری امتحان کنید.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun SearchStartContent(
+    recentSearches: List<String>,
+    onSearch: (String) -> Unit,
+    onClearHistory: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        if (recentSearches.isEmpty()) {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Text("دنبال چه چیزی می‌گردید؟", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "آهنگ، خواننده، آلبوم یا پلی‌لیست را جست‌وجو کنید.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("جست‌وجوهای اخیر", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClearHistory) { Text("پاک‌کردن") }
+            }
+            LazyRow(contentPadding = PaddingValues(top = 8.dp)) {
+                items(recentSearches, key = { it }) { query ->
+                    AssistChip(
+                        onClick = { onSearch(query) },
+                        label = { Text(query, maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private const val SEARCH_HISTORY_KEY = "library_search_history"
+private const val SEARCH_HISTORY_SEPARATOR = "\u001F"
+
+private fun readSearchHistory(preferences: android.content.SharedPreferences): List<String> =
+    preferences.getString(SEARCH_HISTORY_KEY, null)
+        ?.split(SEARCH_HISTORY_SEPARATOR)
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.take(6)
+        .orEmpty()
+
+private fun writeSearchHistory(preferences: android.content.SharedPreferences, queries: List<String>) {
+    preferences.edit()
+        .putString(SEARCH_HISTORY_KEY, queries.joinToString(SEARCH_HISTORY_SEPARATOR) { it.replace(SEARCH_HISTORY_SEPARATOR, "") })
+        .apply()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

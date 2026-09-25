@@ -1,6 +1,7 @@
 package com.ghadirb.aimusic.ui.screens.player
 
 import android.app.Application
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -31,7 +32,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -55,6 +58,7 @@ import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.lyrics.LyricsState
 import com.ghadirb.aimusic.playback.SleepTimerController
 import com.ghadirb.aimusic.playback.SleepTimerState
+import com.ghadirb.aimusic.ui.theme.rememberDynamicAccent
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
@@ -73,10 +77,16 @@ fun PlayerScreen(
     val radio by playerViewModel.radio.collectAsState()
     val queueActions = com.ghadirb.aimusic.ui.components.LocalQueueActions.current
     val sleepState by playerViewModel.sleepTimer.collectAsState()
+    val context = LocalContext.current
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showSleepTimer by rememberSaveable { mutableStateOf(false) }
     var showQueue by rememberSaveable { mutableStateOf(false) }
+    var showMore by rememberSaveable { mutableStateOf(false) }
     val currentTrack = uiState.currentTrack
+    // The shared extractor is deliberately independent of playback: it uses a
+    // small cached artwork decode on IO and falls back to the theme primary.
+    val dynamicAccent by rememberDynamicAccent(currentTrack?.albumArtUri)
+    val onDynamicAccent = if (dynamicAccent.luminance() > 0.45f) Color(0xFF171717) else Color.White
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playerViewModel.importLyrics(uri)
@@ -180,6 +190,10 @@ fun PlayerScreen(
             value = uiState.positionMs.toFloat().coerceIn(0f, duration.toFloat()),
             onValueChange = { playerViewModel.seekTo(it.toLong()) },
             valueRange = 0f..duration.toFloat(),
+            colors = SliderDefaults.colors(
+                thumbColor = dynamicAccent,
+                activeTrackColor = dynamicAccent
+            ),
             modifier = Modifier.semantics { contentDescription = "نوار پیشرفت آهنگ" }
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -193,7 +207,14 @@ fun PlayerScreen(
                 Icon(Icons.Filled.SkipPrevious, contentDescription = "آهنگ قبلی", modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.width(16.dp))
-            FilledIconButton(onClick = { playerViewModel.togglePlayPause() }, modifier = Modifier.size(64.dp)) {
+            FilledIconButton(
+                onClick = { playerViewModel.togglePlayPause() },
+                modifier = Modifier.size(64.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = dynamicAccent,
+                    contentColor = onDynamicAccent
+                )
+            ) {
                 AnimatedContent(
                     targetState = uiState.isPlaying,
                     transitionSpec = {
@@ -216,13 +237,31 @@ fun PlayerScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { playerViewModel.toggleFavorite(currentTrack) }) {
-            Icon(
-                imageVector = if (currentTrack.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                contentDescription = null
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(if (currentTrack.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { playerViewModel.toggleFavorite(currentTrack) }) {
+                Icon(
+                    imageVector = if (currentTrack.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = null
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(if (currentTrack.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
+            }
+            IconButton(
+                onClick = {
+                    val shareText = listOf(currentTrack.title, currentTrack.artist)
+                        .filter { it.isNotBlank() && it != "Unknown artist" }
+                        .joinToString(" — ")
+                    val shareIntent = Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, shareText)
+                    context.startActivity(Intent.createChooser(shareIntent, "اشتراک‌گذاری آهنگ"))
+                }
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = "اشتراک‌گذاری آهنگ")
+            }
+            IconButton(onClick = { showMore = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "اطلاعات بیشتر")
+            }
         }
 
         radio?.let { session ->
@@ -244,7 +283,7 @@ fun PlayerScreen(
                 Icon(
                     Icons.Filled.Shuffle,
                     contentDescription = if (uiState.shuffleEnabled) "پخش تصادفی روشن" else "پخش تصادفی خاموش",
-                    tint = if (uiState.shuffleEnabled) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    tint = if (uiState.shuffleEnabled) dynamicAccent else LocalContentColor.current
                 )
             }
             IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
@@ -255,14 +294,14 @@ fun PlayerScreen(
                         Player.REPEAT_MODE_ALL -> "تکرار همهٔ آهنگ‌ها"
                         else -> "تکرار خاموش"
                     },
-                    tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) dynamicAccent else LocalContentColor.current
                 )
             }
             IconButton(onClick = { playerViewModel.cyclePlaybackSpeed() }) {
                 Text(
                     "×${if (uiState.playbackSpeed == uiState.playbackSpeed.toInt().toFloat()) uiState.playbackSpeed.toInt().toString() else uiState.playbackSpeed.toString()}",
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (uiState.playbackSpeed != 1f) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    color = if (uiState.playbackSpeed != 1f) dynamicAccent else LocalContentColor.current
                 )
             }
             IconButton(onClick = { showLyrics = true }) {
@@ -355,6 +394,30 @@ fun PlayerScreen(
             onClearAll = { playerViewModel.clearQueue(); showQueue = false },
             onDismiss = { showQueue = false }
         )
+    }
+    if (showMore) {
+        PlayerInfoSheet(track = currentTrack, onDismiss = { showMore = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerInfoSheet(track: TrackEntity, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Text("اطلاعات آهنگ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            ListItem(headlineContent = { Text("نام آهنگ") }, supportingContent = { Text(track.title) })
+            if (track.artist != "Unknown artist") {
+                ListItem(headlineContent = { Text("خواننده") }, supportingContent = { Text(track.artist) })
+            }
+            if (track.album != "Unknown album") {
+                ListItem(headlineContent = { Text("آلبوم") }, supportingContent = { Text(track.album) })
+            }
+            track.genre?.takeIf { it.isNotBlank() }?.let { genre ->
+                ListItem(headlineContent = { Text("سبک") }, supportingContent = { Text(genre) })
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 

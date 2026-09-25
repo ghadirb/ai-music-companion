@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
+import com.ghadirb.aimusic.ui.theme.rememberDynamicAccent
 
 /** Compact "now playing" bar shown above the bottom navigation on every screen except the player. */
 @Composable
@@ -47,7 +48,13 @@ fun MiniPlayerBar(
     onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Keep the mini player visually connected to the current artwork without
+    // changing the contrast of its title/actions. Extraction is cached and
+    // animated by rememberDynamicAccent, so this does not affect playback.
+    val accent by rememberDynamicAccent(track.albumArtUri)
     Surface(
+        color = accent.copy(alpha = 0.12f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 3.dp,
         modifier = modifier
             .fillMaxWidth()
