@@ -51,7 +51,12 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
     }
 
     override suspend fun queryOwned(skus: List<String>): List<OwnedPurchase> {
-        val client = helper?.takeIf { awaitReady() } ?: return emptyList()
+        // awaitReady() is what actually sets `helper` — call it unconditionally first.
+        // `helper?.takeIf { awaitReady() }` looked equivalent but isn't: Kotlin's safe-call
+        // skips the takeIf lambda entirely whenever `helper` is still null, so awaitReady()
+        // (and the connection attempt inside it) would never run on the very first call.
+        val ready = awaitReady()
+        val client = helper.takeIf { ready } ?: return emptyList()
         val result = CompletableDeferred<List<OwnedPurchase>>()
         try {
             client.queryInventoryAsync(true, skus) { inventoryResult, inventory ->
@@ -70,7 +75,10 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
     }
 
     override suspend fun purchase(sku: String, developerPayload: String): PurchaseOutcome {
-        val client = helper?.takeIf { awaitReady() } ?: run {
+        // Same fix as queryOwned(): must call awaitReady() unconditionally, not inside
+        // helper?.takeIf{}, or a still-null `helper` skips the connection attempt entirely.
+        val ready = awaitReady()
+        val client = helper.takeIf { ready } ?: run {
             Log.w(TAG, "purchase($sku): not attempted — awaitReady() returned false, see prior log line for why")
             return PurchaseOutcome.Failed("مایکت در دسترس نیست.")
         }
