@@ -1,6 +1,9 @@
 package com.ghadirb.aimusic.billing
 
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import com.ghadirb.aimusic.BuildConfig
 import ir.myket.billingclient.IabHelper
@@ -28,6 +31,7 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         setup?.let { return it.await() }
         val deferred = CompletableDeferred<Boolean>().also { setup = it }
         try {
+            logStoreAvailability()
             val client = IabHelper(activity, BuildConfig.IAB_PUBLIC_KEY)
             helper = client
             client.enableDebugLogging(true) // temporary: on to diagnose the Myket rejection; the library only logs bind/response state, no tokens
@@ -45,6 +49,11 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         val ok = withTimeoutOrNull(SETUP_TIMEOUT_MS) { deferred.await() } ?: false
         if (!ok) {
             Log.w(TAG, "awaitReady: setup did not finish successfully within ${SETUP_TIMEOUT_MS}ms")
+            // The SDK may be waiting for a Service/Broadcast response that never arrives.
+            // Dispose this incomplete connection before retrying; otherwise later taps can
+            // leave orphaned bindings and make the original failure harder to diagnose.
+            helper?.dispose()
+            helper = null
             setup = null // allow another attempt (e.g. the user installs/updates Myket)
         }
         return ok
@@ -110,8 +119,48 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         setup = null
     }
 
+    /**
+     * Logs only device/package discovery state — never the IAB key, purchase token, or user data.
+     * This distinguishes a missing/invisible Myket installation from a Myket-side setup response
+     * that is blocked by the app/product configuration in the developer panel.
+     */
+    private fun logStoreAvailability() {
+        val packageManager = activity.packageManager
+        try {
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(MYKET_PACKAGE, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION") packageManager.getPackageInfo(MYKET_PACKAGE, 0)
+            }
+            val serviceIntent = Intent(MYKET_BIND_ACTION).setPackage(MYKET_PACKAGE)
+            val matchingServices = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.queryIntentServices(
+                    serviceIntent,
+                    PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DISABLED_COMPONENTS.toLong())
+                )
+            } else {
+                @Suppress("DEPRECATION") packageManager.queryIntentServices(
+                    serviceIntent,
+                    PackageManager.MATCH_DISABLED_COMPONENTS
+                )
+            }
+            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION") packageInfo.versionCode.toLong()
+            }
+            Log.i(TAG, "store diagnostic: installed=true version=$versionCode services=${matchingServices.size}")
+        } catch (error: PackageManager.NameNotFoundException) {
+            Log.w(TAG, "store diagnostic: installed=false")
+        } catch (error: Exception) {
+            Log.w(TAG, "store diagnostic: package check failed (${error.javaClass.simpleName})")
+        }
+    }
+
     private companion object {
         const val TAG = "MyketBilling"
+        const val MYKET_PACKAGE = "ir.mservices.market"
+        const val MYKET_BIND_ACTION = "ir.mservices.market.InAppBillingService.BIND"
         const val SETUP_TIMEOUT_MS = 15_000L
         const val QUERY_TIMEOUT_MS = 15_000L
         const val USER_CANCELED = 1
