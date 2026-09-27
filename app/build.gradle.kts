@@ -38,10 +38,15 @@ android {
 
         val marketApplicationId = "ir.mservices.market"
         val marketBindAddress = "ir.mservices.market.InAppBillingService.BIND"
+        // Required by Myket Billing Client 1.19. Besides newer Android support, this
+        // SDK version uses an explicit fallback broadcast to Myket's receiver, which
+        // prevents the setup callback from being lost on recent Android releases.
+        val marketSdkVersion = "6"
         manifestPlaceholders.apply {
             this["marketApplicationId"] = marketApplicationId
             this["marketBindAddress"] = marketBindAddress
             this["marketPermission"] = "$marketApplicationId.BILLING"
+            this["sdkVersion"] = marketSdkVersion
         }
         buildConfigField("String", "IAB_PUBLIC_KEY", "\"$escapedMyketPublicKey\"")
         buildConfigField("String", "MYKET_PREMIUM_SKU", "\"$escapedMyketPremiumSku\"")
@@ -159,7 +164,7 @@ dependencies {
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
     // Myket in-app billing. The merchant key is supplied locally as a Gradle property.
-    implementation("com.github.myketstore:myket-billing-client:1.6")
+    implementation("com.github.myketstore:myket-billing-client:1.19")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
