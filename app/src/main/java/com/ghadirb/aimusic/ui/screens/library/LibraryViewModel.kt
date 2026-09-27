@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -102,6 +103,33 @@ class LibraryViewModel(
 
     private val _scanError = MutableStateFlow<String?>(null)
     val scanError: StateFlow<String?> = _scanError
+
+    // --- Multi-select (delete / copy-move to another folder) ---
+
+    private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedIds: StateFlow<Set<Long>> = _selectedIds
+    val isSelectionMode: StateFlow<Boolean> =
+        _selectedIds.map { it.isNotEmpty() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Long-press on a track: enters selection mode with just that track picked. */
+    fun startSelection(trackId: Long) { _selectedIds.value = setOf(trackId) }
+
+    fun toggleSelection(trackId: Long) {
+        _selectedIds.value = _selectedIds.value.let { current ->
+            if (trackId in current) current - trackId else current + trackId
+        }
+    }
+
+    fun clearSelection() { _selectedIds.value = emptySet() }
+
+    /** Drops the given tracks from the Library after their device files were deleted/moved (see TrackFileOps). */
+    fun removeFromLibrary(ids: Collection<Long>) {
+        viewModelScope.launch {
+            repository.removeTracksFromLibrary(ids.toList())
+            clearSelection()
+        }
+    }
 
     fun setQuery(value: String) { queryFlow.value = value }
     fun setSort(value: LibrarySort) { sortFlow.value = value }

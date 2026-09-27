@@ -1,6 +1,13 @@
 package com.ghadirb.aimusic.ui.screens.library
 
+import android.app.Activity
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,10 +18,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -37,6 +48,7 @@ import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
 import com.ghadirb.aimusic.library.EnergyBand
 import com.ghadirb.aimusic.library.LibraryFilter
 import com.ghadirb.aimusic.library.LibrarySort
+import com.ghadirb.aimusic.library.TrackFileOps
 import com.ghadirb.aimusic.ui.components.LocalQueueActions
 import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
@@ -92,10 +104,156 @@ fun LibraryScreen(
         writeSearchHistory(searchHistoryPreferences, updated)
     }
 
+    // --- Multi-select: delete from device, or copy/move selected tracks to another folder ---
+    val scope = rememberCoroutineScope()
+    val selectedIds by viewModel.selectedIds.collectAsState()
+    val isSelectionMode by viewModel.isSelectionMode.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    // Ready.tracks is filtered/sorted by the active filter; search.tracks covers the search view.
+    // Together they cover every track a selection or a row action could currently refer to.
+    val tracksById = remember(state) {
+        val ready = state as? LibraryUiState.Ready
+        (ready?.tracks.orEmpty() + ready?.search?.tracks.orEmpty()).associateBy { it.id }
+    }
+    var pendingDeleteIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var pendingCopyIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var pendingMove by remember { mutableStateOf(false) }
+    var copyOrMoveTarget by remember { mutableStateOf<Set<Long>?>(null) }
+    var trackPendingDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
+
+    val deleteLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && pendingDeleteIds.isNotEmpty()) {
+            viewModel.removeFromLibrary(pendingDeleteIds)
+            scope.launch { snackbarHostState.showSnackbar("${pendingDeleteIds.size} آهنگ حذف شد") }
+        }
+        pendingDeleteIds = emptySet()
+    }
+
+    fun requestDeleteTracks(targets: List<TrackEntity>) {
+        if (targets.isEmpty()) return
+        scope.launch {
+            val idByUri = targets.mapNotNull { t -> runCatching { Uri.parse(t.path) }.getOrNull()?.let { it to t.id } }.toMap()
+            when (val outcome = TrackFileOps.requestDelete(context, idByUri.keys.toList())) {
+                is TrackFileOps.DeleteOutcome.Deleted -> {
+                    val ids = outcome.uris.mapNotNull { idByUri[it] }
+                    viewModel.removeFromLibrary(ids)
+                    snackbarHostState.showSnackbar("${ids.size} آهنگ حذف شد")
+                }
+                is TrackFileOps.DeleteOutcome.NeedsConfirmation -> {
+                    pendingDeleteIds = outcome.uris.mapNotNull { idByUri[it] }.toSet()
+                    deleteLauncher.launch(IntentSenderRequest.Builder(outcome.intentSender).build())
+                }
+                is TrackFileOps.DeleteOutcome.Failed -> {
+                    snackbarHostState.showSnackbar(outcome.reason)
+                }
+            }
+        }
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        val ids = pendingCopyIds
+        val move = pendingMove
+        pendingCopyIds = emptySet()
+        if (treeUri == null || ids.isEmpty()) return@rememberLauncherForActivityResult
+        val targets = ids.mapNotNull { tracksById[it] }
+        scope.launch {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    treeUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            val pairs = targets.mapNotNull { t -> runCatching { Uri.parse(t.path) }.getOrNull()?.let { it to t.title } }
+            val result = TrackFileOps.copyToFolder(context, treeUri, pairs)
+            val verb = if (move) "انتقال" else "کپی"
+            snackbarHostState.showSnackbar(
+                if (result.failed.isEmpty()) "${result.succeeded.size} آهنگ $verb شد"
+                else "${result.succeeded.size} آهنگ $verb شد، ${result.failed.size} مورد ناموفق بود"
+            )
+            if (move && result.succeeded.isNotEmpty()) {
+                val movedTracks = targets.filter { t -> runCatching { Uri.parse(t.path) }.getOrNull() in result.succeeded }
+                requestDeleteTracks(movedTracks)
+            } else {
+                viewModel.clearSelection()
+            }
+        }
+    }
+
+    trackPendingDeleteConfirm?.let { track ->
+        AlertDialog(
+            onDismissRequest = { trackPendingDeleteConfirm = null },
+            title = { Text("حذف آهنگ") },
+            text = { Text("«${track.title}» از دستگاه حذف شود؟ این کار قابل بازگشت نیست.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    trackPendingDeleteConfirm = null
+                    requestDeleteTracks(listOf(track))
+                }) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { trackPendingDeleteConfirm = null }) { Text("انصراف") } }
+        )
+    }
+
+    copyOrMoveTarget?.let { ids ->
+        AlertDialog(
+            onDismissRequest = { copyOrMoveTarget = null },
+            title = { Text("کپی یا انتقال") },
+            text = { Text("${ids.size} آهنگ انتخاب شده در پوشهٔ مقصد چه کاری انجام شود؟") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingCopyIds = ids; pendingMove = false; copyOrMoveTarget = null
+                    folderPickerLauncher.launch(null)
+                }) { Text("فقط کپی") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        pendingCopyIds = ids; pendingMove = true; copyOrMoveTarget = null
+                        folderPickerLauncher.launch(null)
+                    }) { Text("انتقال (حذف پس از کپی)") }
+                    TextButton(onClick = { copyOrMoveTarget = null }) { Text("انصراف") }
+                }
+            }
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            if (isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${selectedIds.size} انتخاب شده") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.clearSelection() }) {
+                            Icon(Icons.Filled.Close, contentDescription = "لغو انتخاب")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { copyOrMoveTarget = selectedIds },
+                            enabled = selectedIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.DriveFileMove, contentDescription = "کپی یا انتقال به پوشهٔ دیگر")
+                        }
+                        IconButton(
+                            onClick = { requestDeleteTracks(selectedIds.mapNotNull { tracksById[it] }) },
+                            enabled = selectedIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.Delete, contentDescription = "حذف از دستگاه")
+                        }
+                    }
+                )
+            }
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.scanLibrary() }) {
-                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.scan_library))
+            if (!isSelectionMode) {
+                FloatingActionButton(onClick = { viewModel.scanLibrary() }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.scan_library))
+                }
             }
         }
     ) { padding ->
@@ -216,7 +374,13 @@ fun LibraryScreen(
                                             onClick = { onTrackClick(track, search.tracks) },
                                             onFavoriteClick = { viewModel.toggleFavorite(track) },
                                             onAddToPlaylistClick = { trackForPlaylistPicker = track },
-                                            onNotInterestedClick = { viewModel.toggleNotInterested(track) }
+                                            onNotInterestedClick = { viewModel.toggleNotInterested(track) },
+                                            onDeleteClick = { trackPendingDeleteConfirm = track },
+                                            onCopyMoveClick = { copyOrMoveTarget = setOf(track.id) },
+                                            selectionMode = isSelectionMode,
+                                            selected = track.id in selectedIds,
+                                            onToggleSelect = { viewModel.toggleSelection(track.id) },
+                                            onLongPress = { viewModel.startSelection(track.id) }
                                         )
                                     }
                                 }
@@ -232,7 +396,13 @@ fun LibraryScreen(
                                     onClick = { onTrackClick(track, current.tracks) },
                                     onFavoriteClick = { viewModel.toggleFavorite(track) },
                                     onAddToPlaylistClick = { trackForPlaylistPicker = track },
-                                    onNotInterestedClick = { viewModel.toggleNotInterested(track) }
+                                    onNotInterestedClick = { viewModel.toggleNotInterested(track) },
+                                    onDeleteClick = { trackPendingDeleteConfirm = track },
+                                    onCopyMoveClick = { copyOrMoveTarget = setOf(track.id) },
+                                    selectionMode = isSelectionMode,
+                                    selected = track.id in selectedIds,
+                                    onToggleSelect = { viewModel.toggleSelection(track.id) },
+                                    onLongPress = { viewModel.startSelection(track.id) }
                                 )
                             }
                         }
@@ -440,6 +610,7 @@ private fun FilterRow(state: LibraryUiState.Ready, onChange: (LibraryFilter) -> 
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
     track: TrackEntity,
@@ -449,7 +620,17 @@ fun TrackRow(
     onNotInterestedClick: (() -> Unit)? = null,
     isCurrentTrack: Boolean = false,
     /** Extra trailing action rendered before the favourite/menu icons (e.g. "remove from playlist"). */
-    trailingExtra: (@Composable () -> Unit)? = null
+    trailingExtra: (@Composable () -> Unit)? = null,
+    /** Deletes this single track from the device (shown in the row's own menu). */
+    onDeleteClick: (() -> Unit)? = null,
+    /** Copies/moves just this single track to another folder (shown in the row's own menu). */
+    onCopyMoveClick: (() -> Unit)? = null,
+    /** True while the Library is in multi-select mode: shows a checkbox and disables normal tap-to-play. */
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onToggleSelect: (() -> Unit)? = null,
+    /** Long-press anywhere on the row enters selection mode with this track picked. */
+    onLongPress: (() -> Unit)? = null
 ) {
     ListItem(
         headlineContent = {
@@ -462,7 +643,14 @@ fun TrackRow(
             if (track.artist != "Unknown artist") Text(track.artist, maxLines = 1)
         },
         leadingContent = {
-            if (track.albumArtUri != null) {
+            if (selectionMode) {
+                Icon(
+                    imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                    contentDescription = if (selected) "انتخاب شده" else "انتخاب نشده",
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp)
+                )
+            } else if (track.albumArtUri != null) {
                 AsyncImage(
                     model = track.albumArtUri,
                     contentDescription = track.album,
@@ -475,6 +663,7 @@ fun TrackRow(
             }
         },
         trailingContent = {
+            if (selectionMode) return@ListItem
             val queueActions = LocalQueueActions.current
             var menuOpen by remember { mutableStateOf(false) }
             Row {
@@ -484,7 +673,7 @@ fun TrackRow(
                         contentDescription = if (track.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها"
                     )
                 }
-                if (onAddToPlaylistClick != null || queueActions != null || onNotInterestedClick != null) {
+                if (onAddToPlaylistClick != null || queueActions != null || onNotInterestedClick != null || onDeleteClick != null) {
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌های بیشتر")
@@ -510,10 +699,22 @@ fun TrackRow(
                                     onClick = { onAddToPlaylistClick(); menuOpen = false }
                                 )
                             }
+                            if (onCopyMoveClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text("کپی/انتقال به پوشهٔ دیگر") },
+                                    onClick = { onCopyMoveClick(); menuOpen = false }
+                                )
+                            }
                             if (onNotInterestedClick != null) {
                                 DropdownMenuItem(
                                     text = { Text(if (track.notInterested) "برداشتن «علاقه‌ای ندارم»" else "علاقه‌ای ندارم") },
                                     onClick = { onNotInterestedClick(); menuOpen = false }
+                                )
+                            }
+                            if (onDeleteClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text("حذف از دستگاه", color = MaterialTheme.colorScheme.error) },
+                                    onClick = { onDeleteClick(); menuOpen = false }
                                 )
                             }
                         }
@@ -522,7 +723,14 @@ fun TrackRow(
                 trailingExtra?.invoke()
             }
         },
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = if (selectionMode) {
+            Modifier.clickable(onClick = { onToggleSelect?.invoke() })
+        } else {
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongPress
+            )
+        }
     )
 }
 

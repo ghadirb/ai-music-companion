@@ -96,6 +96,16 @@ class MusicRepository(
         else newTracks.mapIndexedNotNull { index, track -> insertedIds.getOrNull(index)?.let { track.copy(id = it) } }
     }
 
+    /**
+     * Drops [ids] from the Library. Call this only after the underlying device file has
+     * actually been deleted or moved away (see [com.ghadirb.aimusic.library.TrackFileOps]) —
+     * it does not touch the file itself, only Room's record of it.
+     */
+    suspend fun removeTracksFromLibrary(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        trackDao.deleteByIds(ids)
+    }
+
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =
         trackDao.setFavorite(trackId, isFavorite)
 

@@ -48,6 +48,10 @@ interface TrackDao {
     @Query("DELETE FROM tracks WHERE path IN (:paths)")
     suspend fun deleteByPaths(paths: List<String>)
 
+    /** Used after the device file itself was deleted/moved away (see TrackFileOps) — removes it from the Library too. */
+    @Query("DELETE FROM tracks WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     /** Liking and "not interested" are mutually exclusive; favoriting a track clears "not interested". */
     @Query("UPDATE tracks SET isFavorite = :isFavorite, notInterested = CASE WHEN :isFavorite THEN 0 ELSE notInterested END WHERE id = :trackId")
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean)
