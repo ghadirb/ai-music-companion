@@ -19,6 +19,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="${marketPermission}" />
 
+    <!-- Required since Android 11 (targetSdk here is 35): without declaring visibility to
+         Myket's package, PackageManager can't resolve/bind ir.mservices.market's billing
+         service, so IabHelper.startSetup() silently fails and every purchase() call returns
+         "مایکت در دسترس نیست" — even with a correct IAB public key and on a device that has
+         Myket installed. This is what Myket's review flagged. -->
+    <queries>
+        <package android:name="ir.mservices.market" />
+        <intent>
+            <action android:name="ir.mservices.market.InAppBillingService.BIND" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
+
     <!-- Android Auto / Automotive (spec item 9): the phone-only build still installs fine —
          "required=false" just lets the app also show up on car head units and Assistant. -->
     <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
