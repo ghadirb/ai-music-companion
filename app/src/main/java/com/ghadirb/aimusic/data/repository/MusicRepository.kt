@@ -13,7 +13,16 @@ import com.ghadirb.aimusic.data.local.entity.PlaylistEntity
 import com.ghadirb.aimusic.data.local.entity.PlaylistTrackCrossRef
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
+import com.ghadirb.aimusic.data.local.entity.BehaviorEventEntity
+import com.ghadirb.aimusic.data.local.entity.RecommendationCacheEntity
+import com.ghadirb.aimusic.data.local.entity.RecommendationEventEntity
 import com.ghadirb.aimusic.data.scanner.MediaLibraryScanner
+import com.ghadirb.aimusic.recommendation.config.ALGORITHM_VERSION
+import com.ghadirb.aimusic.recommendation.events.RecommendationEvents
+import com.ghadirb.aimusic.recommendation.profile.TasteProfile
+import com.ghadirb.aimusic.recommendation.profile.TasteProfileCodec
+import com.ghadirb.aimusic.recommendation.signals.ListeningBehavior
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import com.ghadirb.aimusic.library.TrackStat
 import kotlinx.coroutines.flow.combine
@@ -106,8 +115,10 @@ class MusicRepository(
         trackDao.deleteByIds(ids)
     }
 
-    suspend fun setFavorite(trackId: Long, isFavorite: Boolean) =
+    suspend fun setFavorite(trackId: Long, isFavorite: Boolean) {
         trackDao.setFavorite(trackId, isFavorite)
+        logBehavior(trackId, if (isFavorite) ListeningBehavior.FAVORITED else ListeningBehavior.UNFAVORITED)
+    }
 
     suspend fun setNotInterested(trackId: Long, notInterested: Boolean) =
         trackDao.setNotInterested(trackId, notInterested)
@@ -115,14 +126,25 @@ class MusicRepository(
 
     suspend fun getTrack(trackId: Long): TrackEntity? = trackDao.getById(trackId)
 
-    /** Records one listening session. Called by PlayerViewModel on track change/stop. */
-    suspend fun recordListening(entry: ListeningHistoryEntity): Long = historyDao.insert(entry)
+    /**
+     * Records one listening session. Called by the playback service on track change/stop.
+     * Also resolves the recommendation (if any) that led to this play — best effort, never blocks recording.
+     */
+    suspend fun recordListening(entry: ListeningHistoryEntity): Long {
+        val id = historyDao.insert(entry)
+        bestEffort { attributeToRecommendation(entry) }
+        return id
+    }
 
     suspend fun recentHistory(limit: Int = 200) = historyDao.getRecent(limit)
 
     fun observeUserPreferenceFlow() = preferenceDao.observe()
     suspend fun getUserPreference(): UserPreferenceEntity? = preferenceDao.get()
-    suspend fun saveUserPreference(preference: UserPreferenceEntity) = preferenceDao.upsert(preference)
+    suspend fun saveUserPreference(preference: UserPreferenceEntity) {
+        // The legacy builder knows nothing about the v7 profile: never let it wipe a stored one.
+        val keep = if (preference.profileJson.isBlank()) preferenceDao.get()?.profileJson.orEmpty() else preference.profileJson
+        preferenceDao.upsert(preference.copy(profileJson = keep))
+    }
 
     // ---- Playlists (manual, MVP item 5 in the spec) ----
 
@@ -176,10 +198,13 @@ class MusicRepository(
     suspend fun addTrackToPlaylist(playlistId: Long, trackId: Long) {
         val position = playlistDao.nextPosition(playlistId)
         playlistDao.addTrackToPlaylist(PlaylistTrackCrossRef(playlistId, trackId, position))
+        logBehavior(trackId, ListeningBehavior.ADDED_TO_PLAYLIST)
     }
 
-    suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) =
+    suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) {
         playlistDao.removeTrackFromPlaylist(playlistId, trackId)
+        logBehavior(trackId, ListeningBehavior.REMOVED_FROM_PLAYLIST)
+    }
 
     suspend fun getPlaylist(playlistId: Long): PlaylistEntity? = playlistDao.getPlaylist(playlistId)
 
@@ -189,6 +214,67 @@ class MusicRepository(
         playlistDao.observeTracksInPlaylist(playlistId).first()
 
     suspend fun allTracksSnapshot(): List<TrackEntity> = observeTracks().first()
+
+    // ---- On-device recommendation engine storage (Room v7). All local; every write is best-effort. ----
+
+    private suspend fun <T> bestEffort(block: suspend () -> T): T? =
+        try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+
+    /** Spec §3: explicit user actions (favourite, playlist add/remove) as small rows, never per-second events. */
+    suspend fun logBehavior(trackId: Long, behavior: ListeningBehavior, timestamp: Long = System.currentTimeMillis()) {
+        val dao = database?.behaviorEventDao() ?: return
+        bestEffort { dao.insert(BehaviorEventEntity(trackId = trackId, behavior = behavior.name, timestamp = timestamp)) }
+    }
+
+    suspend fun behaviorEventsSince(since: Long): List<BehaviorEventEntity> =
+        bestEffort { database?.behaviorEventDao()?.since(since) }.orEmpty()
+
+    /** Number of listening sessions started after [since] (cheap COUNT query). */
+    suspend fun historyCountSince(since: Long): Int = historyDao.countSince(since)
+
+    /** Long-term multi-dimensional profile saved by TasteProfileWorker; null if never built or unreadable. */
+    suspend fun getTasteProfile(): TasteProfile? =
+        preferenceDao.get()?.profileJson?.takeIf { it.isNotBlank() }?.let(TasteProfileCodec::decode)
+
+    suspend fun logRecommendationEvents(events: List<RecommendationEventEntity>) {
+        if (events.isEmpty()) return
+        val dao = database?.recommendationEventDao() ?: return
+        bestEffort { dao.insertAll(events) }
+    }
+
+    suspend fun recommendationEventsSince(since: Long): List<RecommendationEventEntity> =
+        bestEffort { database?.recommendationEventDao()?.since(since) }.orEmpty()
+
+    /** Cached Home sections; rows written by another algorithm version (prefix) are deleted (spec §20). */
+    suspend fun loadRecommendationCache(versionPrefix: String = "$ALGORITHM_VERSION:"): List<RecommendationCacheEntity> {
+        val dao = database?.recommendationCacheDao() ?: return emptyList()
+        return bestEffort {
+            dao.deleteOtherVersions(versionPrefix)
+            dao.all()
+        }.orEmpty()
+    }
+
+    /** Replaces the whole cache atomically, so a section that no longer applies (e.g. "tonight") cannot linger. */
+    suspend fun replaceRecommendationCache(entries: List<RecommendationCacheEntity>) {
+        val db = database ?: return
+        val dao = db.recommendationCacheDao()
+        bestEffort { db.withTransaction { dao.clear(); dao.upsertAll(entries) } }
+    }
+
+    /** Keeps the local recommendation tables small (used by the background worker). */
+    suspend fun pruneRecommendationData(nowMs: Long) {
+        bestEffort { database?.recommendationEventDao()?.deleteOlderThan(nowMs - RecommendationEvents.RETENTION_MS) }
+        bestEffort { database?.behaviorEventDao()?.deleteOlderThan(nowMs - RecommendationEvents.RETENTION_MS) }
+    }
+
+    /** Marks the newest unresolved suggestion of the played track as played/completed/skipped (spec §18). */
+    private suspend fun attributeToRecommendation(entry: ListeningHistoryEntity) {
+        val dao = database?.recommendationEventDao() ?: return
+        val window = RecommendationEvents.attributionWindow(entry)
+        val event = dao.latestOpen(entry.trackId, window.first, window.last) ?: return
+        val (completed, skipped) = RecommendationEvents.outcomeOf(entry)
+        dao.markOutcome(event.id, completed, skipped)
+    }
 
     // ---- On-device audio analysis (see analysis/AudioAnalyzer.kt) ----
 

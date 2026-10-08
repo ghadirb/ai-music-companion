@@ -32,5 +32,8 @@ data class UserPreferenceEntity(
     val favoriteRatio: Float = 0f,
     /** Up to three hours of day (0..23) when the user listens most. */
     val peakHours: String = "",
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    // --- v7 ---
+    /** Multi-dimensional TasteProfile as compact JSON (see TasteProfileCodec); empty = not built yet. */
+    val profileJson: String = ""
 )

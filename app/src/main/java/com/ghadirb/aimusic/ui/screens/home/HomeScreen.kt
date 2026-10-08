@@ -90,6 +90,7 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val picks by viewModel.picks.collectAsState()
+    val sections by viewModel.sections.collectAsState()
     val mixes by viewModel.mixes.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
@@ -244,11 +245,25 @@ fun HomeScreen(
             Spacer(Modifier.height(24.dp))
         }
 
-        SectionHeader(emoji = "🎧", title = stringResource(R.string.card_today_pick))
-        if (picks.isEmpty()) {
-            Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+        // v2 engine: every section has its own strategy (for you / because you like / tonight / driving / discover / similar).
+        if (sections.isNotEmpty()) {
+            sections.forEachIndexed { index, section ->
+                if (index > 0) Spacer(Modifier.height(24.dp))
+                SectionHeader(emoji = sectionEmoji(section.type), title = section.title)
+                Text(
+                    section.reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                RecommendationRail(section.items) { onTrackClick(it, section.items.map { r -> r.track }) }
+            }
         } else {
-            RecommendationRail(picks) { onTrackClick(it, picks.map { r -> r.track }) }
+            SectionHeader(emoji = "🎧", title = stringResource(R.string.card_today_pick))
+            if (picks.isEmpty()) {
+                Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+            } else {
+                RecommendationRail(picks) { onTrackClick(it, picks.map { r -> r.track }) }
+            }
         }
 
         // ---- occasions: "what do I want to listen to now?" ----
@@ -329,6 +344,15 @@ private fun SectionHeader(emoji: String, title: String, actions: @Composable Row
         Text("$emoji  $title", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         actions()
     }
+}
+
+private fun sectionEmoji(type: com.ghadirb.aimusic.recommendation.section.SectionType): String = when (type) {
+    com.ghadirb.aimusic.recommendation.section.SectionType.FOR_YOU -> "🎧"
+    com.ghadirb.aimusic.recommendation.section.SectionType.BECAUSE_YOU_LIKE -> "💜"
+    com.ghadirb.aimusic.recommendation.section.SectionType.TONIGHT -> "🌙"
+    com.ghadirb.aimusic.recommendation.section.SectionType.DRIVING -> "🚗"
+    com.ghadirb.aimusic.recommendation.section.SectionType.DISCOVER -> "✨"
+    com.ghadirb.aimusic.recommendation.section.SectionType.SIMILAR_TO_RECENT -> "🔁"
 }
 
 @Composable

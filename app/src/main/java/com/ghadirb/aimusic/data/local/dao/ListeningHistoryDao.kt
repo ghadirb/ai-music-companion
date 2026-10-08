@@ -20,6 +20,10 @@ interface ListeningHistoryDao {
     @Query("SELECT * FROM listening_history ORDER BY startTime DESC LIMIT :limit")
     suspend fun getRecent(limit: Int = 200): List<ListeningHistoryEntity>
 
+    /** Number of sessions that started after [since]; lets the recommendation cache notice new listening cheaply. */
+    @Query("SELECT COUNT(*) FROM listening_history WHERE startTime > :since")
+    suspend fun countSince(since: Long): Int
+
 
 
     /** Per-track aggregate (non-skipped plays + last start time) for library sorting. */

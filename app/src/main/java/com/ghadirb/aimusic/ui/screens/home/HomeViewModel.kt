@@ -9,6 +9,8 @@ import com.ghadirb.aimusic.mix.SmartMixGenerator
 import com.ghadirb.aimusic.recommendation.Recommendation
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
 import com.ghadirb.aimusic.recommendation.ScoringConfig
+import com.ghadirb.aimusic.recommendation.section.RecommendationSection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +35,14 @@ class HomeViewModel(
     private val _picks = MutableStateFlow<List<Recommendation>>(emptyList())
     /** "Today's picks", each with a short reason ("because you listen to this artist a lot"). */
     val picks: StateFlow<List<Recommendation>> = _picks.asStateFlow()
+
+    private val _sections = MutableStateFlow<List<RecommendationSection>>(emptyList())
+    /**
+     * v2 Home sections ("for you", "because you like…", "tonight", "driving", "discover", "similar to recent"),
+     * each produced by its own strategy. Cached sections are shown first, then refreshed in the background.
+     * [picks] is only filled as a fallback when no section could be produced.
+     */
+    val sections: StateFlow<List<RecommendationSection>> = _sections.asStateFlow()
 
     private val _mixes = MutableStateFlow<List<SmartMix>>(emptyList())
     val mixes: StateFlow<List<SmartMix>> = _mixes.asStateFlow()
@@ -81,6 +91,7 @@ class HomeViewModel(
             val engine = RecommendationEngine(repository, config)
             if (count == 0) {
                 _picks.value = emptyList()
+                _sections.value = emptyList()
                 _mixes.value = emptyList()
                 _favorites.value = emptyList()
                 _recentlyPlayed.value = emptyList()
@@ -97,7 +108,7 @@ class HomeViewModel(
                     .distinctBy { it.id }
                     .take(HOME_RAIL_SIZE)
                     .toList()
-                _picks.value = engine.recommend(limit = 8, nowMs = now)
+                loadSections(engine, now)
                 _mixes.value = withContext(Dispatchers.Default) { SmartMixGenerator.generateAll(tracks, history, now, limit = 30, config = config) }
             }
         } catch (e: Exception) {
@@ -106,6 +117,27 @@ class HomeViewModel(
             _mixes.value = emptyList()
         } finally {
             _hasLibrary.value = count > 0
+        }
+    }
+
+    /**
+     * Cache-first (spec §19): a valid cache is shown immediately and nothing is recomputed; a stale one
+     * is shown right away and replaced when the light refresh finishes. All ranking runs inside the
+     * engine on Dispatchers.Default. If the v2 pipeline yields nothing, the legacy picks keep Home alive.
+     */
+    private suspend fun loadSections(engine: RecommendationEngine, now: Long) {
+        try {
+            val cached = engine.cachedSections(now)
+            if (cached.sections.isNotEmpty()) _sections.value = cached.sections
+            val sections = if (cached.sections.isNotEmpty() && cached.isFresh) cached.sections
+            else engine.refreshSections(nowMs = now)
+            _sections.value = sections
+            _picks.value = if (sections.isEmpty()) engine.recommend(limit = 8, nowMs = now) else emptyList()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _sections.value = emptyList()
+            _picks.value = try { engine.recommend(limit = 8, nowMs = now) } catch (e2: CancellationException) { throw e2 } catch (e2: Exception) { emptyList() }
         }
     }
 
