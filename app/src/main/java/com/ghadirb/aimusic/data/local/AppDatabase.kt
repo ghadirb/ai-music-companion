@@ -13,6 +13,7 @@ import com.ghadirb.aimusic.data.local.dao.RecommendationCacheDao
 import com.ghadirb.aimusic.data.local.dao.RecommendationEventDao
 import com.ghadirb.aimusic.data.local.dao.TrackDao
 import com.ghadirb.aimusic.data.local.dao.UserPreferenceDao
+import com.ghadirb.aimusic.data.local.dao.VideoDao
 import com.ghadirb.aimusic.data.local.entity.BehaviorEventEntity
 import com.ghadirb.aimusic.data.local.entity.ListeningHistoryEntity
 import com.ghadirb.aimusic.data.local.entity.PlaylistEntity
@@ -21,6 +22,7 @@ import com.ghadirb.aimusic.data.local.entity.RecommendationCacheEntity
 import com.ghadirb.aimusic.data.local.entity.RecommendationEventEntity
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
+import com.ghadirb.aimusic.data.local.entity.VideoEntity
 
 /**
  * Single Room database for the whole app. Everything here is local-only —
@@ -35,6 +37,8 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
  * v6 adds `tracks.notInterested` (explicit negative feedback, v1.1).
  * v7 adds the on-device recommendation engine storage: `behavior_event`, `recommendation_event`,
  * `recommendation_cache` and `user_preference.profileJson`. Purely additive (no data is touched).
+ * v8 adds the independent `videos` table for the local "ویدئو" tab (resume position, last played).
+ * Purely additive: music, playlists and favourites are not touched.
  */
 @Database(
     entities = [
@@ -45,9 +49,10 @@ import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
         PlaylistTrackCrossRef::class,
         BehaviorEventEntity::class,
         RecommendationEventEntity::class,
-        RecommendationCacheEntity::class
+        RecommendationCacheEntity::class,
+        VideoEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,6 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun behaviorEventDao(): BehaviorEventDao
     abstract fun recommendationEventDao(): RecommendationEventDao
     abstract fun recommendationCacheDao(): RecommendationCacheDao
+    abstract fun videoDao(): VideoDao
 
     companion object {
         @Volatile
@@ -117,6 +123,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v7 -> v8: the local video library. Only creates a new table + indices; nothing that
+         * exists today (tracks, history, playlists, favourites) is read or modified.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `videos` (`id` INTEGER NOT NULL, `contentUri` TEXT NOT NULL, " +
+                        "`displayName` TEXT NOT NULL, `durationMs` INTEGER NOT NULL, `sizeBytes` INTEGER NOT NULL, " +
+                        "`width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `mimeType` TEXT NOT NULL, " +
+                        "`folderName` TEXT NOT NULL, `relativePath` TEXT NOT NULL, `dateAdded` INTEGER NOT NULL, " +
+                        "`dateModified` INTEGER NOT NULL, `lastPositionMs` INTEGER NOT NULL, " +
+                        "`lastPlayedAt` INTEGER NOT NULL, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_videos_lastPlayedAt` ON `videos` (`lastPlayedAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_videos_dateAdded` ON `videos` (`dateAdded`)")
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tracks ADD COLUMN energyLevel REAL")
@@ -138,7 +163,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ai_music_companion.db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     // v1 predates any real install (never released), so the only
                     // gap we can't hand-migrate is v1->v2; destructive fallback
                     // only kicks in for that very old case.

@@ -65,7 +65,7 @@ class DatabaseMigrationTest {
         createV4WithData()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.databaseBuilder(context, AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).build()
+            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).build()
         try {
             val tracks = db.trackDao().observeAll().first()
             assertEquals(1, tracks.size)

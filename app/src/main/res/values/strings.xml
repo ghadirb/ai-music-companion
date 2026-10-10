@@ -23,6 +23,7 @@
     <string name="empty_library">هنوز آهنگی پیدا نشده. کتابخانه را اسکن کنید.</string>
     <string name="scan_library">اسکن کتابخانه</string>
     <string name="mood_cards_analyzing">در حال تحلیل آهنگ‌ها برای این پیشنهاد… کمی بعد دوباره سر بزنید.</string>
+    <string name="nav_video">ویدئو</string>
     <string name="nav_folders">پوشه‌ها</string>
     <string name="permission_title">دسترسی به موسیقی</string>
     <string name="permission_detail">برای ساخت کتابخانه، فقط به فایل‌های صوتی دستگاه دسترسی می‌خواهیم. فایل‌ها، متن آهنگ و سابقهٔ شنیدن بدون انتخاب شما ارسال نمی‌شوند.</string>

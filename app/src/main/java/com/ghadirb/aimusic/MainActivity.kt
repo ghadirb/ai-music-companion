@@ -87,6 +87,7 @@ import com.ghadirb.aimusic.ui.screens.player.rememberPlayerViewModel
 import com.ghadirb.aimusic.ui.screens.playlists.PlaylistDetailScreen
 import com.ghadirb.aimusic.ui.screens.playlists.PlaylistsScreen
 import com.ghadirb.aimusic.ui.screens.settings.SettingsScreen
+import com.ghadirb.aimusic.ui.video.VideoScreen
 import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
 import java.net.URLDecoder
 
@@ -351,6 +352,9 @@ private fun MainScaffold(
                     onAlbumClick = { navController.navigate(albumDetailRoute(it)) },
                     onPlaylistClick = { id, name -> navController.navigate(playlistDetailRoute(id, name)) }
                 )
+            }
+            composable(Screen.Video.route) {
+                VideoScreen(repository = app.videoRepository)
             }
             composable(Screen.Artists.route) {
                 ArtistsScreen(repository = repository) { artist ->

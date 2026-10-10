@@ -5,6 +5,9 @@
     <!-- Library, playback and local recommendations remain on-device. Internet is
          used only after the user explicitly enables the optional AI similarity beta. -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Local video tab: Android 13+ needs its own video permission (the audio one does not cover it).
+         Before Android 13 the READ_EXTERNAL_STORAGE entry below covers videos too. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <!-- Only needed to delete/move tracks that this app didn't create, on legacy (pre-scoped-storage)
@@ -59,6 +62,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Standalone video player. Handles rotation itself (no restart) and supports Picture-in-Picture. -->
+        <activity
+            android:name=".ui.video.VideoPlayerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.AiMusicCompanion" />
 
         <service
             android:name=".playback.PlaybackService"

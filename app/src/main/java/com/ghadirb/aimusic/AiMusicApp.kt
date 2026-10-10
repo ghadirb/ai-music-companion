@@ -17,6 +17,7 @@ import com.ghadirb.aimusic.library.LibraryWatchWorker
 import com.ghadirb.aimusic.premium.EntitlementRepository
 import com.ghadirb.aimusic.premium.EntitlementTokenVerifier
 import com.ghadirb.aimusic.data.repository.MusicRepository
+import com.ghadirb.aimusic.data.repository.VideoRepository
 import com.ghadirb.aimusic.recommendation.TasteProfileWorker
 import java.util.concurrent.TimeUnit
 
@@ -30,6 +31,10 @@ class AiMusicApp : Application() {
         private set
 
     lateinit var repository: MusicRepository
+        private set
+
+    /** Local video library (the "ویدئو" tab). Independent of the music repository. */
+    lateinit var videoRepository: VideoRepository
         private set
 
     /** Gateway client + plan state. Created lazily: nothing here touches the network until the user uses a cloud/premium feature. */
@@ -52,6 +57,7 @@ class AiMusicApp : Application() {
             context = this,
             database = database
         )
+        videoRepository = VideoRepository(database.videoDao(), this)
         scheduleTasteProfileRefresh()
         scheduleAudioAnalysis()
         // Opt-in only (spec item 7) — nothing scheduled unless the user already turned it on

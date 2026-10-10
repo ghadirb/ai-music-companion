@@ -18,11 +18,12 @@ sealed class Screen(val route: String, val labelRes: Int, val icon: ImageVector)
     data object Albums : Screen("albums", R.string.nav_albums, Icons.Filled.Album)
     data object Playlists : Screen("playlists", R.string.nav_playlists, Icons.Filled.QueueMusic)
     data object Favorites : Screen("favorites", R.string.nav_favorites, Icons.Filled.Favorite)
+    data object Video : Screen("video", R.string.nav_video, Icons.Filled.VideoLibrary)
     data object Folders : Screen("folders", R.string.nav_folders, Icons.Filled.Folder)
     data object Settings : Screen("settings", R.string.nav_settings, Icons.Filled.Settings)
 
     companion object {
-        val bottomBarScreens = listOf(Home, Library, Artists, Folders, Playlists)
+        val bottomBarScreens = listOf(Home, Library, Video, Artists, Folders, Playlists)
     }
 }
 
