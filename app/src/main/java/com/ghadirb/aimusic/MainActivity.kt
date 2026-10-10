@@ -211,11 +211,23 @@ private fun MainScaffold(
     )
     var upgradeFeature by remember { mutableStateOf<PremiumFeature?>(null) }
     val purchaseState by premiumViewModel.purchaseState.collectAsState()
+    val trialInfo by premiumViewModel.trial.collectAsState()
+    val trialState by premiumViewModel.trialState.collectAsState()
     val premiumAccess = remember(premiumViewModel) {
         PremiumAccess(premiumViewModel.entitlement, premiumViewModel::isAllowed) { feature -> upgradeFeature = feature }
     }
     // Refresh the plan in the background only if a (cached, offline-verified) premium token is close to expiry.
     LaunchedEffect(Unit) { if (app.entitlements.needsRefresh()) premiumViewModel.refresh() }
+    // Trial started from the upgrade dialog: close it and tell the user to retry what they tapped.
+    LaunchedEffect(trialState) {
+        if (trialState is PurchaseUiState.Success) {
+            if (upgradeFeature != null) {
+                upgradeFeature = null
+                android.widget.Toast.makeText(context, "دورهٔ آزمایشی فعال شد؛ دوباره امتحان کنید.", android.widget.Toast.LENGTH_LONG).show()
+            }
+            premiumViewModel.resetTrialState()
+        }
+    }
     LaunchedEffect(purchaseState) {
         if (purchaseState is PurchaseUiState.Success && upgradeFeature != null) upgradeFeature = null
     }
@@ -461,7 +473,10 @@ private fun MainScaffold(
             skus = premiumViewModel.offeredSkus,
             onBuy = premiumViewModel::buy,
             onRestore = premiumViewModel::restore,
-            onDismiss = { upgradeFeature = null; premiumViewModel.resetPurchaseState() }
+            onDismiss = { upgradeFeature = null; premiumViewModel.resetPurchaseState(); premiumViewModel.resetTrialState() },
+            trial = trialInfo,
+            trialState = trialState,
+            onStartTrial = premiumViewModel::startTrial
         )
     }
 }

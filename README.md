@@ -87,3 +87,7 @@ Proprietary — all rights reserved. See [LICENSE](LICENSE). Not open source; no
 
 ## Video formats
 Two engines: AndroidX Media3/ExoPlayer first (hardware decoders, automatic fallback to Android's software decoders), and **libVLC** (LGPL-2.1, includes FFmpeg) as the fallback engine for AVI/WMV/RMVB/VOB, DTS/AC3 audio and files ExoPlayer cannot decode. Release APKs are built for `arm64-v8a` + `armeabi-v7a` only (`-PABI_FILTERS` overrides; CI adds `x86_64` for the emulator smoke test). libVLC and FFmpeg attribution is shown in Settings.
+
+## Free trial of Premium (7 days)
+A Free user who taps a Premium feature (or opens the Premium screen) can start a **one-time 7-day trial**. It is decided and stored by the gateway (`POST /v1/trial/start`, record `trial:<install>` in KV), never by the app: the signed entitlement token carries the SKU `trial` and expires with the trial, so it works offline until then and cannot be extended by clearing data or changing the phone clock. During the trial the AI quota is `TRIAL_DAILY_EMBEDDING_LIMIT` (default 40/day). A purchase replaces the trial; after it ends the Free features stay available. Settings: `TRIAL_DAYS`, `TRIAL_DAILY_EMBEDDING_LIMIT`, `TRIAL_PER_IP_DAY` in `cloudflare-worker/wrangler.toml` (keep `TRIAL_DAYS_LABEL` in `Entitlement.kt` equal to `TRIAL_DAYS`).
+Limit: the identity is an anonymous per-install id, so a reinstall (new id) can start a new trial; per-address caps only make mass abuse harder.

@@ -19,7 +19,27 @@ data class Entitlement(
 ) {
     fun isPremiumAt(nowMs: Long): Boolean = plan == Plan.PREMIUM && (expiresAtMs == null || nowMs < expiresAtMs)
 
+    /** Premium that comes only from the one-time free trial (no purchase). */
+    val isTrial: Boolean get() = plan == Plan.PREMIUM && skus == setOf(TRIAL_SKU)
+
     companion object { val FREE = Entitlement() }
+}
+
+/** Pseudo-SKU the gateway puts in tokens while the free trial runs. */
+const val TRIAL_SKU = "trial"
+
+/** Length shown in the UI; the gateway's `TRIAL_DAYS` setting decides the real length (keep them equal). */
+const val TRIAL_DAYS_LABEL = 7
+
+/** Server-reported state of the one-time free trial. */
+data class TrialInfo(val eligible: Boolean = true, val active: Boolean = false, val expiresAtMs: Long? = null)
+
+object TrialMath {
+    private const val DAY_MS = 86_400_000L
+
+    /** Whole days left, rounded up (a trial with 2 hours left shows "1 day"); 0 when over. */
+    fun daysLeft(expiresAtMs: Long, nowMs: Long): Int =
+        if (nowMs >= expiresAtMs) 0 else ((expiresAtMs - nowMs + DAY_MS - 1) / DAY_MS).toInt()
 }
 
 /** Server-reported daily AI quota (informational; the server enforces it). */

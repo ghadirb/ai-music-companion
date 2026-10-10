@@ -24,10 +24,26 @@ class EntitlementRepository(
         data class Failed(val error: String?) : RefreshResult
     }
 
+    sealed interface TrialResult {
+        data object Started : TrialResult
+        data object Offline : TrialResult
+        data object NotAvailable : TrialResult
+        data class Failed(val error: String?) : TrialResult
+    }
+
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private val _entitlement = MutableStateFlow(loadCached())
     val entitlement: StateFlow<Entitlement> = _entitlement.asStateFlow()
+
+    /** Whether the one-time free trial can still be started (server is the authority; default true until told otherwise). */
+    private val _trial = MutableStateFlow(
+        TrialInfo(
+            eligible = prefs.getBoolean(KEY_TRIAL_ELIGIBLE, true),
+            expiresAtMs = prefs.getLong(KEY_TRIAL_EXPIRES, 0L).takeIf { it > 0 }
+        )
+    )
+    val trial: StateFlow<TrialInfo> = _trial.asStateFlow()
 
     private val _quota = MutableStateFlow<AiQuota?>(null)
     val quota: StateFlow<AiQuota?> = _quota.asStateFlow()
@@ -51,8 +67,27 @@ class EntitlementRepository(
         return RefreshResult.Updated
     }
 
-    /** Applies an `/entitlements/me`, `/myket/verify` or `/myket/restore` response. */
+    /**
+     * Starts the one-time free trial. Only the server can grant it (and only once per install); premium
+     * switches on from the verified response/token, never from this call succeeding by itself.
+     */
+    suspend fun startTrial(): TrialResult {
+        val response = api.post("/v1/trial/start", JSONObject())
+        if (response.isOffline) return TrialResult.Offline
+        if (response.code == 503) return TrialResult.NotAvailable
+        if (!response.isSuccess) return TrialResult.Failed(response.error)
+        applyServerState(response.body)
+        return if (_entitlement.value.isPremiumAt(clock())) TrialResult.Started else TrialResult.Failed("trial_not_granted")
+    }
+
+    /** Applies an `/entitlements/me`, `/myket/verify`, `/myket/restore` or `/trial/start` response. */
     fun applyServerState(body: JSONObject) {
+        body.optJSONObject("trial")?.let { t ->
+            val expires = if (t.isNull("expiresAt")) null else t.optLong("expiresAt").takeIf { it > 0 }
+            val info = TrialInfo(eligible = t.optBoolean("eligible", true), active = t.optBoolean("active", false), expiresAtMs = expires)
+            prefs.edit().putBoolean(KEY_TRIAL_ELIGIBLE, info.eligible).putLong(KEY_TRIAL_EXPIRES, info.expiresAtMs ?: 0L).apply()
+            _trial.value = info
+        }
         if (body.has("aiDailyLimit")) {
             _quota.value = AiQuota(body.optInt("aiDailyLimit"), body.optInt("aiDailyRemaining"))
         }
@@ -80,5 +115,7 @@ class EntitlementRepository(
     private companion object {
         const val PREFS = "entitlement_cache"
         const val KEY_TOKEN = "token"
+        const val KEY_TRIAL_ELIGIBLE = "trial_eligible"
+        const val KEY_TRIAL_EXPIRES = "trial_expires_at"
     }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeHarness, okEmbedding, SECRET, NOW, installId, signSession } from "./helpers";
-import { base64UrlEncode } from "../src/util";
+import { base64UrlDecode, base64UrlEncode } from "../src/util";
 
 const purchaseOk = (payload: string | null) => () => new Response(JSON.stringify({ purchaseState: 0, consumptionState: 0, developerPayload: payload }), { status: 200 });
 
@@ -318,5 +318,108 @@ describe("AI DJ intent", () => {
     await buyPremium(h, token);
     h.setUpstream(chat("I cannot do that"));
     expect((await h.call("/v1/dj/intent", { token, body: { prompt: "calm" } })).status).toBe(502);
+  });
+});
+
+describe("free trial", () => {
+  const DAY = 86_400_000;
+  const start = (h: ReturnType<typeof makeHarness>, token: string, ip?: string) => h.call("/v1/trial/start", { token, ip });
+
+  it("is offered once, starts on request and grants premium for 7 days with the trial quota", async () => {
+    const h = makeHarness();
+    const token = await h.session();
+    const before = await h.call("/v1/entitlements/me", { token });
+    expect(before.body.premium).toBe(false);
+    expect(before.body.trial).toEqual({ eligible: true, active: false, startedAt: null, expiresAt: null });
+
+    const res = await start(h, token);
+    expect(res.status).toBe(200);
+    expect(res.body.premium).toBe(true);
+    expect(res.body.skus).toEqual(["trial"]);
+    expect(res.body.expiresAt).toBe(NOW + 7 * DAY);
+    expect(res.body.trial).toEqual({ eligible: false, active: true, startedAt: NOW, expiresAt: NOW + 7 * DAY });
+
+    const me = await h.call("/v1/entitlements/me", { token });
+    expect(me.body.aiDailyLimit).toBe(40);
+  });
+
+  it("does not extend or restart the trial when called again (idempotent)", async () => {
+    const h = makeHarness();
+    const token = await h.session();
+    await start(h, token);
+    h.clock.now += 3 * DAY;
+    const again = await start(h, await h.session(1));
+    expect(again.body.expiresAt).toBe(NOW + 7 * DAY);
+    expect(again.body.trial.startedAt).toBe(NOW);
+  });
+
+  it("ends after 7 days and can never be restarted by the same identity", async () => {
+    const h = makeHarness();
+    await start(h, await h.session());
+    h.clock.now += 7 * DAY + 1000;
+    const token = await h.session(1);
+    const me = await h.call("/v1/entitlements/me", { token });
+    expect(me.body.premium).toBe(false);
+    expect(me.body.trial.eligible).toBe(false);
+    expect(me.body.trial.active).toBe(false);
+    const retry = await start(h, token);
+    expect(retry.body.premium).toBe(false);
+    expect((await h.call("/v1/dj/intent", { token, body: { prompt: "calm" } })).status).toBe(403);
+  });
+
+  it("unlocks premium-only server features during the trial", async () => {
+    const h = makeHarness();
+    const token = await h.session();
+    await start(h, token);
+    h.setUpstream(() => new Response(JSON.stringify({ choices: [{ message: { content: '{"moods":["calm"]}' } }] }), { status: 200 }));
+    const res = await h.call("/v1/dj/intent", { token, body: { prompt: "calm music" } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-ai-tier")).toBe("premium");
+    expect(res.headers.get("x-ai-daily-limit")).toBe("40");
+  });
+
+  it("a purchase takes over from the trial (full premium quota, purchase SKU)", async () => {
+    const h = makeHarness();
+    const token = await h.session();
+    await start(h, token);
+    await buyPremium(h, token);
+    const me = await h.call("/v1/entitlements/me", { token });
+    expect(me.body.skus).toEqual(["premium_lifetime"]);
+    expect(me.body.aiDailyLimit).toBe(120);
+  });
+
+  it("treats a corrupt trial record as already used, never as a new trial", async () => {
+    const h = makeHarness();
+    const token = await h.session();
+    h.kv.store.set(`trial:anon:${installId(1)}`, "{broken");
+    const res = await start(h, token);
+    expect(res.body.premium).toBe(false);
+    expect(res.body.trial.eligible).toBe(false);
+  });
+
+  it("caps trial starts per network address per day", async () => {
+    const h = makeHarness({ TRIAL_PER_IP_DAY: "2" });
+    const ip = "198.51.100.9";
+    for (const n of [1, 2]) expect((await start(h, await h.session(n, ip), ip)).status).toBe(200);
+    const third = await start(h, await h.session(3, ip), ip);
+    expect(third.status).toBe(429);
+    expect(third.body.error).toBe("trial_limit_reached");
+  });
+
+  it("requires a session and the entitlement store", async () => {
+    const h = makeHarness();
+    expect((await h.call("/v1/trial/start", {})).status).toBe(401);
+    const noKv = makeHarness({ PURCHASE_ENTITLEMENTS: undefined });
+    expect((await noKv.call("/v1/trial/start", { token: await noKv.session() })).status).toBe(503);
+  });
+
+  it("signs an entitlement token whose expiry is the trial end", async () => {
+    const pair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+    const jwk = JSON.stringify(await crypto.subtle.exportKey("jwk", pair.privateKey));
+    const h = makeHarness({ ENTITLEMENT_SIGNING_JWK: jwk });
+    const res = await start(h, await h.session());
+    const payload = JSON.parse(base64UrlDecode(res.body.entitlementToken.split(".")[1]));
+    expect(payload.skus).toEqual(["trial"]);
+    expect(payload.exp).toBe(Math.floor((NOW + 7 * DAY) / 1000));
   });
 });

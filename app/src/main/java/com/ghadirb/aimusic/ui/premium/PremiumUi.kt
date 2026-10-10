@@ -17,12 +17,17 @@ import androidx.lifecycle.viewModelScope
 import com.ghadirb.aimusic.billing.PurchaseRepository
 import com.ghadirb.aimusic.billing.PurchaseUiState
 import com.ghadirb.aimusic.premium.AiQuota
+import com.ghadirb.aimusic.premium.TRIAL_DAYS_LABEL
+import com.ghadirb.aimusic.premium.TrialInfo
+import com.ghadirb.aimusic.premium.TrialMath
 import com.ghadirb.aimusic.premium.Entitlement
 import com.ghadirb.aimusic.premium.EntitlementRepository
 import com.ghadirb.aimusic.premium.EntitlementSource
 import com.ghadirb.aimusic.premium.FeatureGate
 import com.ghadirb.aimusic.premium.PremiumFeature
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class PremiumViewModel(
@@ -33,6 +38,27 @@ class PremiumViewModel(
     val quota: StateFlow<AiQuota?> = entitlements.quota
     val purchaseState: StateFlow<PurchaseUiState> = purchases.state
     val offeredSkus: List<String> get() = purchases.offeredSkus
+
+    val trial: StateFlow<TrialInfo> = entitlements.trial
+    private val _trialState = MutableStateFlow<PurchaseUiState>(PurchaseUiState.Idle)
+    val trialState: StateFlow<PurchaseUiState> = _trialState.asStateFlow()
+
+    fun startTrial() {
+        if (_trialState.value is PurchaseUiState.Loading) return
+        _trialState.value = PurchaseUiState.Loading("در حال فعال‌سازی دورهٔ آزمایشی…")
+        viewModelScope.launch {
+            _trialState.value = when (val r = entitlements.startTrial()) {
+                EntitlementRepository.TrialResult.Started -> PurchaseUiState.Success("دورهٔ آزمایشی $TRIAL_DAYS_LABEL روزه فعال شد.")
+                EntitlementRepository.TrialResult.Offline -> PurchaseUiState.Error("اتصال اینترنت برقرار نیست.")
+                EntitlementRepository.TrialResult.NotAvailable -> PurchaseUiState.Error("دورهٔ آزمایشی هنوز در این نسخه فعال نشده است.")
+                is EntitlementRepository.TrialResult.Failed -> PurchaseUiState.Error(
+                    if (r.error == "trial_limit_reached") "تعداد درخواست‌ها از این شبکه زیاد است؛ کمی بعد دوباره امتحان کنید."
+                    else "فعال‌سازی دورهٔ آزمایشی ممکن نشد. کمی بعد دوباره تلاش کنید."
+                )
+            }
+        }
+    }
+    fun resetTrialState() { _trialState.value = PurchaseUiState.Idle }
 
     fun isAllowed(feature: PremiumFeature): Boolean = entitlements.isAllowed(feature)
     fun refresh() { viewModelScope.launch { entitlements.refresh() } }
@@ -73,7 +99,10 @@ fun UpgradeDialog(
     skus: List<String>,
     onBuy: (String) -> Unit,
     onRestore: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    trial: TrialInfo = TrialInfo(eligible = false),
+    trialState: PurchaseUiState = PurchaseUiState.Idle,
+    onStartTrial: () -> Unit = {}
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -92,12 +121,22 @@ fun UpgradeDialog(
                     "پخش‌کننده، کتابخانه، علاقه‌مندی‌ها، پلی‌لیست‌ها، پیشنهادهای پایه و بکاپ همیشه رایگان می‌مانند.",
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp)
                 )
+                if (!trial.eligible) {
+                    Text(
+                        "دورهٔ آزمایشی رایگان برای این نصب قبلاً استفاده شده است.",
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                PurchaseStatus(trialState)
                 PurchaseStatus(purchaseState)
             }
         },
         confirmButton = {
             Column(horizontalAlignment = Alignment.End) {
-                val busy = purchaseState is PurchaseUiState.Loading
+                val busy = purchaseState is PurchaseUiState.Loading || trialState is PurchaseUiState.Loading
+                if (trial.eligible) {
+                    Button(onClick = onStartTrial, enabled = !busy) { Text("شروع $TRIAL_DAYS_LABEL روز رایگان") }
+                }
                 skus.forEach { sku ->
                     Button(onClick = { onBuy(sku) }, enabled = !busy) { Text(skuLabel(sku)) }
                 }
@@ -134,6 +173,8 @@ fun PremiumScreen(viewModel: PremiumViewModel) {
     val entitlement by viewModel.entitlement.collectAsState()
     val quota by viewModel.quota.collectAsState()
     val purchaseState by viewModel.purchaseState.collectAsState()
+    val trial by viewModel.trial.collectAsState()
+    val trialState by viewModel.trialState.collectAsState()
     val premium = entitlement.isPremiumAt(System.currentTimeMillis())
 
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -150,7 +191,19 @@ fun PremiumScreen(viewModel: PremiumViewModel) {
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text(if (premium) "پلن شما: پرمیوم ✅" else "پلن شما: رایگان", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    when {
+                        premium && entitlement.isTrial -> "پلن شما: دورهٔ آزمایشی رایگان ✅"
+                        premium -> "پلن شما: پرمیوم ✅"
+                        else -> "پلن شما: رایگان"
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (premium && entitlement.isTrial) {
+                    entitlement.expiresAtMs?.let {
+                        Text("${TrialMath.daysLeft(it, System.currentTimeMillis())} روز تا پایان دورهٔ آزمایشی باقی مانده است.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 if (premium && entitlement.source == EntitlementSource.SERVER_SESSION) {
                     Text("تأیید امن سرور (فقط برای همین نشست). اتصال به اینترنت لازم است.", style = MaterialTheme.typography.bodySmall)
                 }
@@ -175,7 +228,16 @@ fun PremiumScreen(viewModel: PremiumViewModel) {
 
         if (!premium) {
             Spacer(Modifier.height(20.dp))
-            val busy = purchaseState is PurchaseUiState.Loading
+            val busy = purchaseState is PurchaseUiState.Loading || trialState is PurchaseUiState.Loading
+            if (trial.eligible) {
+                Button(onClick = viewModel::startTrial, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Text("شروع $TRIAL_DAYS_LABEL روز رایگان")
+                }
+                Text("بدون پرداخت. فقط یک‌بار برای هر نصب و پایان خودکار؛ بعد از آن قابلیت‌های رایگان همچنان در دسترس‌اند.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp))
+            } else {
+                Text("دورهٔ آزمایشی رایگان این نصب به پایان رسیده است.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp))
+            }
+            PurchaseStatus(trialState)
             viewModel.offeredSkus.forEach { sku ->
                 Button(onClick = { viewModel.buy(sku) }, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Text(skuLabel(sku)) }
             }

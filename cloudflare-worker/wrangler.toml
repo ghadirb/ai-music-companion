@@ -14,6 +14,10 @@ FREE_IP_DAILY_FACTOR = "5"
 SESSION_LIMIT_PER_IP_DAY = "30"
 REQUEST_LIMIT_PER_MINUTE = "40"
 ENTITLEMENT_TTL_DAYS = "7"
+# One-time free trial of Premium features (server-side, started by the user on their first Premium use).
+TRIAL_DAYS = "7"
+TRIAL_DAILY_EMBEDDING_LIMIT = "40"
+TRIAL_PER_IP_DAY = "20"
 DJ_MODEL = "gpt-4o-mini"
 # SKU table: durationDays = null means lifetime. Add/rename SKUs here without touching code.
 PREMIUM_SKUS = '{"premium_lifetime":{"durationDays":null},"premium_monthly":{"durationDays":31},"premium_yearly":{"durationDays":366}}'
