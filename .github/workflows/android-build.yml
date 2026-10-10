@@ -5,7 +5,12 @@ on:
     branches: [ "master", "main" ]
   pull_request:
     branches: [ "master", "main" ]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      deploy_worker:
+        description: "Also deploy cloudflare-worker to Cloudflare (needs the CLOUDFLARE_API_TOKEN secret)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -131,6 +136,28 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  # Manual only: tests must pass first. Secrets already on the Worker (JWT, Myket, signing key) are kept by wrangler.
+  deploy-worker:
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_worker
+    needs: worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare-worker/package-lock.json
+      - run: npm ci
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy
+
 
   # ---------------------------------------------------------------- Android instrumented tests (migrations, DAO, repository)
   instrumented:
