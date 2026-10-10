@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.video.VideoFoldersTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-10T15:00:18" hostname="runnervmmprz5" time="0.002">
+  <properties/>
+  <testcase name="sameNameInDifferentPathsStaysSeparate" classname="com.ghadirb.aimusic.video.VideoFoldersTest" time="0.002"/>
+  <testcase name="nameFallsBackToLastPathSegment" classname="com.ghadirb.aimusic.video.VideoFoldersTest" time="0.0"/>
+  <testcase name="groupsByFolderWithCountsAndDuration" classname="com.ghadirb.aimusic.video.VideoFoldersTest" time="0.0"/>
+  <testcase name="unknownFolderGetsFallbackName" classname="com.ghadirb.aimusic.video.VideoFoldersTest" time="0.0"/>
+  <testcase name="inFolderFiltersByKey" classname="com.ghadirb.aimusic.video.VideoFoldersTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-10T15:00:18" hostname="runnervmmprz5" time="0.003">
+  <properties/>
+  <testcase name="nonDecoderErrorsNeverRetry" classname="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" time="0.0"/>
+  <testcase name="recognisesPlatformSoftwareDecoders" classname="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" time="0.0"/>
+  <testcase name="decoderErrorsTriggerRetryOnlyOnce" classname="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" time="0.001"/>
+  <testcase name="vendorHardwareDecodersAreNotSoftware" classname="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" time="0.0"/>
+  <testcase name="orderPutsSoftwareFirstAndIsStable" classname="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" time="0.0"/>
+  <testcase name="orderKeepsListWhenSoftwareNotPreferred" classname="com.ghadirb.aimusic.video.VideoDecoderPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

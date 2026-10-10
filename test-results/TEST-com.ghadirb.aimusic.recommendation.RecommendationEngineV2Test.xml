@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" tests="34" skipped="0" failures="0" errors="0" timestamp="2026-10-10T15:00:17" hostname="runnervmmprz5" time="0.36">
+  <properties/>
+  <testcase name="diversityLimitsTracksPerAlbumInTopTen" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.013"/>
+  <testcase name="recencyDecaysWithAge" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="profileLearnsCalmTasteFromBehaviour" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.007"/>
+  <testcase name="everySectionTypeHasPersianTitleAndReason" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="sameInputGivesSameRecommendations" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.039"/>
+  <testcase name="recencyAnchorsMustBeSorted" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="diversityAdaptsInSmallLibraries" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="skipTimingDecidesSeverity" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="skipStreakIsDetectedAndRaisesAdaptation" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="similarityIsBoundedSymmetricAndMeaningful" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.002"/>
+  <testcase name="baselineWeightsSumToOneAndNormalisationKeepsProportions" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="sectionsUseDifferentStrategies" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.01"/>
+  <testcase name="coldStartStillProducesExplainedRecommendations" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.004"/>
+  <testcase name="singleArtistFlooringIsPreventedWhenThereIsChoice" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.004"/>
+  <testcase name="noHistoryMeansNoSession" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="discoveryOutcomesComeFromTheFirstPlayOfEachTrack" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="nineCompletionsDifferFromNineSkipsWithSamePlayCount" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="skipThresholdsAreConfigurable" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="onlyCalmListenerGetsCalmTracksRankedAboveEnergeticOnes" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.003"/>
+  <testcase name="cacheCodecRoundTripsAndSurvivesCorruption" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.003"/>
+  <testcase name="explorationBaselineIsSeventyTwentyTen" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="diversityLimitsTracksPerArtistInTopTen" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="cacheFreshnessFollowsTtl" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="notInterestedTracksAreNeverRecommended" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.003"/>
+  <testcase name="moodAndArtistSimilarity" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="explorationGrowsWhenNewTracksAreAcceptedAndShrinksWhenSkipped" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="profileLearnsDifferentTasteForNightAndAfternoon" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.002"/>
+  <testcase name="fiveTrackLibraryDoesNotCrashAndReturnsEverything" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="bigLibraryStaysBoundedAndUnique" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.25"/>
+  <testcase name="finishedSessionHasNoPenaltyButEarlySkipDoes" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.001"/>
+  <testcase name="explorationSlotsAlwaysAddUpToListSize" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.004"/>
+  <testcase name="rankingAdaptsToASkipStreak" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.003"/>
+  <testcase name="explorationRespectsAnExplicitNoDiscoverySection" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <testcase name="skipBetweenMediumAndWeakIsInterpolated" classname="com.ghadirb.aimusic.recommendation.RecommendationEngineV2Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

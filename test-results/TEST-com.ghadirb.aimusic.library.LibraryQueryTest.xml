@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.library.LibraryQueryTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-10T15:00:17" hostname="runnervmmprz5" time="0.04">
+  <properties/>
+  <testcase name="sortsByMostAndRecentlyPlayedUsingStats" classname="com.ghadirb.aimusic.library.LibraryQueryTest" time="0.032"/>
+  <testcase name="favoritesSortFirst" classname="com.ghadirb.aimusic.library.LibraryQueryTest" time="0.002"/>
+  <testcase name="sortsByRecentlyAdded" classname="com.ghadirb.aimusic.library.LibraryQueryTest" time="0.0"/>
+  <testcase name="filtersByFavoriteGenreMoodAndEnergy" classname="com.ghadirb.aimusic.library.LibraryQueryTest" time="0.001"/>
+  <testcase name="sortsByTitle" classname="com.ghadirb.aimusic.library.LibraryQueryTest" time="0.0"/>
+  <testcase name="sortsByDurationAscending" classname="com.ghadirb.aimusic.library.LibraryQueryTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
