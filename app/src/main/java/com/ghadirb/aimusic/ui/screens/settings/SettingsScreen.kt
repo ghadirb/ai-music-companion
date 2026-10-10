@@ -279,6 +279,14 @@ fun SettingsScreen(
         HorizontalDivider()
 
         ListItem(
+            headlineContent = { Text("مجوزهای نرم‌افزارهای متن‌باز") },
+            supportingContent = {
+                Text("پخش ویدئو با موتور جایگزین از VLC (libVLC، مجوز LGPL-2.1، سازنده: VideoLAN) و کتابخانه‌های FFmpeg درون آن استفاده می‌کند. پخش‌کنندهٔ اصلی بر پایهٔ AndroidX Media3 (Apache-2.0) است. کد منبع و متن کامل مجوزها: videolan.org و github.com/androidx/media")
+            }
+        )
+        HorizontalDivider()
+
+        ListItem(
             headlineContent = { Text("آمار شنیدن") },
             supportingContent = { Text("آمار پایه رایگان است؛ آمار و بینش‌های پیشرفته ویژهٔ پرمیوم است.") },
             modifier = Modifier.clickable(onClick = onOpenStats)

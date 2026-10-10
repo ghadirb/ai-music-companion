@@ -9,6 +9,7 @@ import android.os.ParcelFileDescriptor
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,6 +53,7 @@ import kotlinx.coroutines.launch
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -74,6 +76,23 @@ class VlcPlayerActivity : ComponentActivity() {
     private var error by mutableStateOf<String?>(null)
     private var resumeApplied = false
     private var startAtMs = 0L
+    private var layoutRef: VLCVideoLayout? = null
+    private var queue = longArrayOf()
+    private var queueIndex = 0
+
+    private val pickSubtitle = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        // libVLC reads plain files best: copy the chosen subtitle into the app cache first.
+        val ext = contentResolver.query(uri, null, null, null, null)?.use { c ->
+            val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (c.moveToFirst() && i >= 0) c.getString(i).substringAfterLast('.', "srt") else "srt"
+        } ?: "srt"
+        val out = java.io.File(cacheDir, "sub_${System.currentTimeMillis()}.$ext")
+        runCatching {
+            contentResolver.openInputStream(uri)?.use { input -> out.outputStream().use { input.copyTo(it) } }
+            player?.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(out), true)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +103,8 @@ class VlcPlayerActivity : ComponentActivity() {
         val repo = (application as AiMusicApp).videoRepository
         val id = intent.getLongExtra(EXTRA_VIDEO_ID, -1L)
         startAtMs = intent.getLongExtra(EXTRA_START_MS, -1L)
+        queue = intent.getLongArrayExtra(EXTRA_QUEUE)?.takeIf { it.isNotEmpty() } ?: longArrayOf(id)
+        queueIndex = queue.indexOf(id).coerceAtLeast(0)
 
         setContent {
             AiMusicCompanionTheme(darkTheme = true) {
@@ -91,22 +112,38 @@ class VlcPlayerActivity : ComponentActivity() {
             }
         }
 
-        lifecycleScope.launch {
-            val v = repo.get(id)
-            if (v == null) { error = "ویدئو پیدا نشد."; return@launch }
-            video = v
-            if (startAtMs < 0L) startAtMs = VideoResume.startPosition(v.lastPositionMs, v.durationMs)
-            repo.markPlayed(v.id)
-            startPlayback(v)
-        }
+        lifecycleScope.launch { loadAt(queueIndex, startAtMs) }
+    }
+
+    /** Loads queue[index]; [startMs] < 0 means the saved resume position. */
+    private suspend fun loadAt(index: Int, startMs: Long) {
+        val repo = (application as AiMusicApp).videoRepository
+        val v = queue.getOrNull(index)?.let { repo.get(it) }
+        if (v == null) { error = "ویدئو پیدا نشد."; return }
+        saveNow()
+        queueIndex = index
+        error = null
+        video = v
+        positionMs = 0L; durationMs = 0L; buffering = true; resumeApplied = false
+        startAtMs = if (startMs >= 0L) startMs else VideoResume.startPosition(v.lastPositionMs, v.durationMs)
+        repo.markPlayed(v.id)
+        startPlayback(v)
+    }
+
+    private fun go(delta: Int) {
+        val i = queueIndex + delta
+        if (i in queue.indices) lifecycleScope.launch { loadAt(i, -1L) }
     }
 
     private fun startPlayback(v: VideoEntity) {
         try {
-            val vlc = LibVLC(this, arrayListOf("--audio-time-stretch"))
-            libVlc = vlc
-            val mp = MediaPlayer(vlc)
-            player = mp
+            val vlc = libVlc ?: LibVLC(this, arrayListOf("--audio-time-stretch")).also { libVlc = it }
+            val mp = player ?: MediaPlayer(vlc).also { newPlayer ->
+                player = newPlayer
+                layoutRef?.let { newPlayer.attachViews(it, null, true, false) }
+            }
+            mp.stop()
+            fd?.close()
             // A file descriptor works for any content:// uri from MediaStore / SAF.
             val pfd = contentResolver.openFileDescriptor(Uri.parse(v.contentUri), "r")
                 ?: run { error = "فایل ویدئو قابل باز کردن نیست."; return }
@@ -127,7 +164,10 @@ class VlcPlayerActivity : ComponentActivity() {
                     MediaPlayer.Event.Buffering -> buffering = e.buffering < 100f
                     MediaPlayer.Event.LengthChanged -> durationMs = e.lengthChanged
                     MediaPlayer.Event.TimeChanged -> { positionMs = e.timeChanged; maybeSave() }
-                    MediaPlayer.Event.EndReached -> { playing = false; saveNow(finished = true) }
+                    MediaPlayer.Event.EndReached -> {
+                        playing = false; saveNow(finished = true)
+                        if (queueIndex < queue.lastIndex) go(+1)
+                    }
                     MediaPlayer.Event.EncounteredError -> error = "این ویدئو با هیچ‌کدام از موتورهای پخش باز نشد."
                 }
             }
@@ -165,8 +205,9 @@ class VlcPlayerActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     VLCVideoLayout(ctx).also { layout ->
+                        layoutRef = layout
                         // The player may not exist yet on the first frame; attach as soon as it does.
-                        layout.post { player?.attachViews(layout, null, true, false) }
+                        layout.post { player?.let { if (!it.vlcVout.areViewsAttached()) it.attachViews(layout, null, true, false) } }
                     }
                 },
                 update = { layout -> player?.let { if (!it.vlcVout.areViewsAttached()) it.attachViews(layout, null, true, false) } }
@@ -199,11 +240,13 @@ class VlcPlayerActivity : ComponentActivity() {
                     ) {
                         Text("${fmt(positionMs)} / ${fmt(durationMs)}", color = Color.White, style = MaterialTheme.typography.bodySmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { player?.let { it.time = (it.time - 10_000).coerceAtLeast(0) } }) { Text("۱۰- ثانیه") }
+                            if (queue.size > 1) TextButton(onClick = { go(-1) }, enabled = queueIndex > 0) { Text("قبلی") }
+                            TextButton(onClick = { player?.let { it.time = (it.time - 10_000).coerceAtLeast(0) } }) { Text("۱۰-") }
                             Button(onClick = { player?.let { if (it.isPlaying) it.pause() else it.play() } }) {
                                 Text(if (playing) "توقف" else "پخش")
                             }
-                            TextButton(onClick = { player?.let { it.time = it.time + 10_000 } }) { Text("۱۰+ ثانیه") }
+                            TextButton(onClick = { player?.let { it.time = it.time + 10_000 } }) { Text("۱۰+") }
+                            if (queue.size > 1) TextButton(onClick = { go(+1) }, enabled = queueIndex < queue.lastIndex) { Text("بعدی") }
                         }
                         Row {
                             TextButton(onClick = { dialog = "audio" }) { Text("صدا") }
@@ -225,6 +268,13 @@ class VlcPlayerActivity : ComponentActivity() {
                 text = {
                     Column {
                         if (tracks.isNullOrEmpty()) Text("موردی موجود نیست.")
+                        if (which == "sub") {
+                            Text(
+                                "افزودن زیرنویس از فایل…",
+                                Modifier.fillMaxWidth().clickable { dialog = null; pickSubtitle.launch(arrayOf("*/*")) }.padding(vertical = 10.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         tracks?.forEach { t ->
                             Text(
                                 (if (t.id == current) "✓  " else "") + t.name,
@@ -276,13 +326,15 @@ class VlcPlayerActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_VIDEO_ID = "video_id"
         private const val EXTRA_START_MS = "start_ms"
+        private const val EXTRA_QUEUE = "video_queue"
 
         /** [startMs] < 0 means "use the saved resume position". */
-        fun start(context: Context, videoId: Long, startMs: Long = -1L) {
+        fun start(context: Context, videoId: Long, startMs: Long = -1L, queueIds: List<Long> = emptyList()) {
             context.startActivity(
                 Intent(context, VlcPlayerActivity::class.java)
                     .putExtra(EXTRA_VIDEO_ID, videoId)
                     .putExtra(EXTRA_START_MS, startMs)
+                    .putExtra(EXTRA_QUEUE, queueIds.toLongArray())
             )
         }
     }

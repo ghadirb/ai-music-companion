@@ -122,7 +122,7 @@ class VideoPlayerActivity : ComponentActivity() {
     private fun openFallbackEngine(videoId: Long, startMs: Long) {
         if (fallbackLaunched) return
         fallbackLaunched = true
-        VlcPlayerActivity.start(this, videoId, startMs)
+        VlcPlayerActivity.start(this, videoId, startMs, controller.state.value.queue.map { it.id })
         finish()
     }
 

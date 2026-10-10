@@ -84,3 +84,6 @@ Next: licensed online lyrics (provider abstraction exists), Google Play billing 
 
 ## License
 Proprietary — all rights reserved. See [LICENSE](LICENSE). Not open source; no permission is granted to copy, redistribute or use the code commercially without the owner's written consent.
+
+## Video formats
+Two engines: AndroidX Media3/ExoPlayer first (hardware decoders, automatic fallback to Android's software decoders), and **libVLC** (LGPL-2.1, includes FFmpeg) as the fallback engine for AVI/WMV/RMVB/VOB, DTS/AC3 audio and files ExoPlayer cannot decode. Release APKs are built for `arm64-v8a` + `armeabi-v7a` only (`-PABI_FILTERS` overrides; CI adds `x86_64` for the emulator smoke test). libVLC and FFmpeg attribution is shown in Settings.
