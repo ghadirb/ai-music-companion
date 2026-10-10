@@ -26,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import com.ghadirb.aimusic.AiMusicApp
 import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
 import com.ghadirb.aimusic.video.VideoPlaybackController
+import com.ghadirb.aimusic.video.VlcFallbackPolicy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -75,6 +76,18 @@ class VideoPlayerActivity : ComponentActivity() {
         val ids = intent.getLongArrayExtra(EXTRA_QUEUE)?.toList().orEmpty().ifEmpty { listOf(startId) }
         lifecycleScope.launch { controller.load(ids, startId) }
 
+        // Hand the file to the libVLC engine when ExoPlayer cannot play it (AVI/WMV..., or decoder failures).
+        lifecycleScope.launch {
+            controller.state
+                .map { st -> Triple(st.current, st.needsFallbackEngine, st.positionMs) }
+                .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
+                .collect { (video, needsFallback, pos) ->
+                    if (video != null && (needsFallback || VlcFallbackPolicy.prefersVlc(video.displayName))) {
+                        openFallbackEngine(video.id, if (needsFallback) pos else -1L)
+                    }
+                }
+        }
+
         // Keep the PiP window's aspect ratio / auto-enter flag in sync with what is playing.
         if (supportsPip) {
             lifecycleScope.launch {
@@ -95,11 +108,22 @@ class VideoPlayerActivity : ComponentActivity() {
                     onBack = { finish() },
                     onToggleFullscreen = ::toggleFullscreen,
                     onEnterPip = ::enterPip,
-                    onPickSubtitleFile = { pickSubtitle.launch(arrayOf("*/*")) }
+                    onPickSubtitleFile = { pickSubtitle.launch(arrayOf("*/*")) },
+                    onOpenFallbackEngine = {
+                        controller.state.value.current?.let { openFallbackEngine(it.id, controller.state.value.positionMs) }
+                    }
                 )
             }
         }
         applySystemBars()
+    }
+
+    private var fallbackLaunched = false
+    private fun openFallbackEngine(videoId: Long, startMs: Long) {
+        if (fallbackLaunched) return
+        fallbackLaunched = true
+        VlcPlayerActivity.start(this, videoId, startMs)
+        finish()
     }
 
     // ---- orientation / fullscreen ----

@@ -75,6 +75,8 @@ android {
             buildConfigField("boolean", "VERBOSE_LOGS", "true")
         }
         release {
+            // libVLC ships native code for every ABI (~100 MB universal). Real phones are arm only.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("boolean", "VERBOSE_LOGS", "false")
@@ -142,6 +144,9 @@ dependencies {
     implementation("androidx.media3:media3-session:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+
+    // Fallback video engine (LGPL-2.1): AVI/WMV/RMVB/VOB, DTS/AC3, codecs the phone lacks.
+    implementation("org.videolan.android:libvlc-all:3.6.0")
 
     // Room
     implementation("androidx.room:room-runtime:2.6.1")

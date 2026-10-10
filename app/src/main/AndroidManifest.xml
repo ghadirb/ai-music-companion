@@ -72,6 +72,13 @@
             android:resizeableActivity="true"
             android:theme="@style/Theme.AiMusicCompanion" />
 
+        <!-- Fallback video engine (libVLC) for formats ExoPlayer cannot play. -->
+        <activity
+            android:name=".ui.video.VlcPlayerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density"
+            android:theme="@style/Theme.AiMusicCompanion" />
+
         <service
             android:name=".playback.PlaybackService"
             android:exported="true"

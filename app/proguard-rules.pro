@@ -17,3 +17,7 @@
 -renamesourcefileattribute SourceFile
 
 # Room / WorkManager / Media3 / Compose / Coil ship their own consumer rules.
+
+# libVLC fallback video engine (JNI calls back into these classes).
+-keep class org.videolan.libvlc.** { *; }
+-dontwarn org.videolan.**

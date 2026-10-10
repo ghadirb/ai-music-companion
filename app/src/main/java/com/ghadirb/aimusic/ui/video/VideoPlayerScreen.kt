@@ -64,7 +64,8 @@ fun VideoPlayerScreen(
     onBack: () -> Unit,
     onToggleFullscreen: () -> Unit,
     onEnterPip: () -> Unit,
-    onPickSubtitleFile: () -> Unit
+    onPickSubtitleFile: () -> Unit,
+    onOpenFallbackEngine: () -> Unit = {}
 ) {
     val state by controller.state.collectAsState()
     val context = LocalContext.current
@@ -110,12 +111,17 @@ fun VideoPlayerScreen(
         )
 
         if (state.audioUnsupported && state.error == null && !inPip) {
-            Text(
-                "صدای این فایل روی این گوشی پشتیبانی نمی‌شود؛ ویدئو بدون صدا پخش می‌شود.",
-                color = Color.White, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp, start = 24.dp, end = 24.dp)
-                    .background(Color(0x99000000)).padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+            Column(
+                Modifier.align(Alignment.TopCenter).padding(top = 48.dp, start = 24.dp, end = 24.dp)
+                    .background(Color(0x99000000)).padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "صدای این فایل روی این گوشی پشتیبانی نمی‌شود.",
+                    color = Color.White, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center
+                )
+                TextButton(onClick = onOpenFallbackEngine) { Text("پخش با موتور جایگزین") }
+            }
         }
 
         if (state.buffering && state.error == null) {

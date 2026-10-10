@@ -63,7 +63,9 @@ class VideoPlaybackController(
         /** Software decoders are being preferred (user choice or automatic fallback). */
         val softwareDecoding: Boolean = false,
         /** The file has an audio track this device cannot decode (e.g. AC3/DTS): video plays silently. */
-        val audioUnsupported: Boolean = false
+        val audioUnsupported: Boolean = false,
+        /** ExoPlayer cannot play this file; the screen should hand it to the libVLC engine. */
+        val needsFallbackEngine: Boolean = false
     ) {
         val current: VideoEntity? get() = queue.getOrNull(index)
         val subtitlesOn: Boolean get() = subtitles.any { it.selected }
@@ -138,6 +140,10 @@ class VideoPlaybackController(
                 // Hardware decoder failed: try once more, at the same position, with software decoders.
                 softwareRetried += id
                 setSoftwareDecoding(true, persist = true)
+                return
+            }
+            if (VlcFallbackPolicy.shouldFallBackToVlc(error.errorCode, softwareDecodersTried = preferSoftware)) {
+                _state.value = _state.value.copy(needsFallbackEngine = true)
                 return
             }
             val missing = error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
