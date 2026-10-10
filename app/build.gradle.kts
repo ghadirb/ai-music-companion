@@ -21,6 +21,9 @@ val cloudAiBaseUrl = providers.gradleProperty("CLOUD_AI_BASE_URL")
     .orElse("https://ai-music-companion-embedding.ghadir-baraty.workers.dev")
     .get().trimEnd('/').replace("\\", "\\\\").replace("\"", "\\\"")
 
+val releaseAbis = providers.gradleProperty("ABI_FILTERS").orElse("arm64-v8a,armeabi-v7a").get()
+    .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
 android {
     namespace = "com.ghadirb.aimusic"
     compileSdk = 35
@@ -76,7 +79,8 @@ android {
         }
         release {
             // libVLC ships native code for every ABI (~100 MB universal). Real phones are arm only.
-            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+            // CI builds an extra x86_64 variant (-PABI_FILTERS=...,x86_64) just for the emulator smoke test.
+            ndk { abiFilters += releaseAbis }
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("boolean", "VERBOSE_LOGS", "false")
