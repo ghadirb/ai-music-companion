@@ -109,6 +109,15 @@ fun VideoPlayerScreen(
             onRelease = { it.player = null }
         )
 
+        if (state.audioUnsupported && state.error == null && !inPip) {
+            Text(
+                "صدای این فایل روی این گوشی پشتیبانی نمی‌شود؛ ویدئو بدون صدا پخش می‌شود.",
+                color = Color.White, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp, start = 24.dp, end = 24.dp)
+                    .background(Color(0x99000000)).padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+
         if (state.buffering && state.error == null) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
         }
@@ -151,6 +160,9 @@ fun VideoPlayerScreen(
                     Text(message, color = Color.White, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (state.queue.isNotEmpty()) Button(onClick = controller::retry) { Text("تلاش دوباره") }
+                        if (!state.softwareDecoding && state.queue.isNotEmpty()) {
+                            OutlinedButton(onClick = { controller.setSoftwareDecoding(true) }) { Text("رمزگشای نرم‌افزاری") }
+                        }
                         if (state.index < state.queue.lastIndex) OutlinedButton(onClick = controller::next) { Text("ویدئوی بعدی") }
                         OutlinedButton(onClick = onBack) { Text("بستن") }
                     }

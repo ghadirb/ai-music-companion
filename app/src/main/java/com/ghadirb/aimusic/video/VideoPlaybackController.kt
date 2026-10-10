@@ -13,6 +13,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.ghadirb.aimusic.data.local.entity.VideoEntity
 import com.ghadirb.aimusic.data.repository.VideoRepository
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +27,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+private const val PREFS = "video_player_prefs"
+private const val KEY_SOFTWARE = "software_decoding"
 
 /**
  * Owns the ExoPlayer used by the video player screen. Deliberately separate from the music
@@ -55,16 +59,36 @@ class VideoPlaybackController(
         val subtitles: List<SubtitleOption> = emptyList(),
         val videoWidth: Int = 0,
         val videoHeight: Int = 0,
-        val loaded: Boolean = false
+        val loaded: Boolean = false,
+        /** Software decoders are being preferred (user choice or automatic fallback). */
+        val softwareDecoding: Boolean = false,
+        /** The file has an audio track this device cannot decode (e.g. AC3/DTS): video plays silently. */
+        val audioUnsupported: Boolean = false
     ) {
         val current: VideoEntity? get() = queue.getOrNull(index)
         val subtitlesOn: Boolean get() = subtitles.any { it.selected }
     }
 
+    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Read by the codec selector every time a decoder is created, so it can change without rebuilding the player. */
+    @Volatile private var preferSoftware: Boolean = prefs.getBoolean(KEY_SOFTWARE, false)
+    private val softwareRetried = HashSet<Long>()
+
+    private val codecSelector = MediaCodecSelector { mimeType, secure, tunneling ->
+        VideoDecoderPolicy.order(
+            MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling), preferSoftware
+        ) { it.name }
+    }
+
     val player: ExoPlayer = ExoPlayer.Builder(
         context.applicationContext,
-        // Falls back to another decoder when the first one fails to initialise (helps odd devices).
-        DefaultRenderersFactory(context.applicationContext).setEnableDecoderFallback(true)
+        // Decoder fallback helps odd devices; the selector lets us prefer Android's software decoders.
+        DefaultRenderersFactory(context.applicationContext)
+            .setEnableDecoderFallback(true)
+            .setMediaCodecSelector(codecSelector)
+            // Uses an FFmpeg/other Media3 extension automatically if one is ever added to the build.
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
     )
         .setAudioAttributes(
             AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
@@ -109,6 +133,13 @@ class VideoPlaybackController(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            val id = player.currentMediaItem?.mediaId?.toLongOrNull()
+            if (id != null && VideoDecoderPolicy.shouldRetryWithSoftware(error.errorCode, preferSoftware, id in softwareRetried)) {
+                // Hardware decoder failed: try once more, at the same position, with software decoders.
+                softwareRetried += id
+                setSoftwareDecoding(true, persist = true)
+                return
+            }
             val missing = error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
             if (missing) {
                 // Spec §17: a file that no longer exists must not stay in the list.
@@ -180,6 +211,17 @@ class VideoPlaybackController(
         if (index in 0 until player.mediaItemCount) { ensurePrepared(); player.seekToDefaultPosition(index) }
     }
     fun retry() { player.prepare(); player.play() }
+
+    /** Switches between hardware-first and software-first decoding and restarts the current video in place. */
+    fun setSoftwareDecoding(enabled: Boolean, persist: Boolean = true) {
+        preferSoftware = enabled
+        if (persist) prefs.edit().putBoolean(KEY_SOFTWARE, enabled).apply()
+        val position = player.currentPosition.coerceAtLeast(0L)
+        _state.value = _state.value.copy(error = null, softwareDecoding = enabled)
+        player.prepare()
+        player.seekTo(position)
+        player.play()
+    }
     private fun ensurePrepared() { if (player.playbackState == Player.STATE_IDLE) player.prepare() }
 
     // ---- subtitles ----
@@ -268,7 +310,11 @@ class VideoPlaybackController(
             SubtitleOption(i, subtitleLabel(g, i), g.isSelected)
         }
         val size = player.videoSize
+        val audioGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+        val audioUnsupported = audioGroups.isNotEmpty() && audioGroups.none { it.isSupported }
         _state.value = prev.copy(
+            softwareDecoding = preferSoftware,
+            audioUnsupported = audioUnsupported,
             index = index,
             isPlaying = player.isPlaying,
             buffering = player.playbackState == Player.STATE_BUFFERING,
