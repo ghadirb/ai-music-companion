@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,7 +24,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -39,6 +43,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -225,6 +231,10 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                     }
                 }
             }
+            IconButton(onClick = vm::toggleByFolder) {
+                if (state.byFolder) Icon(Icons.Filled.FolderOpen, contentDescription = "نمایش همهٔ ویدئوها")
+                else Icon(Icons.Filled.Folder, contentDescription = "نمایش بر اساس پوشه")
+            }
             IconButton(onClick = vm::toggleGrid) {
                 if (state.grid) Icon(Icons.Filled.ViewList, contentDescription = "نمایش فهرستی")
                 else Icon(Icons.Filled.GridView, contentDescription = "نمایش شبکه‌ای")
@@ -232,6 +242,18 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
             IconButton(onClick = vm::refresh) { Icon(Icons.Filled.Refresh, contentDescription = "بازخوانی") }
         }
         if (state.syncing && state.videos.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
+
+        // Inside an opened folder: back to the folder list (also bound to the system back button).
+        if (state.byFolder && state.openFolder != null) {
+            BackHandler(onBack = vm::closeFolder)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = vm::closeFolder) { Icon(Icons.Filled.ArrowBack, contentDescription = "بازگشت به پوشه‌ها") }
+                Text(state.openFolderName, style = MaterialTheme.typography.titleMedium)
+            }
+        }
 
         when {
             state.videos.isEmpty() && state.syncing && state.totalCount == 0 -> LoadingState()
@@ -245,6 +267,16 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 Icons.Filled.VideoLibrary,
                 if (state.filter == VideoFilter.RECENT && state.query.isBlank()) "هنوز ویدئویی پخش نکرده‌اید" else "نتیجه‌ای پیدا نشد"
             )
+            state.byFolder && state.openFolder == null -> LazyColumn(Modifier.fillMaxSize()) {
+                items(state.folders, key = { it.key }) { f ->
+                    ListItem(
+                        leadingContent = { Icon(Icons.Filled.Folder, contentDescription = null) },
+                        headlineContent = { Text(f.name) },
+                        supportingContent = { Text("${f.count} ویدئو") },
+                        modifier = Modifier.clickable { vm.openFolder(f.key) }
+                    )
+                }
+            }
             state.grid -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(160.dp),
                 contentPadding = PaddingValues(12.dp),

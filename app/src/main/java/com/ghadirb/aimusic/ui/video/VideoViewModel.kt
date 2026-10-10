@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.ghadirb.aimusic.data.local.entity.VideoEntity
 import com.ghadirb.aimusic.data.repository.VideoRepository
 import com.ghadirb.aimusic.video.VideoFilter
+import com.ghadirb.aimusic.video.VideoFolder
+import com.ghadirb.aimusic.video.VideoFolders
 import com.ghadirb.aimusic.video.VideoLibraryQuery
 import com.ghadirb.aimusic.video.VideoSort
 import com.ghadirb.aimusic.video.VideoThumbnails
@@ -26,6 +28,13 @@ data class VideoUiState(
     val sort: VideoSort = VideoSort.NEWEST,
     val filter: VideoFilter = VideoFilter.ALL,
     val grid: Boolean = true,
+    /** "By folder" view: first the folder list, then the videos of the opened folder. */
+    val byFolder: Boolean = false,
+    /** Key of the opened folder (see [VideoFolders.keyOf]); null shows the folder list. */
+    val openFolder: String? = null,
+    val openFolderName: String = "",
+    /** Folders of the currently searched / filtered videos (only filled in folder mode). */
+    val folders: List<VideoFolder> = emptyList(),
     /** True until the first MediaStore sync has finished (or failed). */
     val syncing: Boolean = true,
     /** The last sync could not run (e.g. permission revoked). */
@@ -39,6 +48,8 @@ class VideoViewModel(private val repository: VideoRepository) : ViewModel() {
         val sort: VideoSort = VideoSort.NEWEST,
         val filter: VideoFilter = VideoFilter.ALL,
         val grid: Boolean = true,
+        val byFolder: Boolean = false,
+        val openFolder: String? = null,
         val syncing: Boolean = true,
         val syncFailed: Boolean = false
     )
@@ -46,10 +57,15 @@ class VideoViewModel(private val repository: VideoRepository) : ViewModel() {
     private val controls = MutableStateFlow(Controls())
 
     val uiState: StateFlow<VideoUiState> = combine(repository.observeVideos(), controls) { all, c ->
+        val visible = VideoLibraryQuery.apply(all, c.query, c.sort, c.filter)
+        val open = c.openFolder.takeIf { c.byFolder }
         VideoUiState(
-            videos = VideoLibraryQuery.apply(all, c.query, c.sort, c.filter),
+            videos = if (open != null) VideoFolders.inFolder(visible, open) else visible,
             totalCount = all.size,
             query = c.query, sort = c.sort, filter = c.filter, grid = c.grid,
+            byFolder = c.byFolder, openFolder = open,
+            openFolderName = open?.let { k -> visible.firstOrNull { VideoFolders.keyOf(it) == k }?.let(VideoFolders::nameOf) }.orEmpty(),
+            folders = if (c.byFolder && open == null) VideoFolders.group(visible) else emptyList(),
             syncing = c.syncing, syncFailed = c.syncFailed
         )
     }.flowOn(Dispatchers.Default) // sorting / searching thousands of rows stays off the main thread
@@ -59,6 +75,9 @@ class VideoViewModel(private val repository: VideoRepository) : ViewModel() {
     fun setSort(value: VideoSort) = controls.update { it.copy(sort = value) }
     fun setFilter(value: VideoFilter) = controls.update { it.copy(filter = value) }
     fun toggleGrid() = controls.update { it.copy(grid = !it.grid) }
+    fun toggleByFolder() = controls.update { it.copy(byFolder = !it.byFolder, openFolder = null) }
+    fun openFolder(key: String) = controls.update { it.copy(openFolder = key) }
+    fun closeFolder() = controls.update { it.copy(openFolder = null) }
 
     /** Re-syncs with MediaStore (off the main thread inside the repository/scanner). */
     fun refresh() {

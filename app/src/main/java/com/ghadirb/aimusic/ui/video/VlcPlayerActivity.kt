@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -197,9 +195,9 @@ class VlcPlayerActivity : ComponentActivity() {
     private fun VlcScreen() {
         var controls by remember { mutableStateOf(true) }
         var dialog by remember { mutableStateOf<String?>(null) } // "audio" | "sub"
-        Box(
-            Modifier.fillMaxSize().background(Color.Black)
-                .pointerInput(Unit) { detectTapGestures(onTap = { controls = !controls }) }
+        PlayerGestureLayer(
+            onTap = { controls = !controls },
+            modifier = Modifier.background(Color.Black)
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
