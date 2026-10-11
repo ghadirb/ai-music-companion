@@ -7,6 +7,7 @@ import android.content.IntentSender
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -67,17 +68,25 @@ object TrackFileOps {
             try {
                 // Only a row that really went away counts; "0 rows" means the file is still on the phone.
                 if (resolver.delete(uri, null, null) > 0) deleted += uri
-            } catch (e: RecoverableSecurityException) {
+            } catch (e: SecurityException) {
                 // Android 10: the user must allow THIS file first; the system grants access but does NOT
                 // delete it - the caller must call requestDelete again with the remaining uris.
-                val remaining = uris.dropWhile { it != uri }
-                return@withContext DeleteOutcome.NeedsConfirmation(e.userAction.actionIntent.intentSender, remaining, deleted.toList())
-            } catch (e: SecurityException) {
+                // RecoverableSecurityException only exists on API 29+, so it is never named in a catch
+                // clause here (minSdk is 26): it is detected inside an API-guarded helper instead.
+                val sender = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) recoverableIntentSender(e) else null
+                if (sender != null) {
+                    val remaining = uris.dropWhile { it != uri }
+                    return@withContext DeleteOutcome.NeedsConfirmation(sender, remaining, deleted.toList())
+                }
                 return@withContext DeleteOutcome.Failed("دسترسی حذف این فایل داده نشد.")
             }
         }
         DeleteOutcome.Deleted(deleted)
     }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun recoverableIntentSender(e: SecurityException): IntentSender? =
+        (e as? RecoverableSecurityException)?.userAction?.actionIntent?.intentSender
 
     /** Which source uris copied successfully vs. failed. */
     data class CopyResult(val succeeded: List<Uri>, val failed: List<Uri>)

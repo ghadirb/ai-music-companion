@@ -13,7 +13,7 @@ import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.SessionResult
+import androidx.media3.session.SessionError
 import com.ghadirb.aimusic.AiMusicApp
 import com.ghadirb.aimusic.MainActivity
 import com.google.common.collect.ImmutableList
@@ -27,6 +27,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Foreground Media3 service. Owns the single ExoPlayer + MediaSession so playback survives the
@@ -172,15 +173,20 @@ class PlaybackService : MediaLibraryService() {
                 try {
                     val saved = stateStore.load()
                     val repository = (application as AiMusicApp).repository
-                    val tracks = saved?.trackIds.orEmpty().mapNotNull { repository.getTrack(it) }
-                    if (saved == null || tracks.isEmpty()) {
+                    val byId = saved?.trackIds.orEmpty().mapNotNull { repository.getTrack(it) }.associateBy { it.id }
+                    // Skip tracks deleted/moved since the queue was saved; a vanished current track must not inherit its old position.
+                    val plan = if (saved == null) null else withContext(Dispatchers.IO) {
+                        SessionRestore.plan(saved) { id ->
+                            val track = byId[id] ?: return@plan false
+                            !SessionRestore.needsFileCheck(saved, id) || TrackAvailability.isReadable(this@PlaybackService, track.path)
+                        }
+                    }
+                    if (plan == null) {
                         future.setException(UnsupportedOperationException("Nothing to resume"))
                     } else {
-                        val currentId = saved.trackIds.getOrNull(saved.index)
-                        val index = tracks.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
                         future.set(
                             MediaSession.MediaItemsWithStartPosition(
-                                tracks.map { it.toMediaItem() }, index, saved.positionMs
+                                plan.keptIds.mapNotNull { byId[it]?.toMediaItem() }, plan.index, plan.positionMs
                             )
                         )
                     }
@@ -213,10 +219,10 @@ class PlaybackService : MediaLibraryService() {
                     val item = BrowseTree.item(repository, mediaId, isEntitled())
                     future.set(
                         if (item != null) LibraryResult.ofItem(item, null)
-                        else LibraryResult.ofError(SessionResult.RESULT_ERROR_BAD_VALUE)
+                        else LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
                     )
                 } catch (e: Exception) {
-                    future.set(LibraryResult.ofError(SessionResult.RESULT_ERROR_UNKNOWN))
+                    future.set(LibraryResult.ofError(SessionError.ERROR_UNKNOWN))
                 }
             }
             return future
@@ -237,7 +243,7 @@ class PlaybackService : MediaLibraryService() {
                     val children = BrowseTree.children(repository, parentId, isEntitled())
                     future.set(LibraryResult.ofItemList(ImmutableList.copyOf(children.orEmpty()), params))
                 } catch (e: Exception) {
-                    future.set(LibraryResult.ofError(SessionResult.RESULT_ERROR_UNKNOWN))
+                    future.set(LibraryResult.ofError(SessionError.ERROR_UNKNOWN))
                 }
             }
             return future

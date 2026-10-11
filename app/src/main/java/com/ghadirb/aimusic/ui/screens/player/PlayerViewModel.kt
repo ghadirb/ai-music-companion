@@ -18,6 +18,8 @@ import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.embedding.OnlineSimilarityRanker
 import com.ghadirb.aimusic.playback.PlaybackStateStore
 import com.ghadirb.aimusic.playback.PlayerController
+import com.ghadirb.aimusic.playback.SessionRestore
+import com.ghadirb.aimusic.playback.TrackAvailability
 import com.ghadirb.aimusic.playback.SleepTimerController
 import com.ghadirb.aimusic.playback.SleepTimerState
 import com.ghadirb.aimusic.radio.RadioConfig
@@ -394,13 +396,21 @@ class PlayerViewModel(
     private fun restoreLastSession() {
         viewModelScope.launch {
             val saved = stateStore.load() ?: return@launch
-            val tracks = saved.trackIds.mapNotNull { resolve(it) }
-            if (tracks.isEmpty() || controller.hasItems()) return@launch
-            val savedCurrentId = saved.trackIds.getOrNull(saved.index)
-            val index = tracks.indexOfFirst { it.id == savedCurrentId }.coerceAtLeast(0)
-            controller.restoreQueue(tracks, index, saved.positionMs, saved.shuffle, saved.repeatMode)
+            if (controller.hasItems()) return@launch
+            // Drop tracks that were deleted/moved since the queue was saved (checked off the main thread).
+            // Resolve on the caller's dispatcher (trackCache is not thread-safe); only file checks go to IO.
+            val byId = saved.trackIds.mapNotNull { resolve(it) }.associateBy { it.id }
+            val restore = withContext(Dispatchers.IO) {
+                SessionRestore.plan(saved) { id ->
+                    val track = byId[id] ?: return@plan false
+                    !SessionRestore.needsFileCheck(saved, id) || TrackAvailability.isReadable(getApplication<Application>(), track.path)
+                }
+            } ?: return@launch
+            val tracks = restore.keptIds.mapNotNull { byId[it] }
+            val index = restore.index.coerceIn(0, tracks.lastIndex)
+            controller.restoreQueue(tracks, index, restore.positionMs, saved.shuffle, saved.repeatMode)
             _uiState.update {
-                it.copy(currentTrack = tracks[index], positionMs = saved.positionMs, queueIndex = index)
+                it.copy(currentTrack = tracks[index], positionMs = restore.positionMs, queueIndex = index)
             }
         }
     }
