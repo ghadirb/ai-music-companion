@@ -28,6 +28,7 @@ sealed class Screen(val route: String, val labelRes: Int, val icon: ImageVector)
 }
 
 const val ROUTE_PLAYER = "player"
+const val ROUTE_ONLINE = "online"
 const val ROUTE_PREMIUM = "premium"
 const val ROUTE_STATS = "stats"
 const val ROUTE_HISTORY = "history"

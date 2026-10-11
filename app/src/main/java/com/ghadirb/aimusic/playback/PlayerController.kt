@@ -176,6 +176,11 @@ class PlayerController(private val context: Context) {
     fun duration(): Long = controller?.duration?.coerceAtLeast(0) ?: 0L
     fun isPlaying(): Boolean = controller?.isPlaying ?: false
     fun currentMediaId(): String? = controller?.currentMediaItem?.mediaId
+    /** Link the current item is playing from (streamed items only; local files have a file/content Uri). */
+    fun currentUri(): String? = controller?.currentMediaItem?.localConfiguration?.uri?.toString()
+    fun currentTitle(): String? = controller?.currentMediaItem?.mediaMetadata?.title?.toString()
+    fun currentArtist(): String? = controller?.currentMediaItem?.mediaMetadata?.artist?.toString()
+    fun hasNext(): Boolean = controller?.hasNextMediaItem() ?: false
     fun shuffleEnabled(): Boolean = controller?.shuffleModeEnabled ?: false
     fun repeatMode(): Int = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
 

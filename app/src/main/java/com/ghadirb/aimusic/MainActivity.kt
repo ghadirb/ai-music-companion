@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -61,6 +62,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ALBUM_DETAIL
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ARTIST_DETAIL
+import com.ghadirb.aimusic.ui.navigation.ROUTE_ONLINE
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYER
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PREMIUM
 import com.ghadirb.aimusic.ui.navigation.ROUTE_SMART_PLAYLIST
@@ -88,6 +90,8 @@ import com.ghadirb.aimusic.ui.screens.playlists.PlaylistDetailScreen
 import com.ghadirb.aimusic.ui.screens.playlists.PlaylistsScreen
 import com.ghadirb.aimusic.ui.screens.settings.SettingsScreen
 import com.ghadirb.aimusic.ui.video.VideoScreen
+import com.ghadirb.aimusic.ui.screens.online.OnlineMusicScreen
+import com.ghadirb.aimusic.ui.screens.online.OnlineMusicViewModel
 import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
 import java.net.URLDecoder
 
@@ -273,6 +277,7 @@ private fun MainScaffold(
         currentRoute == null -> stringResource(R.string.app_name)
         currentRoute == ROUTE_PLAYER -> "در حال پخش"
         currentRoute == ROUTE_PREMIUM -> "پرمیوم"
+        currentRoute == ROUTE_ONLINE -> stringResource(R.string.nav_online)
         currentRoute == ROUTE_STATS -> "آمار"
         currentRoute == ROUTE_HISTORY -> "تاریخچهٔ پخش"
         currentRoute == ROUTE_TASTE -> "تکامل سلیقه"
@@ -311,6 +316,11 @@ private fun MainScaffold(
                     }
                 },
                 actions = {
+                    if (currentRoute != ROUTE_ONLINE) {
+                        IconButton(onClick = { navController.navigate(ROUTE_ONLINE) { launchSingleTop = true } }) {
+                            Icon(Icons.Filled.NewReleases, contentDescription = stringResource(R.string.nav_online))
+                        }
+                    }
                     if (currentRoute != Screen.Favorites.route) {
                         IconButton(onClick = { navController.navigate(Screen.Favorites.route) }) {
                             Icon(Icons.Filled.Favorite, contentDescription = "علاقه‌مندی‌ها")
@@ -369,6 +379,10 @@ private fun MainScaffold(
                     onAlbumClick = { navController.navigate(albumDetailRoute(it)) },
                     onPlaylistClick = { id, name -> navController.navigate(playlistDetailRoute(id, name)) }
                 )
+            }
+            composable(ROUTE_ONLINE) {
+                val onlineViewModel: OnlineMusicViewModel = viewModel()
+                OnlineMusicScreen(onlineViewModel)
             }
             composable(Screen.Video.route) {
                 VideoScreen(repository = app.videoRepository)

@@ -15,6 +15,14 @@ import com.ghadirb.aimusic.cloud.CloudConsent
 import com.ghadirb.aimusic.data.local.AppDatabase
 import com.ghadirb.aimusic.library.LibraryWatchStore
 import com.ghadirb.aimusic.library.LibraryWatchWorker
+import com.ghadirb.aimusic.music.AhaangScanner
+import com.ghadirb.aimusic.music.FileAhaangStore
+import com.ghadirb.aimusic.music.FileTextStore
+import com.ghadirb.aimusic.music.HttpListingFetcher
+import com.ghadirb.aimusic.music.MusicApi
+import com.ghadirb.aimusic.music.OnlineDownloader
+import com.ghadirb.aimusic.music.OnlineFavorites
+import com.ghadirb.aimusic.music.OnlineMusicRepository
 import com.ghadirb.aimusic.premium.EntitlementRepository
 import com.ghadirb.aimusic.premium.EntitlementTokenVerifier
 import com.ghadirb.aimusic.data.repository.MusicRepository
@@ -45,6 +53,18 @@ class AiMusicApp : Application() {
         EntitlementRepository(this, cloudApi, EntitlementTokenVerifier(BuildConfig.ENTITLEMENT_PUBLIC_KEY))
     }
     val purchases: PurchaseRepository by lazy { PurchaseRepository(cloudApi, entitlements) }
+
+    /** New songs + singer collections from the music sources (the "آهنگ‌های جدید" screen). Nothing runs until that screen is opened. */
+    val onlineMusic: OnlineMusicRepository by lazy {
+        OnlineMusicRepository(
+            MusicApi(cloudApi),
+            AhaangScanner(HttpListingFetcher(), FileAhaangStore(java.io.File(filesDir, "ahaang_snapshot.json")))
+                // Singer ZIPs sit years back; without this the snapshot cleanup would drop them before the server config is read.
+                .also { it.collectionWindowDays = com.ghadirb.aimusic.music.DEFAULT_COLLECTION_WINDOW_DAYS },
+        )
+    }
+    val onlineFavorites: OnlineFavorites by lazy { OnlineFavorites(FileTextStore(java.io.File(filesDir, "online_favorites.json"))) }
+    val onlineDownloader: OnlineDownloader by lazy { OnlineDownloader() }
 
     override fun onCreate() {
         super.onCreate()

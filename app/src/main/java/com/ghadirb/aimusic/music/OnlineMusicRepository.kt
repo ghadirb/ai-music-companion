@@ -57,9 +57,19 @@ class OnlineMusicRepository(
     suspend fun refresh(windowDays: Int): AhaangScanReport = coroutineScope {
         val config = async { backend.config() }
         val scan = async { scanner.scan(windowDays) }
-        (config.await() as? ApiResult.Ok)?.value?.priorities?.takeIf { it.isNotEmpty() }?.let { priority = DEFAULT_SOURCE_PRIORITY + it }
+        (config.await() as? ApiResult.Ok)?.value?.let { cfg ->
+            cfg.priorities.takeIf { it.isNotEmpty() }?.let { priority = DEFAULT_SOURCE_PRIORITY + it }
+            scanner.collectionWindowDays = cfg.collectionWindowDays
+        }
         scan.await()
     }
+
+    /**
+     * Walks the OLD Ahaang day folders (years back) for singer-collection ZIPs. Resumable: finished days are never fetched
+     * again, so the caller simply repeats while [CollectionScanReport.remainingDays] > 0 and nothing stopped it.
+     */
+    suspend fun scanCollections(songWindowDays: Int, onProgress: (done: Int, remaining: Int) -> Unit = { _, _ -> }): CollectionScanReport =
+        scanner.scanCollections(songWindowDays, onProgress = onProgress)
 
     suspend fun loadTracks(windowDays: Int, query: String): TracksFeed {
         val since = sinceIso(windowDays)
@@ -94,9 +104,9 @@ class OnlineMusicRepository(
     }
 
     suspend fun artists(windowDays: Int): List<OnlineArtist> {
-        val since = sinceIso(windowDays)
+        val since = sinceIso(maxOf(windowDays, scanner.collectionWindowDays))
         val server = (backend.artists() as? ApiResult.Ok)?.value ?: emptyList()
-        val device = scanner.collections(since).groupBy { it.artistKey }.map { (key, list) ->
+        val device = scanner.collections(since).filter { it.kind == Autoindex.CollectionKind.ARTIST }.groupBy { it.artistKey }.map { (key, list) ->
             OnlineArtist(key, list.firstNotNullOfOrNull { it.artist } ?: key, list.size, list.maxOf { it.folderIso })
         }
         val byKey = LinkedHashMap<String, OnlineArtist>()
@@ -108,9 +118,9 @@ class OnlineMusicRepository(
     }
 
     suspend fun collections(artistKey: String, windowDays: Int): List<OnlineCollection> {
-        val since = sinceIso(windowDays)
+        val since = sinceIso(maxOf(windowDays, scanner.collectionWindowDays))
         val server = (backend.collections(artistKey) as? ApiResult.Ok)?.value ?: emptyList()
-        val device = scanner.collections(since).filter { it.artistKey == artistKey }
+        val device = scanner.collections(since).filter { it.artistKey == artistKey && it.kind == Autoindex.CollectionKind.ARTIST }
         val seen = HashSet<String>()
         return (server + device).filter { seen.add(it.url) }.sortedByDescending { it.folderIso }
     }

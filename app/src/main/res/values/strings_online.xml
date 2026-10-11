@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_online">آهنگ‌های جدید</string>
+    <string name="online_tab_new">جدیدها</string>
+    <string name="online_tab_singers">گلچین خوانندگان</string>
+    <string name="online_tab_favorites">علاقه‌مندی‌ها</string>
+    <string name="online_window_3">۳ ماه اخیر</string>
+    <string name="online_window_6">۶ ماه اخیر</string>
+    <string name="online_search_hint">جست‌وجوی آهنگ یا خواننده</string>
+    <string name="online_empty">آهنگی پیدا نشد.</string>
+    <string name="online_empty_favorites">هنوز آهنگ آنلاینی را به علاقه‌مندی‌ها اضافه نکرده‌اید.</string>
+    <string name="online_singers_empty">هنوز گلچینی پیدا نشده است. جست‌وجوی آرشیو ادامه دارد.</string>
+    <string name="online_server_down">سرور در دسترس نیست؛ فقط نتایجی که گوشی خودش جمع کرده نمایش داده می‌شود.</string>
+    <string name="online_scan_progress">در حال جست‌وجوی آرشیو قدیمی… %1$d روز مانده</string>
+    <string name="online_collections_count">%1$d مجموعه</string>
+    <string name="online_size_mb">%1$s مگابایت</string>
+    <string name="online_source_label">منبع: %1$s</string>
+    <string name="online_play_all">پخش همه</string>
+    <string name="online_play_next">پخش بعدی</string>
+    <string name="online_add_queue">افزودن به صف پخش</string>
+    <string name="online_favorite_add">افزودن به علاقه‌مندی‌ها</string>
+    <string name="online_favorite_remove">حذف از علاقه‌مندی‌ها</string>
+    <string name="online_download_song">افزودن به کتابخانه</string>
+    <string name="online_download_all">افزودن کل مجموعه به کتابخانه</string>
+    <string name="online_cancel">لغو</string>
+    <string name="online_back">بازگشت</string>
+    <string name="online_retry">تلاش دوباره</string>
+    <string name="online_reading_archive">در حال خواندن فهرست مجموعه…</string>
+    <string name="online_archive_temporary">الان خواندن این مجموعه ممکن نیست؛ کمی بعد دوباره تلاش کنید.</string>
+    <string name="online_archive_permanent">این آرشیو قابل استفاده نیست (رمزگذاری‌شده، خراب یا خیلی بزرگ است).</string>
+    <string name="online_archive_offline">برای دیدن فهرست این مجموعه به اینترنت نیاز است.</string>
+    <string name="online_fallback_used">لینک اول کار نکرد؛ همین آهنگ از منبع «%1$s» پخش می‌شود.</string>
+    <string name="online_all_failed">هیچ‌یک از منبع‌ها این آهنگ را پخش نکردند؛ می‌رویم سراغ آهنگ بعدی.</string>
+    <string name="online_no_link">برای این آهنگ لینک قابل پخشی پیدا نشد.</string>
+    <string name="online_downloading">در حال دانلود… %1$d٪</string>
+    <string name="online_preparing">در حال آماده‌سازی…</string>
+    <string name="online_downloaded_one">«%1$s» به کتابخانه اضافه شد.</string>
+    <string name="online_downloaded_many">%1$d آهنگ به کتابخانه اضافه شد.</string>
+    <string name="online_downloaded_partial">%1$d آهنگ اضافه شد، %2$d آهنگ قابل استفاده نبود.</string>
+    <string name="online_download_failed">دانلود انجام نشد (%1$s).</string>
+    <string name="online_now_playing">در حال پخش</string>
+    <string name="online_last_updated">آخرین تاریخ: %1$s</string>
+    <string name="online_quality_kbps">%1$d kbps</string>
+    <string name="online_notice">لینک‌ها مستقیم از سایت‌های منبع پخش می‌شوند؛ پخش و دانلود فقط برای فایل‌هایی است که استفاده از آن‌ها برایتان مجاز است.</string>
+</resources>
