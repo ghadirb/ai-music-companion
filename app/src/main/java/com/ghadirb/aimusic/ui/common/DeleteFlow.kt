@@ -40,19 +40,37 @@ fun rememberDeleteFlow(
     val pending = remember { arrayOfNulls<TrackFileOps.DeleteOutcome.NeedsConfirmation>(1) }
     val launcherRef = remember { arrayOfNulls<ActivityResultLauncher<IntentSenderRequest>>(1) }
 
+    // Paths are read before deleting (the rows vanish afterwards) and used to prove the files are really gone.
+    val paths = remember { HashMap<Uri, String>() }
+
+    /** The system says [uris] were deleted: only those really gone from the phone are reported to the caller. */
+    fun report(uris: List<Uri>, expected: Int) {
+        scope.launch {
+            val verified = TrackFileOps.verifyDeleted(context, uris, paths)
+            if (verified.gone.isNotEmpty()) deleted(verified.gone)
+            when {
+                verified.kept.isNotEmpty() ->
+                    message("${verified.kept.size} فایل از حافظهٔ گوشی پاک نشد و در فهرست باقی ماند.")
+                uris.size < expected -> message("بعضی فایل‌ها حذف نشدند.")
+            }
+        }
+    }
+
     fun step(uris: List<Uri>, deletedSoFar: List<Uri>) {
         scope.launch {
+            val unknown = uris.filter { it !in paths }
+            if (unknown.isNotEmpty()) paths.putAll(TrackFileOps.pathsOf(context, unknown))
             when (val outcome = TrackFileOps.requestDelete(context, uris, deletedSoFar)) {
                 is TrackFileOps.DeleteOutcome.Deleted -> {
-                    if (outcome.uris.isNotEmpty()) deleted(outcome.uris)
-                    if (outcome.uris.size < uris.size + deletedSoFar.size) message("بعضی فایل‌ها حذف نشدند.")
+                    if (outcome.uris.isNotEmpty()) report(outcome.uris, uris.size + deletedSoFar.size)
+                    else message("بعضی فایل‌ها حذف نشدند.")
                 }
                 is TrackFileOps.DeleteOutcome.NeedsConfirmation -> {
                     pending[0] = outcome
                     launcherRef[0]?.launch(IntentSenderRequest.Builder(outcome.intentSender).build())
                 }
                 is TrackFileOps.DeleteOutcome.Failed -> {
-                    if (deletedSoFar.isNotEmpty()) deleted(deletedSoFar)
+                    if (deletedSoFar.isNotEmpty()) report(deletedSoFar, deletedSoFar.size)
                     message(outcome.reason)
                 }
             }
@@ -65,14 +83,15 @@ fun rememberDeleteFlow(
         if (request == null) return@rememberLauncherForActivityResult
         if (result.resultCode == Activity.RESULT_OK) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // createDeleteRequest already deleted every file in the batch.
-                deleted(request.deletedSoFar + request.uris)
+                // createDeleteRequest should have deleted every file in the batch - verified, not assumed.
+                val all = request.deletedSoFar + request.uris
+                report(all, all.size)
             } else {
                 // Android 10: access granted for one file - actually delete it now and continue with the rest.
                 step(request.uris, request.deletedSoFar)
             }
         } else {
-            if (request.deletedSoFar.isNotEmpty()) deleted(request.deletedSoFar)
+            if (request.deletedSoFar.isNotEmpty()) report(request.deletedSoFar, request.deletedSoFar.size)
             message("حذف لغو شد.")
         }
     }

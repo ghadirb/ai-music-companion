@@ -11,6 +11,7 @@ import androidx.annotation.RequiresApi
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Deletes or copies/moves tracks that were scanned from MediaStore (see
@@ -87,6 +88,50 @@ object TrackFileOps {
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun recoverableIntentSender(e: SecurityException): IntentSender? =
         (e as? RecoverableSecurityException)?.userAction?.actionIntent?.intentSender
+
+    /** Device file paths (MediaStore DATA column) of [uris]; must be read BEFORE deleting, while the rows still exist. */
+    suspend fun pathsOf(context: Context, uris: List<Uri>): Map<Uri, String> = withContext(Dispatchers.IO) {
+        val out = HashMap<Uri, String>()
+        for (uri in uris) {
+            runCatching {
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0)?.takeIf { it.isNotBlank() }?.let { out[uri] = it }
+                }
+            }
+        }
+        out
+    }
+
+    /** [gone] really left the phone; [kept] are files that are still on the device. */
+    data class VerifyResult(val gone: List<Uri>, val kept: List<Uri>)
+
+    /**
+     * The system said these were deleted - check that the files really are gone, so the app never drops an
+     * item from its lists while the file is still on the phone. On Android 10 and below (legacy storage) a
+     * file that survived is deleted directly as a second attempt.
+     */
+    suspend fun verifyDeleted(context: Context, uris: List<Uri>, paths: Map<Uri, String>): VerifyResult =
+        withContext(Dispatchers.IO) {
+            val gone = mutableListOf<Uri>()
+            val kept = mutableListOf<Uri>()
+            for (uri in uris) {
+                var present = stillOnDevice(context, uri, paths[uri])
+                if (present && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+                    paths[uri]?.let { runCatching { File(it).delete() } }
+                    runCatching { context.contentResolver.delete(uri, null, null) }
+                    present = stillOnDevice(context, uri, paths[uri])
+                }
+                if (present) kept += uri else gone += uri
+            }
+            VerifyResult(gone, kept)
+        }
+
+    private fun stillOnDevice(context: Context, uri: Uri, path: String?): Boolean {
+        if (path != null) return runCatching { File(path).exists() }.getOrDefault(false)
+        return runCatching {
+            context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)?.use { it.count > 0 } ?: false
+        }.getOrDefault(false)
+    }
 
     /** Which source uris copied successfully vs. failed. */
     data class CopyResult(val succeeded: List<Uri>, val failed: List<Uri>)
