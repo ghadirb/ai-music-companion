@@ -5,6 +5,8 @@ import {
   activeEntitlement, entitlementKey, newEntitlementRecord, ownershipKey, signEntitlementToken, trialKey, trialStatus,
   type EntitlementRecord, type OwnershipRecord, type TrialRecord,
 } from "./entitlement";
+import { handleMusic, handleMusicAdmin, storeFor } from "./music/api";
+import { runScan } from "./music/service";
 import { verifyWithMyket } from "./myket";
 import { counterFor, type Counter } from "./quota";
 import { base64UrlDecode, base64UrlEncode, hmacBase64Url, json, readJson, sha256Hex, timingSafeEqual } from "./util";
@@ -31,6 +33,17 @@ export default {
       now: () => Date.now(),
     });
   },
+
+  /** Cron Trigger: incremental scan of the music sources. Failures are logged and never throw (the next tick retries). */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const store = storeFor(env);
+    if (!store) return;
+    ctx.waitUntil(
+      runScan(store, { fetchImpl: (input, init) => fetch(input, init), now: () => Date.now() })
+        .then((summary) => log('cron', 'music_scan', { ...summary }))
+        .catch((error) => log('cron', 'music_scan_failed', { name: error instanceof Error ? error.name : 'unknown' })),
+    );
+  },
 };
 
 /** Exported for tests: dependency-injected request handler. */
@@ -46,6 +59,8 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     }
 
     if (path === "/v1/session/anonymous") return await issueSession(request, env, deps, requestId);
+    // Admin routes carry their own secret (never a user session) and are throttled per network address.
+    if (path.startsWith("/v1/music/admin/")) return await handleMusicAdmin(path, request, env, deps);
 
     const claims = await verifySession(request, env.JWT_SIGNING_SECRET, deps.now());
     if (!claims) return json({ error: "unauthorized" }, 401);
@@ -62,7 +77,9 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       case "/v1/myket/restore": return await restorePurchase(request, env, deps, claims, requestId);
       case "/v1/entitlements/me": return await getEntitlement(env, deps, claims);
       case "/v1/trial/start": return await startTrial(request, env, deps, claims, requestId);
-      default: return json({ error: "not_found" }, 404);
+      default:
+        if (path.startsWith("/v1/music/")) return await handleMusic(path, request, env, deps, claims);
+        return json({ error: "not_found" }, 404);
     }
   } catch (error) {
     log(requestId, "internal_error", { path, name: error instanceof Error ? error.name : "unknown" });

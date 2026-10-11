@@ -5,6 +5,8 @@ export interface Env {
   MYKET_ACCESS_TOKEN?: string;
   /** Private ES256 key (JWK JSON) used to sign entitlement tokens the app verifies offline. */
   ENTITLEMENT_SIGNING_JWK?: string;
+  /** Admin token for the Novasa music endpoints (scan trigger + remote config). Separate from every Premium/AI secret. */
+  MUSIC_ADMIN_TOKEN?: string;
 
   // ---- plain configuration (wrangler.toml [vars]) ----
   MYKET_PACKAGE_NAME?: string;
@@ -28,6 +30,8 @@ export interface Env {
   // ---- bindings ----
   PURCHASE_ENTITLEMENTS?: KVNamespace;
   QUOTA_COUNTER?: DurableObjectNamespace;
+  /** D1 database for the Novasa music catalog (migrations/0001_music.sql). Independent of the entitlement KV. */
+  MUSIC_DB?: D1Database;
 }
 
 export interface SkuConfig { durationDays: number | null }
