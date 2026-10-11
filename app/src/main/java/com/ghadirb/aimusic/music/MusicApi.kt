@@ -15,7 +15,7 @@ data class TracksPage(val tracks: List<OnlineTrack>, val total: Int, val nextOff
 data class ArchiveInfo(val entries: List<ArchiveTrack>)
 data class ResolveResult(val version: OnlineVersion?)
 
-/** Client of the Worker's /v1/music/* endpoints (anonymous session, no secret in the APK). */
+/** Client of the Worker's music endpoints under /v1/music (anonymous session, no secret in the APK). */
 class MusicApi(private val cloud: CloudApi) {
 
     private fun <T> map(r: CloudApi.Response, parse: (JSONObject) -> T): ApiResult<T> = when {
