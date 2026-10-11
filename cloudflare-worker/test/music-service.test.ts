@@ -185,6 +185,13 @@ describe("remote configuration", () => {
     expect(r.ok && r.config).toMatchObject({ scanBudget: 20, scanEnabled: false });
   });
 
+  it("collectionWindowDays defaults to years (singer ZIPs are filed on scattered old days) and is range-checked", () => {
+    expect(DEFAULT_CONFIG.collectionWindowDays).toBeGreaterThanOrEqual(1900);
+    expect(applyConfigPatch(DEFAULT_CONFIG, { collectionWindowDays: 3000 }).ok).toBe(true);
+    expect(applyConfigPatch(DEFAULT_CONFIG, { collectionWindowDays: 5 }).ok).toBe(false);
+    expect(applyConfigPatch(DEFAULT_CONFIG, { collectionWindowDays: 99999 }).ok).toBe(false);
+  });
+
   it("changes priority, enabling and templates of sources without a new app release", () => {
     const sources = DEFAULT_SOURCES.map((s) => (s.id === "giso" ? { ...s, priority: 0, enabled: true } : { ...s, enabled: s.id !== "roz" }));
     const r = applyConfigPatch(DEFAULT_CONFIG, { sources });
@@ -304,6 +311,22 @@ describe("catalog in D1 (real SQL, real migration)", () => {
     expect(d1.rows("SELECT COUNT(*) n FROM music_versions")[0]).toEqual({ n: 1 });
     expect(d1.rows("SELECT COUNT(*) n FROM music_archives")[0]).toEqual({ n: 0 });
     expect(d1.rows("SELECT day_key FROM music_scan_days").map((r: any) => r.day_key)).toEqual(["giso:1405-07-18"]);
+  });
+
+  it("ZIP collections are kept for the (much longer) collection window while old songs are still pruned", async () => {
+    const { d1, store } = fresh();
+    const old = { sourceId: "ahaang", url: "https://a/Artoosh%20-%20Goldenhits.zip", fileName: "Artoosh - Goldenhits.zip", collection: "Goldenhits", artist: "Artoosh", artistKey: "artoosh", size: 5, folderDate: "1401-03-07", folderIso: "2022-05-28", modified: null, discoveredAt: OCT11 };
+    await store.saveDayScan("ahaang:1401-03-07", "ahaang", "1401-03-07", dayScan([sighting({ title: "Stale", url: "https://x/s.mp3", folderIso: "2022-05-28", folderDate: "1401-03-07" })], [old]), OCT11);
+    await store.prune("2026-03-20", "1405-01-01", "2020-01-01");
+    expect(d1.rows("SELECT COUNT(*) n FROM music_tracks")[0]).toEqual({ n: 0 });
+    expect(d1.rows("SELECT artist_key FROM music_archives").map((r: any) => r.artist_key)).toEqual(["artoosh"]);
+  });
+
+  it("the singer list hides periodic (monthly / yearly) collections but keeps singer collections", async () => {
+    const { store } = fresh();
+    const zip = (artist: string, artistKey: string, name: string) => ({ sourceId: "ahaang", url: `https://a/${name}`, fileName: name, collection: "x", artist, artistKey, size: 5, folderDate: "1405-06-30", folderIso: "2026-09-21", modified: null, discoveredAt: OCT11 });
+    await store.saveDayScan("ahaang:1405-06-30", "ahaang", "1405-06-30", dayScan([], [zip("Monthly Collection", "monthly collection", "m.zip"), zip("Artoosh", "artoosh", "a.zip")]), OCT11);
+    expect((await store.listArtists()).map((a) => a.artist_key)).toEqual(["artoosh"]);
   });
 });
 

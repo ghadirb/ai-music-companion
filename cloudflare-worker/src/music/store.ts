@@ -177,7 +177,7 @@ export class MusicStore {
   async listArtists(): Promise<ArtistRow[]> {
     const { results } = await this.db.prepare(
       `SELECT artist_key, MAX(artist) AS artist, COUNT(*) AS collections, MAX(folder_iso) AS latest_iso FROM music_archives
-       WHERE artist_key <> '' AND status <> 'rejected' GROUP BY artist_key ORDER BY latest_iso DESC, artist_key ASC LIMIT 500`,
+       WHERE artist_key <> '' AND artist_key NOT IN ('monthly collection','year collection','weekly collection','yearly collection') AND status <> 'rejected' GROUP BY artist_key ORDER BY latest_iso DESC, artist_key ASC LIMIT 500`,
     ).all<ArtistRow>();
     return results;
   }
@@ -230,12 +230,13 @@ export class MusicStore {
    * Drops tracks/archives filed before the cutoff. The same day is passed in both calendars because folder dates are
    * stored Jalali (scan_days) and Gregorian (tracks/archives); comparing across calendars would delete everything.
    */
-  async prune(olderThanIso: string, olderThanJalali: string): Promise<void> {
+  async prune(olderThanIso: string, olderThanJalali: string, archivesOlderThanIso: string = olderThanIso): Promise<void> {
     await this.db.batch([
       this.db.prepare(`DELETE FROM music_versions WHERE track_id IN (SELECT id FROM music_tracks WHERE first_folder_iso < ?)`).bind(olderThanIso),
       this.db.prepare(`DELETE FROM music_tracks WHERE first_folder_iso < ?`).bind(olderThanIso),
-      this.db.prepare(`DELETE FROM music_archive_entries WHERE archive_url IN (SELECT url FROM music_archives WHERE folder_iso < ?)`).bind(olderThanIso),
-      this.db.prepare(`DELETE FROM music_archives WHERE folder_iso < ?`).bind(olderThanIso),
+      // ZIP collections live much longer than songs (see MusicConfig.collectionWindowDays).
+      this.db.prepare(`DELETE FROM music_archive_entries WHERE archive_url IN (SELECT url FROM music_archives WHERE folder_iso < ?)`).bind(archivesOlderThanIso),
+      this.db.prepare(`DELETE FROM music_archives WHERE folder_iso < ?`).bind(archivesOlderThanIso),
       this.db.prepare(`DELETE FROM music_scan_days WHERE folder_date < ?`).bind(olderThanJalali),
     ]);
   }

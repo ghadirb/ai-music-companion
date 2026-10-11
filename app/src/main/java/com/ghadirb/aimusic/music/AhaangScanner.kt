@@ -79,13 +79,14 @@ class HttpRangeSource(private val url: String, private val timeoutMs: Int = 12_0
 // ---------------------------------------------------------------------------------------------- persistence
 
 data class FileRecord(val name: String, val size: Long?, val modified: String?)
-data class DayRecord(val dayKey: String, val iso: String, val status: String, val scannedAt: Long, val files: List<FileRecord>)
+/** [zipOnly] = an old day kept only for its ZIP collections (songs of that day were not stored); it is re-read in full if the song window ever grows over it. */
+data class DayRecord(val dayKey: String, val iso: String, val status: String, val scannedAt: Long, val files: List<FileRecord>, val zipOnly: Boolean = false)
 
 class AhaangSnapshot(val days: Map<String, DayRecord> = emptyMap()) {
     fun toJson(): String {
         val arr = JSONArray()
         for (d in days.values) {
-            arr.put(JSONObject().put("k", d.dayKey).put("i", d.iso).put("s", d.status).put("t", d.scannedAt).put("f", JSONArray().also { fa ->
+            arr.put(JSONObject().put("k", d.dayKey).put("i", d.iso).put("s", d.status).put("t", d.scannedAt).put("zo", d.zipOnly).put("f", JSONArray().also { fa ->
                 d.files.forEach { fa.put(JSONObject().put("n", it.name).put("z", it.size ?: JSONObject.NULL).put("m", it.modified ?: JSONObject.NULL)) }
             }))
         }
@@ -103,7 +104,7 @@ class AhaangSnapshot(val days: Map<String, DayRecord> = emptyMap()) {
                     val f = fa.getJSONObject(j)
                     FileRecord(f.getString("n"), if (f.isNull("z")) null else f.getLong("z"), if (f.isNull("m")) null else f.getString("m"))
                 }
-                map[o.getString("k")] = DayRecord(o.getString("k"), o.getString("i"), o.getString("s"), o.getLong("t"), files)
+                map[o.getString("k")] = DayRecord(o.getString("k"), o.getString("i"), o.getString("s"), o.getLong("t"), files, o.optBoolean("zo", false))
             }
             AhaangSnapshot(map)
         } catch (_: Exception) { AhaangSnapshot() } // a corrupt cache just means "scan again"
@@ -127,10 +128,16 @@ class FileAhaangStore(private val file: File) : AhaangStore {
 
 data class AhaangScanReport(val scannedDays: Int, val errors: Int, val stoppedEarly: Boolean)
 
+/** [remainingDays] > 0 means more old days are still waiting (call again); the scan is resumable, finished days are never re-fetched. */
+data class CollectionScanReport(val scannedDays: Int, val errors: Int, val remainingDays: Int, val stoppedEarly: Boolean)
+
 /**
  * Scans the Ahaang day folders ON THE PHONE. The site redirects datacenter traffic (Cloudflare) in a loop, so the Worker
  * cannot read it, while a phone on a normal connection can. Same incremental rules as the Worker: old days are never
  * re-fetched, only recent ones (late uploads), failures (retry) and a slow re-check of the last two weeks.
+ *
+ * Two passes: [scan] reads songs + ZIPs for the recent window (3/6 months); [scanCollections] walks MUCH further back
+ * (years) but keeps only ZIPs, because singer collections ("Artoosh - Goldenhits.zip") are filed on a few scattered old days.
  */
 class AhaangScanner(
     private val fetcher: ListingFetcher,
@@ -141,12 +148,16 @@ class AhaangScanner(
 ) {
     private var snapshot: AhaangSnapshot = store.load()
 
+    /** Days of ZIP history to keep (set by the repository from the server config before scanning). */
+    @Volatile var collectionWindowDays: Int = RETENTION_DAYS
+
     fun dayUrl(day: FolderDay): String = String.format(java.util.Locale.ROOT, "%s/%02d/%02d/%02d/", baseUrl, day.jalali.jy % 100, day.jalali.jm, day.jalali.jd)
 
     private fun isDue(record: DayRecord?, age: Int, nowMs: Long): Boolean {
         if (record == null) return true
         val since = nowMs - record.scannedAt
         return when {
+            record.zipOnly -> true // was kept for its ZIPs only; the song window now covers it, so read the songs too
             record.status == "error" && since >= 30 * MIN -> true
             age < 3 && since >= 25 * MIN -> true
             age < 14 && since >= 6 * HOUR -> true
@@ -160,7 +171,7 @@ class AhaangScanner(
         val due = days.withIndex().filter { (age, d) -> isDue(snapshot.days[d.jalali.key], age, nowMs) }.map { it.value }
         var scanned = 0; var errors = 0; var consecutiveBad = 0; var stopped = false
         for (batch in due.chunked(concurrency)) {
-            val results = coroutineScope { batch.map { d -> async { d to scanDay(d, nowMs) } }.awaitAll() }
+            val results = coroutineScope { batch.map { d -> async { d to scanDay(d, nowMs, zipOnly = false) } }.awaitAll() }
             val updated = LinkedHashMap(snapshot.days)
             for ((d, rec) in results) {
                 updated[d.jalali.key] = rec
@@ -175,26 +186,74 @@ class AhaangScanner(
         AhaangScanReport(scanned, errors, stopped)
     }
 
-    private fun scanDay(day: FolderDay, nowMs: Long): DayRecord {
+    /**
+     * Reads day folders OLDER than the song window, up to [collectionWindowDays] back, newest first, keeping only ZIPs.
+     * At most [maxDays] days per call so the first run (about 2,000 days) can be spread over several calls and cancelled
+     * at any time without losing progress. A day that was fetched fine is never fetched again by this pass.
+     */
+    suspend fun scanCollections(songWindowDays: Int, maxDays: Int = 240, onProgress: (done: Int, remaining: Int) -> Unit = { _, _ -> }): CollectionScanReport = withContext(Dispatchers.IO) {
+        val nowMs = now()
+        val all = Jalali.recentDays(nowMs, maxOf(collectionWindowDays, songWindowDays))
+        val old = all.drop(songWindowDays)
+        val pending = old.filter { d ->
+            val rec = snapshot.days[d.jalali.key]
+            rec == null || (rec.status == "error" && nowMs - rec.scannedAt >= 30 * MIN)
+        }
+        val todo = pending.take(maxDays)
+        var scanned = 0; var errors = 0; var consecutiveBad = 0; var stopped = false
+        var sinceSave = 0
+        for (batch in todo.chunked(concurrency)) {
+            val results = coroutineScope { batch.map { d -> async { d to scanDay(d, nowMs, zipOnly = true) } }.awaitAll() }
+            val updated = LinkedHashMap(snapshot.days)
+            for ((d, rec) in results) {
+                updated[d.jalali.key] = rec
+                scanned += 1; sinceSave += 1
+                if (rec.status == "error") { errors += 1; consecutiveBad += 1 } else consecutiveBad = 0
+            }
+            snapshot = AhaangSnapshot(updated)
+            if (sinceSave >= 24) { store.save(prune(snapshot.days, nowMs).let { AhaangSnapshot(it) }); sinceSave = 0 }
+            onProgress(scanned, pending.size - scanned)
+            if (consecutiveBad >= 3) { stopped = true; break }
+        }
+        snapshot = AhaangSnapshot(prune(snapshot.days, nowMs))
+        store.save(snapshot)
+        CollectionScanReport(scanned, errors, (pending.size - scanned).coerceAtLeast(0), stopped)
+    }
+
+    private fun scanDay(day: FolderDay, nowMs: Long, zipOnly: Boolean): DayRecord {
         val key = day.jalali.key
         val iso = day.gregorian.toString()
         return when (val res = fetcher.fetch(dayUrl(day))) {
-            is Fetch.NotFound -> DayRecord(key, iso, "empty", nowMs, emptyList())
-            is Fetch.Error -> DayRecord(key, iso, "error", nowMs, emptyList())
+            is Fetch.NotFound -> DayRecord(key, iso, "empty", nowMs, emptyList(), zipOnly)
+            is Fetch.Error -> DayRecord(key, iso, "error", nowMs, emptyList(), zipOnly)
             is Fetch.Ok -> when (val parsed = Autoindex.parse(res.body)) {
-                is ListingResult.NotAListing -> DayRecord(key, iso, "error", nowMs, emptyList())
+                is ListingResult.NotAListing -> DayRecord(key, iso, "error", nowMs, emptyList(), zipOnly)
                 is ListingResult.Listing -> {
-                    val files = parsed.entries.filter { !it.isDir && (Autoindex.isAudioName(it.name) || Autoindex.isZipName(it.name)) }
+                    val files = parsed.entries.filter { !it.isDir && (Autoindex.isZipName(it.name) || (!zipOnly && Autoindex.isAudioName(it.name))) }
                         .take(MAX_FILES_PER_DAY).map { FileRecord(it.name, it.size, it.modified) }
-                    DayRecord(key, iso, if (files.isEmpty()) "empty" else "ok", nowMs, files)
+                    DayRecord(key, iso, if (files.isEmpty()) "empty" else "ok", nowMs, files, zipOnly)
                 }
             }
         }
     }
 
+    /**
+     * Songs are kept [RETENTION_DAYS]; ZIP history is kept [collectionWindowDays]. Between the two only ZIP names stay, so
+     * the cache of an install that scanned years of folders stays small.
+     */
     private fun prune(days: Map<String, DayRecord>, nowMs: Long): Map<String, DayRecord> {
-        val cutoff = Jalali.recentDays(nowMs, RETENTION_DAYS).last().gregorian.toString()
-        return days.filterValues { it.iso >= cutoff }
+        val keep = maxOf(RETENTION_DAYS, collectionWindowDays)
+        val songCutoff = Jalali.recentDays(nowMs, RETENTION_DAYS).last().gregorian.toString()
+        val zipCutoff = Jalali.recentDays(nowMs, keep).last().gregorian.toString()
+        val out = LinkedHashMap<String, DayRecord>()
+        for ((k, rec) in days) {
+            when {
+                rec.iso >= songCutoff -> out[k] = rec
+                rec.iso >= zipCutoff -> out[k] = if (rec.zipOnly || rec.files.none { Autoindex.isAudioName(it.name) }) rec
+                    else rec.copy(files = rec.files.filter { Autoindex.isZipName(it.name) }, zipOnly = true)
+            }
+        }
+        return out
     }
 
     private fun fileUrl(record: DayRecord, name: String): String {

@@ -52,7 +52,7 @@ export async function handleMusic(path: string, request: Request, env: Env, deps
   switch (path) {
     case "/v1/music/config":
       return json({
-        defaultWindowDays: config.defaultWindowDays, maxWindowDays: config.maxWindowDays,
+        defaultWindowDays: config.defaultWindowDays, maxWindowDays: config.maxWindowDays, collectionWindowDays: config.collectionWindowDays,
         windowOptions: [...new Set([Math.min(90, config.maxWindowDays), Math.min(180, config.maxWindowDays)])],
         sources: enabledSources(config).map((s) => ({ id: s.id, name: s.name, priority: s.priority, zips: s.scanZips })),
         lastScanAt: await store.lastScanAt(),

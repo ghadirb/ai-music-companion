@@ -22,6 +22,11 @@ export interface MusicConfig {
   lateRescanDays: number;
   retentionDays: number;
   archiveValidationPerRun: number;
+  /**
+   * How far back ZIP collections ("گلچین") are looked for and kept. Far longer than the song window: singer collections are
+   * filed on a few scattered days over years (verified: Goldenhits ZIPs sit 200-1800 days back), so a 3-6 month window left the section empty.
+   */
+  collectionWindowDays: number;
 }
 
 export const DEFAULT_CONFIG: MusicConfig = {
@@ -29,6 +34,7 @@ export const DEFAULT_CONFIG: MusicConfig = {
   defaultWindowDays: 90, maxWindowDays: 183,
   scanEnabled: true, scanEveryMinutes: 30, scanBudget: 40,
   recentDays: 3, lateRescanDays: 14, retentionDays: 200, archiveValidationPerRun: 3,
+  collectionWindowDays: 2400,
 };
 
 const CONFIG_KEY = "config";
@@ -45,7 +51,7 @@ export function applyConfigPatch(current: MusicConfig, patch: unknown): ConfigPa
   const errors: string[] = [];
   const numeric: [keyof MusicConfig, number, number][] = [
     ["defaultWindowDays", 7, 366], ["maxWindowDays", 7, 366], ["scanEveryMinutes", 10, 1440], ["scanBudget", 5, 45],
-    ["recentDays", 1, 7], ["lateRescanDays", 1, 30], ["retentionDays", 30, 400], ["archiveValidationPerRun", 0, 10],
+    ["recentDays", 1, 7], ["lateRescanDays", 1, 30], ["retentionDays", 30, 400], ["archiveValidationPerRun", 0, 10], ["collectionWindowDays", 30, 4000],
   ];
   const allowed = new Set<string>(["sources", "scanEnabled", ...numeric.map((n) => n[0])]);
   for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
@@ -165,7 +171,8 @@ export async function runScan(store: MusicStore, rawDeps: ServiceDeps, opts: { f
   summary.validatedArchives = await validatePendingArchives(store, deps, config.archiveValidationPerRun);
 
   const cutoff = recentJalaliDays(now, config.retentionDays).at(-1)!;
-  await store.prune(jalaliToIso(cutoff), jalaliKey(cutoff));
+  const archiveCutoff = recentJalaliDays(now, Math.max(config.collectionWindowDays, config.retentionDays)).at(-1)!;
+  await store.prune(jalaliToIso(cutoff), jalaliKey(cutoff), jalaliToIso(archiveCutoff));
   return summary;
 }
 

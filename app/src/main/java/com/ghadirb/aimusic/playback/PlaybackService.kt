@@ -54,7 +54,20 @@ class PlaybackService : MediaLibraryService() {
 
     private val persistListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            // A missing/unreadable file must not leave the player stuck: move on to the next track.
+            val failing = player.currentMediaItem
+            if (failing?.mediaId?.startsWith("online:") == true) {
+                // The app's online player first tries another source's copy of the SAME song; skip only if nobody did in time.
+                scope.launch {
+                    delay(ONLINE_FALLBACK_GRACE_MS)
+                    if (player.playerError != null && player.currentMediaItem?.mediaId == failing.mediaId) skipBrokenItem()
+                }
+                return
+            }
+            skipBrokenItem()
+        }
+
+        // A missing/unreadable file must not leave the player stuck: move on to the next track.
+        private fun skipBrokenItem() {
             consecutiveErrors++
             if (consecutiveErrors <= MAX_CONSECUTIVE_ERRORS && player.hasNextMediaItem()) {
                 player.seekToNextMediaItem()
@@ -304,5 +317,6 @@ class PlaybackService : MediaLibraryService() {
     private companion object {
         const val PERSIST_INTERVAL_MS = 15_000L
         const val MAX_CONSECUTIVE_ERRORS = 5
+        const val ONLINE_FALLBACK_GRACE_MS = 4_000L
     }
 }

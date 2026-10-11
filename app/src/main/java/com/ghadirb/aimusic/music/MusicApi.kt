@@ -10,7 +10,13 @@ sealed class ApiResult<out T> {
     data class Failed(val code: Int, val error: String?) : ApiResult<Nothing>()
 }
 
-data class MusicConfigInfo(val defaultWindowDays: Int, val maxWindowDays: Int, val priorities: Map<String, Int>, val lastScanAt: Long?)
+data class MusicConfigInfo(
+    val defaultWindowDays: Int, val maxWindowDays: Int, val priorities: Map<String, Int>, val lastScanAt: Long?,
+    /** How far back singer collections (ZIPs) are looked for; years, because they are filed on scattered old days. */
+    val collectionWindowDays: Int = DEFAULT_COLLECTION_WINDOW_DAYS,
+)
+/** Verified on the live site (Oct 2026): "Goldenhits" ZIPs sit 1,600-1,850 days back and the archive starts ~2,250 days back. */
+const val DEFAULT_COLLECTION_WINDOW_DAYS = 2400
 data class TracksPage(val tracks: List<OnlineTrack>, val total: Int, val nextOffset: Int?)
 data class ArchiveInfo(val entries: List<ArchiveTrack>)
 data class ResolveResult(val version: OnlineVersion?)
@@ -37,7 +43,11 @@ class MusicApi(private val cloud: CloudApi) : MusicBackend {
         val pr = HashMap<String, Int>()
         val src = b.optJSONArray("sources") ?: JSONArray()
         for (i in 0 until src.length()) src.getJSONObject(i).let { pr[it.getString("id")] = it.optInt("priority", 99) }
-        MusicConfigInfo(b.optInt("defaultWindowDays", 90), b.optInt("maxWindowDays", 183), pr, if (b.has("lastScanAt") && !b.isNull("lastScanAt")) b.optLong("lastScanAt") else null)
+        MusicConfigInfo(
+            b.optInt("defaultWindowDays", 90), b.optInt("maxWindowDays", 183), pr,
+            if (b.has("lastScanAt") && !b.isNull("lastScanAt")) b.optLong("lastScanAt") else null,
+            b.optInt("collectionWindowDays", DEFAULT_COLLECTION_WINDOW_DAYS).coerceIn(30, 4000),
+        )
     }
 
     override suspend fun tracks(windowDays: Int, query: String, offset: Int, limit: Int): ApiResult<TracksPage> =

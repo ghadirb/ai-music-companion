@@ -109,6 +109,7 @@ class PlayerViewModel(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            if (controller.currentMediaId()?.startsWith("online:") == true) return // handled by the online player's fallback
             val fileProblem = when (error.errorCode) {
                 PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
                 PlaybackException.ERROR_CODE_IO_NO_PERMISSION,

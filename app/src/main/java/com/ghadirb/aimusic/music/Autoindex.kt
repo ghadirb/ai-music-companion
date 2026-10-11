@@ -137,4 +137,31 @@ object Autoindex {
         val p = parseTrackName(fileName)
         return Pair(p.artist, p.title)
     }
+
+    // ------------------------------------------------------------------ collection kinds
+
+    /** "Monthly Collection - Mehr 1404.zip", "Year Collection - 1401.zip": site-made bundles, not a singer's collection. */
+    private val PERIODIC_ARTIST = Regex("""^(?:monthly|weekly|yearly|year|season(?:al)?)\s+collections?$""")
+    private val GOLD_WORDS = Regex("""gold|golchin|\u06AF\u0644\u0686\u06CC\u0646|greatest|\bhits?\b|\bbest\b""")
+
+    enum class CollectionKind {
+        /** A singer's collection ("Artoosh - Goldenhits"), also when the file name has no singer but says "Golchin"/"Goldenhits". */
+        ARTIST,
+        /** Monthly / yearly bundles of new songs. */
+        PERIODIC,
+        /** Anything else that happens to be a ZIP (a bare number, a cover pack ...): never shown. */
+        OTHER,
+    }
+
+    fun isPeriodicArtistKey(artistKey: String): Boolean = PERIODIC_ARTIST.matches(artistKey)
+
+    fun collectionKind(artist: String?, collection: String): CollectionKind {
+        val a = normalizeText(artist ?: "")
+        if (a.isNotEmpty() && PERIODIC_ARTIST.matches(a)) return CollectionKind.PERIODIC
+        if (a.isNotEmpty()) return CollectionKind.ARTIST
+        return if (GOLD_WORDS.containsMatchIn(normalizeText(collection))) CollectionKind.ARTIST else CollectionKind.OTHER
+    }
+
+    /** Identity of a collection regardless of the quality marker in the file name ("X - Goldenhits.zip" == "X - Goldenhits (128).zip"). */
+    fun collectionKey(artist: String?, collection: String): String = artistKey(artist) + "|" + normalizeText(collection)
 }

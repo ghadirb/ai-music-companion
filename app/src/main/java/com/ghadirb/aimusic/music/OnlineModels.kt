@@ -38,7 +38,14 @@ data class OnlineCollection(
     val entryCount: Int?,
     /** true = discovered by the phone itself (sources the Worker cannot reach). */
     val onDevice: Boolean = false,
-)
+    /** Other copies of the SAME collection (e.g. the 128 kbps ZIP next to the full-quality one). Tried when this link fails. */
+    val altUrls: List<String> = emptyList(),
+) {
+    val kind: Autoindex.CollectionKind get() = Autoindex.collectionKind(artist, collection)
+    /** kbps from the file name; null = unmarked = the original (best) file. */
+    val quality: Int? get() = Autoindex.parseTrackName(fileName).quality
+    val key: String get() = Autoindex.collectionKey(artist, collection)
+}
 
 data class ArchiveTrack(val path: String, val name: String, val size: Long)
 

@@ -3,6 +3,7 @@ package com.ghadirb.aimusic.playback
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
@@ -117,6 +118,37 @@ class PlayerController(private val context: Context) {
         }
     }
 
+    // ---- Streamed (online) items: their mediaId is "online:<id>", never a library row id ----
+    fun playItems(items: List<MediaItem>, startIndex: Int) {
+        if (items.isEmpty()) return
+        controller?.apply {
+            setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), 0L)
+            prepare()
+            play()
+        }
+    }
+
+    fun addItemLast(item: MediaItem) { controller?.addMediaItem(item) }
+
+    fun addItemNext(item: MediaItem) {
+        val c = controller ?: return
+        val index = if (c.mediaItemCount == 0) 0 else (c.currentMediaItemIndex + 1).coerceAtMost(c.mediaItemCount)
+        c.addMediaItem(index, item)
+    }
+
+    /** Swaps the link of one queue item (same song, another source) and keeps playing. */
+    fun replaceItemAt(index: Int, item: MediaItem) {
+        val c = controller ?: return
+        if (index !in 0 until c.mediaItemCount) return
+        c.replaceMediaItem(index, item)
+        c.prepare()
+        c.play()
+    }
+
+    fun mediaIdAt(index: Int): String? {
+        val c = controller ?: return null
+        return if (index in 0 until c.mediaItemCount) c.getMediaItemAt(index).mediaId else null
+    }
     // ---- Transport ----
     fun togglePlayPause() {
         controller?.apply { if (isPlaying) pause() else play() }
