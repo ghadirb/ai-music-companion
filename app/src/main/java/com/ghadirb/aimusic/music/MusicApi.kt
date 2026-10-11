@@ -15,8 +15,17 @@ data class TracksPage(val tracks: List<OnlineTrack>, val total: Int, val nextOff
 data class ArchiveInfo(val entries: List<ArchiveTrack>)
 data class ResolveResult(val version: OnlineVersion?)
 
+/** What the repository needs from the Worker; an interface so the repository is unit-testable without a network. */
+interface MusicBackend {
+    suspend fun config(): ApiResult<MusicConfigInfo>
+    suspend fun tracks(windowDays: Int, query: String, offset: Int, limit: Int): ApiResult<TracksPage>
+    suspend fun artists(): ApiResult<List<OnlineArtist>>
+    suspend fun collections(artistKey: String): ApiResult<List<OnlineCollection>>
+    suspend fun archive(url: String): ApiResult<ArchiveInfo>
+    suspend fun resolve(trackId: String, exclude: List<String>): ApiResult<ResolveResult>
+}
 /** Client of the Worker's music endpoints under /v1/music (anonymous session, no secret in the APK). */
-class MusicApi(private val cloud: CloudApi) {
+class MusicApi(private val cloud: CloudApi) : MusicBackend {
 
     private fun <T> map(r: CloudApi.Response, parse: (JSONObject) -> T): ApiResult<T> = when {
         r.isOffline -> ApiResult.Offline
@@ -24,20 +33,20 @@ class MusicApi(private val cloud: CloudApi) {
         else -> ApiResult.Failed(r.code, r.error)
     }
 
-    suspend fun config(): ApiResult<MusicConfigInfo> = map(cloud.post("/v1/music/config", JSONObject())) { b ->
+    override suspend fun config(): ApiResult<MusicConfigInfo> = map(cloud.post("/v1/music/config", JSONObject())) { b ->
         val pr = HashMap<String, Int>()
         val src = b.optJSONArray("sources") ?: JSONArray()
         for (i in 0 until src.length()) src.getJSONObject(i).let { pr[it.getString("id")] = it.optInt("priority", 99) }
         MusicConfigInfo(b.optInt("defaultWindowDays", 90), b.optInt("maxWindowDays", 183), pr, if (b.has("lastScanAt") && !b.isNull("lastScanAt")) b.optLong("lastScanAt") else null)
     }
 
-    suspend fun tracks(windowDays: Int, query: String, offset: Int, limit: Int = 30): ApiResult<TracksPage> =
+    override suspend fun tracks(windowDays: Int, query: String, offset: Int, limit: Int): ApiResult<TracksPage> =
         map(cloud.post("/v1/music/tracks", JSONObject().put("windowDays", windowDays).put("q", query).put("offset", offset).put("limit", limit))) { b ->
             val arr = b.getJSONArray("tracks")
             TracksPage((0 until arr.length()).map { parseTrack(arr.getJSONObject(it)) }, b.optInt("total", 0), if (b.isNull("nextOffset")) null else b.optInt("nextOffset"))
         }
 
-    suspend fun artists(): ApiResult<List<OnlineArtist>> = map(cloud.post("/v1/music/artists", JSONObject())) { b ->
+    override suspend fun artists(): ApiResult<List<OnlineArtist>> = map(cloud.post("/v1/music/artists", JSONObject())) { b ->
         val arr = b.getJSONArray("artists")
         (0 until arr.length()).map {
             val o = arr.getJSONObject(it)
@@ -45,20 +54,20 @@ class MusicApi(private val cloud: CloudApi) {
         }
     }
 
-    suspend fun collections(artistKey: String): ApiResult<List<OnlineCollection>> =
+    override suspend fun collections(artistKey: String): ApiResult<List<OnlineCollection>> =
         map(cloud.post("/v1/music/collections", JSONObject().put("artistKey", artistKey))) { b ->
             val arr = b.getJSONArray("collections")
             (0 until arr.length()).map { parseCollection(arr.getJSONObject(it)) }
         }
 
     /** Contents of a validated archive. Errors such as "archive_unavailable" (encrypted, unsafe, too big) are returned, not thrown. */
-    suspend fun archive(url: String): ApiResult<ArchiveInfo> = map(cloud.post("/v1/music/archive", JSONObject().put("url", url))) { b ->
+    override suspend fun archive(url: String): ApiResult<ArchiveInfo> = map(cloud.post("/v1/music/archive", JSONObject().put("url", url))) { b ->
         val arr = b.getJSONArray("entries")
         ArchiveInfo((0 until arr.length()).map { val o = arr.getJSONObject(it); ArchiveTrack(o.getString("path"), o.getString("name"), o.optLong("size")) })
     }
 
     /** Asks the Worker for the first version of the song that really serves audio, skipping links the phone already saw fail. */
-    suspend fun resolve(trackId: String, exclude: List<String>): ApiResult<ResolveResult> =
+    override suspend fun resolve(trackId: String, exclude: List<String>): ApiResult<ResolveResult> =
         map(cloud.post("/v1/music/resolve", JSONObject().put("trackId", trackId).put("exclude", JSONArray(exclude.take(12))))) { b ->
             if (!b.optBoolean("ok")) ResolveResult(null) else ResolveResult(b.getJSONObject("version").let {
                 OnlineVersion(it.getString("url"), it.getString("sourceId"), it.optString("source"), it.optIntOrNull("quality"), it.optLongOrNull("size"))
