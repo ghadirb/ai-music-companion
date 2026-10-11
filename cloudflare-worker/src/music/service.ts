@@ -1,5 +1,5 @@
 import { jalaliKey, jalaliToIso, recentJalaliDays, type JalaliDate } from "./jalali";
-import { dayKey, validateSource, DEFAULT_SOURCES, type MusicSource } from "./sources";
+import { dayKey, mirrorFetch, validateSource, DEFAULT_SOURCES, type MusicSource } from "./sources";
 import { scanDay } from "./scanner";
 import { resolvePlayable, SourceHealth, type Attempt } from "./resolve";
 import { MusicStore } from "./store";
@@ -125,9 +125,10 @@ export interface ScanSummary {
 export interface ServiceDeps { fetchImpl: typeof fetch; now: () => number }
 
 /** One scheduled (or admin-triggered) pass: scan what is due, validate some archives, prune old rows. */
-export async function runScan(store: MusicStore, deps: ServiceDeps, opts: { force?: boolean; windowDays?: number } = {}): Promise<ScanSummary> {
-  const now = deps.now();
+export async function runScan(store: MusicStore, rawDeps: ServiceDeps, opts: { force?: boolean; windowDays?: number } = {}): Promise<ScanSummary> {
+  const now = rawDeps.now();
   const config = await loadConfig(store);
+  const deps: ServiceDeps = { ...rawDeps, fetchImpl: mirrorFetch(config.sources, rawDeps.fetchImpl) };
   const summary: ScanSummary = { scannedDays: 0, requests: 0, tracksSeen: 0, archivesSeen: 0, errors: 0, skippedSources: [], validatedArchives: 0, budgetExhausted: false };
   if (!config.scanEnabled && !opts.force) return summary;
   const lastRun = Number(await store.getSetting(LAST_RUN_KEY)) || 0;
@@ -187,7 +188,8 @@ export async function validatePendingArchives(store: MusicStore, deps: ServiceDe
   return done;
 }
 
-export async function validateArchive(store: MusicStore, deps: ServiceDeps, url: string, size: number | null): Promise<ZipFailure | "ok"> {
+export async function validateArchive(store: MusicStore, rawDeps: ServiceDeps, url: string, size: number | null): Promise<ZipFailure | "ok"> {
+  const deps: ServiceDeps = { ...rawDeps, fetchImpl: mirrorFetch((await loadConfig(store)).sources, rawDeps.fetchImpl) };
   if (size === null) { await store.markArchive(url, "rejected", "unknown_size", deps.now()); return "too_small"; }
   const listing = await readZipListing(url, size, deps.fetchImpl);
   if (listing.ok) {
@@ -207,7 +209,8 @@ export const sharedHealth = new SourceHealth();
 export interface ResolveOutcome { ok: boolean; version: TrackVersion | null; attempts: Attempt[] }
 
 /** Walks the song's versions in priority order, returns the first that really serves audio, and remembers link health. */
-export async function resolveTrack(store: MusicStore, deps: ServiceDeps, trackId: string, exclude: string[], health: SourceHealth = sharedHealth): Promise<ResolveOutcome | null> {
+export async function resolveTrack(store: MusicStore, rawDeps: ServiceDeps, trackId: string, exclude: string[], health: SourceHealth = sharedHealth): Promise<ResolveOutcome | null> {
+  const deps: ServiceDeps = { ...rawDeps, fetchImpl: mirrorFetch((await loadConfig(store)).sources, rawDeps.fetchImpl) };
   const rows = await store.trackVersions(trackId);
   if (!rows.length) return null;
   const skip = new Set(exclude);

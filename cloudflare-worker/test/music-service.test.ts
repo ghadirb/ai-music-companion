@@ -369,11 +369,11 @@ describe("runScan (scheduled / admin)", () => {
   it("stops hammering a failing source after 3 errors but keeps scanning the healthy ones", async () => {
     const p = pages();
     const broken: Record<string, Page> = {};
-    for (const d of recentJalaliDays(OCT11, 30)) broken[dayUrl(src("mellody"), d)] = { status: 503 };
+    for (const d of recentJalaliDays(OCT11, 30)) broken[dayUrl({ ...src("mellody"), baseUrl: "https://dl.melody98.ir" }, d)] = { status: 503 }; // the Worker scans through the mirror host
     const t = await setup({ ...p, ...broken });
     const summary = await t.run();
     expect(summary.skippedSources).toContain("mellody");
-    expect(t.s.calls.filter((u) => u.includes("mellody98")).length).toBeLessThanOrEqual(3 + 3 /* concurrent in-flight */);
+    expect(t.s.calls.filter((u) => u.includes("melody98.ir")).length).toBeLessThanOrEqual(3 + 3 /* concurrent in-flight */);
     expect(summary.tracksSeen).toBeGreaterThan(30);
   });
 

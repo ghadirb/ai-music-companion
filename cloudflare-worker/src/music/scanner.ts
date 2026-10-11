@@ -52,6 +52,13 @@ async function fetchListing(url: string, fetchImpl: typeof fetch, timeoutMs: num
   if (res.status === 404 || res.status === 410) { await res.body?.cancel().catch(() => undefined); return { ok: false, status: "empty", detail: "not_found" }; }
   if (res.status === 401 || res.status === 403) { await res.body?.cancel().catch(() => undefined); return { ok: false, status: "error", detail: "forbidden" }; }
   if (res.status >= 500) { await res.body?.cancel().catch(() => undefined); return { ok: false, status: "error", detail: "server_error" }; }
+  if (res.status >= 300 && res.status < 400) {
+    // Redirects are not followed blindly; the target host is recorded (host only, never the full URL) to diagnose blocking.
+    let host = "unknown";
+    try { host = new URL(res.headers.get("location") ?? "", url).host || "unknown"; } catch { /* keep "unknown" */ }
+    await res.body?.cancel().catch(() => undefined);
+    return { ok: false, status: "error", detail: `status_${res.status}_to_${host}`.slice(0, 80) };
+  }
   if (res.status !== 200) { await res.body?.cancel().catch(() => undefined); return { ok: false, status: "error", detail: `status_${res.status}` }; }
   const declared = Number(res.headers.get("content-length") ?? 0);
   if (declared > MAX_LISTING_BYTES) { await res.body?.cancel().catch(() => undefined); return { ok: false, status: "error", detail: "listing_too_large" }; }
