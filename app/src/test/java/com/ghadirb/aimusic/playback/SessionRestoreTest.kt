@@ -63,4 +63,18 @@ class SessionRestoreTest {
         assertFalse(SessionRestore.needsFileCheck(s, 9L))
         assertFalse(SessionRestore.needsFileCheck(s, 99L)) // unknown id
     }
+
+    @Test fun `short queue is not trimmed`() {
+        val s = saved(listOf(1, 2, 3), index = 2)
+        assertEquals(s, SessionRestore.limit(s, 10))
+    }
+
+    @Test fun `long queue keeps a window that contains the current track`() {
+        val ids = (0L until 5000L).toList()
+        for (index in listOf(0, 10, 1500, 2600, 4990, 4999)) {
+            val out = SessionRestore.limit(saved(ids, index = index), 2000)
+            assertEquals(2000, out.trackIds.size)
+            assertEquals("index $index", ids[index], out.trackIds[out.index])
+        }
+    }
 }

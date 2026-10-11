@@ -44,6 +44,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.ghadirb.aimusic.video.PlaybackSpeeds
+import com.ghadirb.aimusic.video.VideoAspect
 import com.ghadirb.aimusic.video.VideoController
 import com.ghadirb.aimusic.video.VideoPlaybackController
 import com.ghadirb.aimusic.video.VlcPlaybackController
@@ -80,6 +81,10 @@ fun VideoPlayerScreen(
     var showSubtitles by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    // Picture fitting (fit / fill / zoom). Kept for the whole viewing session, across queue items.
+    var aspect by remember { mutableStateOf(VideoAspect.FIT) }
+    // libVLC only: re-apply when the video changes, because scaling needs an existing video output.
+    LaunchedEffect(aspect, state.index) { controller.setAspect(aspect) }
 
     // Auto-hide while playing; any interaction restarts the timer.
     LaunchedEffect(controlsVisible, state.isPlaying, interactions, showSubtitles, showQueue, showAudio) {
@@ -108,7 +113,14 @@ fun VideoPlayerScreen(
                         player = controller.player
                     }
                 },
-                update = { it.player = controller.player },
+                update = {
+                    it.player = controller.player
+                    it.resizeMode = when (aspect) {
+                        VideoAspect.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        VideoAspect.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        VideoAspect.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    }
+                },
                 onRelease = { it.player = null }
             )
             is VlcPlaybackController -> AndroidView(
@@ -163,6 +175,8 @@ fun VideoPlayerScreen(
                 onAudio = { showAudio = true },
                 onSpeed = { controller.setSpeed(PlaybackSpeeds.next(state.speed)) },
                 onQueue = { showQueue = true },
+                aspectLabel = aspect.label,
+                onAspect = { aspect = aspect.next() },
                 onInteract = { interactions++ }
             )
         }

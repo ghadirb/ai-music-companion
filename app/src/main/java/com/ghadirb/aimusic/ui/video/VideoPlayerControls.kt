@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
@@ -72,6 +73,8 @@ fun VideoPlayerControls(
     onSpeed: () -> Unit,
     onQueue: () -> Unit,
     onInteract: () -> Unit,
+    aspectLabel: String = "",
+    onAspect: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hasPrev = state.index > 0
@@ -161,13 +164,18 @@ fun VideoPlayerControls(
                     TextButton(onClick = { onInteract(); onSpeed() }) {
                         Text(PlaybackSpeeds.label(state.speed), color = if (state.speed != 1f) MaterialTheme.colorScheme.primary else Color.White)
                     }
+                    if (aspectLabel.isNotEmpty()) {
+                        TextButton(onClick = { onInteract(); onAspect() }) {
+                            Text(aspectLabel, color = Color.White)
+                        }
+                    }
                     Box(Modifier.weight(1f))
                     Icon(Icons.Filled.VolumeUp, contentDescription = "صدا", tint = Color.White)
                     Slider(
                         value = volume.toFloat(),
                         onValueChange = { onInteract(); onVolume(it.toInt()) },
                         valueRange = 0f..maxVolume.coerceAtLeast(1).toFloat(),
-                        modifier = Modifier.width(120.dp).padding(start = 8.dp)
+                        modifier = Modifier.widthIn(min = 56.dp, max = 120.dp).padding(start = 8.dp)
                     )
                 }
             }

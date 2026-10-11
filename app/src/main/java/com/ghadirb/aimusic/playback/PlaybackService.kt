@@ -7,6 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.LibraryResult
@@ -73,6 +74,11 @@ class PlaybackService : MediaLibraryService() {
         }
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = persist()
         override fun onRepeatModeChanged(repeatMode: Int) = persist()
+        // Queue edits (add next, reorder, remove) must reach the saved queue even without a track change,
+        // because the periodic save only updates the position.
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) persist()
+        }
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
                 SleepTimerController.onPausedAtEndOfItem()
@@ -117,7 +123,7 @@ class PlaybackService : MediaLibraryService() {
         scope.launch {
             while (isActive) {
                 delay(PERSIST_INTERVAL_MS)
-                if (player.isPlaying) persist()
+                if (player.isPlaying) stateStore.savePosition(player.currentPosition)
             }
         }
     }

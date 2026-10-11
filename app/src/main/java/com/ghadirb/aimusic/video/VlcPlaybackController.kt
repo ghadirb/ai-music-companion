@@ -179,6 +179,17 @@ class VlcPlaybackController(
 
     override fun setSpeed(speed: Float) { mp.setRate(speed); publish() }
 
+    override fun setAspect(aspect: VideoAspect) {
+        // Best effort: scaling only applies once a video output exists, so a failure here must never affect playback.
+        runCatching {
+            mp.videoScale = when (aspect) {
+                VideoAspect.FIT -> MediaPlayer.ScaleType.SURFACE_BEST_FIT
+                VideoAspect.FILL -> MediaPlayer.ScaleType.SURFACE_FILL
+                VideoAspect.ZOOM -> MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
+            }
+        }
+    }
+
     // ---- tracks ----
     override fun selectSubtitle(index: Int) {
         subtitleTracks().getOrNull(index)?.let { mp.setSpuTrack(it.id) }

@@ -29,6 +29,18 @@ object SessionRestore {
         return RestorePlan(kept, next?.let { kept.indexOf(it) } ?: 0, 0L)
     }
 
+    /**
+     * Keeps at most [max] ids, as a window that always contains the current track. (A plain "take the
+     * first N" would make a queue longer than N resume on the wrong track once the index passed N.)
+     */
+    fun limit(state: SavedPlayback, max: Int): SavedPlayback {
+        val size = state.trackIds.size
+        if (max <= 0 || size <= max) return state
+        val index = state.index.coerceIn(0, size - 1)
+        val start = (index - max / 2).coerceIn(0, size - max)
+        return state.copy(trackIds = state.trackIds.subList(start, start + max), index = index - start)
+    }
+
     /** Positions of [saved] ids that deserve a real file check: the current track plus a short look-ahead. */
     fun needsFileCheck(saved: SavedPlayback, id: Long): Boolean {
         val pos = saved.trackIds.indexOf(id)
