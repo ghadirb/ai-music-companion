@@ -1,6 +1,5 @@
 package com.ghadirb.aimusic.music
 
-import com.sun.net.httpserver.HttpServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,12 +7,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
-import java.net.InetSocketAddress
 import java.nio.file.Files
 
 /** Downloads against a real local HTTP server: nothing is faked except the site itself. */
 class OnlineDownloaderTest {
-    private lateinit var server: HttpServer
+    private lateinit var server: TestHttpServer
     private lateinit var dir: File
     private val dl = OnlineDownloader(allowHttp = true, timeoutMs = 3_000)
     private val mp3 = byteArrayOf(0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0x21) + ByteArray(2000) { 1 }
@@ -32,7 +30,7 @@ class OnlineDownloaderTest {
 
     @Before fun start() {
         dir = Files.createTempDirectory("dl").toFile()
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server = TestHttpServer()
         serve("/ok.mp3", 200, "audio/mpeg", mp3)
         serve("/page.mp3", 200, "audio/mpeg", html) // HTTP 200 with an HTML body behind an .mp3 name
         serve("/ctype.mp3", 200, "text/html; charset=utf-8", mp3)

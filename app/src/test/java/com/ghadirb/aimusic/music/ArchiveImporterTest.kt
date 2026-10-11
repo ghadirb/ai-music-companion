@@ -1,6 +1,5 @@
 package com.ghadirb.aimusic.music
 
-import com.sun.net.httpserver.HttpServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,14 +8,13 @@ import org.junit.Before
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class ArchiveImporterTest {
-    private lateinit var server: HttpServer
+    private lateinit var server: TestHttpServer
     private lateinit var cache: File
     private lateinit var dest: File
     private val hits = AtomicInteger()
@@ -48,7 +46,7 @@ class ArchiveImporterTest {
 
     @Before fun start() {
         cache = Files.createTempDirectory("zc").toFile(); dest = Files.createTempDirectory("zd").toFile()
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server = TestHttpServer()
         serve("/good.zip", 200, "application/zip", zip("01 Gole Yakh.mp3" to mp3(1), "02 Bahar.mp3" to mp3(2), "cover.jpg" to ByteArray(500) { 7 }))
         serve("/gone.zip", 404, "text/html", "<html>no</html>".toByteArray())
         serve("/page.zip", 200, "application/zip", "<html>login</html>".toByteArray())
