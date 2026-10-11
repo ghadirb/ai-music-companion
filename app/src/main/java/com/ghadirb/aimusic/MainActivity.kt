@@ -96,6 +96,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var billingGateway: MyketBillingGateway
 
     @OptIn(UnstableApi::class)
+    override fun onStart() {
+        super.onStart()
+        (application as AiMusicApp).rescanLibraryIfStale()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as AiMusicApp

@@ -109,7 +109,7 @@ class LibraryWatchWorker(
         private const val SIMILAR_TO_FAVORITE_THRESHOLD = 6.0
         private val WORKOUT_BPM_RANGE = 120..160
 
-        /** Enables the periodic check (call after the user turns the setting on, and once at app start if it's already on). */
+        /** Enables the periodic check. KEEP (not UPDATE): re-arming at every app start must not push the first run 6 h away. (call after the user turns the setting on, and once at app start if it's already on). */
         fun schedule(context: Context) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
@@ -119,7 +119,7 @@ class LibraryWatchWorker(
                 .setConstraints(constraints)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request
+                WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request
             )
         }
 

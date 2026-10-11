@@ -101,6 +101,11 @@ class LibraryViewModel(
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning
 
+    /** One-shot result of a manual scan, shown as a snackbar. */
+    private val _scanMessage = MutableStateFlow<String?>(null)
+    val scanMessage: StateFlow<String?> = _scanMessage
+    fun consumeScanMessage() { _scanMessage.value = null }
+
     private val _scanError = MutableStateFlow<String?>(null)
     val scanError: StateFlow<String?> = _scanError
 
@@ -142,9 +147,10 @@ class LibraryViewModel(
             _isScanning.value = true
             _scanError.value = null
             try {
-                repository.rescanLibrary()
+                val added = repository.rescanLibrary()
                 // New tracks have no energy/mood yet — kick the (unique, cancellable) analyzer.
                 onLibraryChanged()
+                _scanMessage.value = if (added.isEmpty()) "آهنگ جدیدی پیدا نشد." else "${added.size} آهنگ جدید اضافه شد."
             } catch (e: SecurityException) {
                 _scanError.value = "دسترسی به فایل‌های صوتی داده نشده است. مجوز را در تنظیمات دستگاه فعال کنید."
             } catch (e: Exception) {

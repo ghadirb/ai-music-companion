@@ -62,7 +62,35 @@ class AiMusicApp : Application() {
         scheduleAudioAnalysis()
         // Opt-in only (spec item 7) — nothing scheduled unless the user already turned it on
         // in Settings; re-arming here just survives process death / device reboot.
-        if (LibraryWatchStore(this).enabled) LibraryWatchWorker.schedule(this)
+        if (LibraryWatchStore(this).enabled) {
+            LibraryWatchWorker.schedule(this)
+            // Also look right now: otherwise songs copied since the last run would wait for the next periodic run.
+            LibraryWatchWorker.enqueueNow(this)
+        }
+    }
+
+    private val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    @Volatile private var lastForegroundScan = 0L
+
+    /**
+     * Cheap on-device MediaStore re-sync whenever the app comes to the foreground (at most once a minute),
+     * so a song copied to the phone shows up when the app is opened - no setting needed. New songs are
+     * handed to the analyzer like after a manual scan.
+     */
+    fun rescanLibraryIfStale() {
+        val now = System.currentTimeMillis()
+        if (now - lastForegroundScan < 60_000L) return
+        lastForegroundScan = now
+        appScope.launch {
+            try {
+                val added = repository.rescanLibrary()
+                if (added.isNotEmpty()) com.ghadirb.aimusic.analysis.AudioAnalysisWorker.enqueueNow(this@AiMusicApp)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // No audio permission yet or a provider hiccup: the library screen reports it on manual scan.
+            }
+        }
     }
 
     /**

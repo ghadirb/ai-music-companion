@@ -29,7 +29,12 @@ object TrackFileOps {
          * Launch [intentSender] (e.g. with ActivityResultContracts.StartIntentSenderForResult);
          * a positive result means every uri in [uris] was deleted.
          */
-        data class NeedsConfirmation(val intentSender: IntentSender, val uris: List<Uri>) : DeleteOutcome
+        data class NeedsConfirmation(
+            val intentSender: IntentSender,
+            val uris: List<Uri>,
+            /** Android 10 deletes one uri per confirmation: files already deleted earlier in this batch. */
+            val deletedSoFar: List<Uri> = emptyList()
+        ) : DeleteOutcome
         data class Failed(val reason: String) : DeleteOutcome
     }
 
@@ -42,25 +47,31 @@ object TrackFileOps {
      *   (returned in the same order) after it's resolved.
      * - Below Android 10: legacy storage permission lets ContentResolver delete directly.
      */
-    suspend fun requestDelete(context: Context, uris: List<Uri>): DeleteOutcome = withContext(Dispatchers.IO) {
-        if (uris.isEmpty()) return@withContext DeleteOutcome.Deleted(emptyList())
+    suspend fun requestDelete(
+        context: Context,
+        uris: List<Uri>,
+        deletedSoFar: List<Uri> = emptyList()
+    ): DeleteOutcome = withContext(Dispatchers.IO) {
+        if (uris.isEmpty()) return@withContext DeleteOutcome.Deleted(deletedSoFar)
         val resolver = context.contentResolver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             return@withContext try {
                 val pendingIntent = MediaStore.createDeleteRequest(resolver, uris)
-                DeleteOutcome.NeedsConfirmation(pendingIntent.intentSender, uris)
+                DeleteOutcome.NeedsConfirmation(pendingIntent.intentSender, uris, deletedSoFar)
             } catch (e: Exception) {
                 DeleteOutcome.Failed("درخواست حذف ساخته نشد.")
             }
         }
-        val deleted = mutableListOf<Uri>()
+        val deleted = deletedSoFar.toMutableList()
         for (uri in uris) {
             try {
+                // Only a row that really went away counts; "0 rows" means the file is still on the phone.
                 if (resolver.delete(uri, null, null) > 0) deleted += uri
             } catch (e: RecoverableSecurityException) {
-                // Android 10: this uri (and any after it) need the user's confirmation first.
+                // Android 10: the user must allow THIS file first; the system grants access but does NOT
+                // delete it - the caller must call requestDelete again with the remaining uris.
                 val remaining = uris.dropWhile { it != uri }
-                return@withContext DeleteOutcome.NeedsConfirmation(e.userAction.actionIntent.intentSender, remaining)
+                return@withContext DeleteOutcome.NeedsConfirmation(e.userAction.actionIntent.intentSender, remaining, deleted.toList())
             } catch (e: SecurityException) {
                 return@withContext DeleteOutcome.Failed("دسترسی حذف این فایل داده نشد.")
             }

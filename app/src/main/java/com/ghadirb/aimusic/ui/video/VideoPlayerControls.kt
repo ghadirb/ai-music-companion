@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
@@ -26,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -41,6 +43,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.ghadirb.aimusic.video.PlaybackSpeeds
 import com.ghadirb.aimusic.video.VideoLibraryQuery
 import com.ghadirb.aimusic.video.VideoPlaybackController
 
@@ -65,6 +68,8 @@ fun VideoPlayerControls(
     onToggleFullscreen: () -> Unit,
     onEnterPip: () -> Unit,
     onSubtitles: () -> Unit,
+    onAudio: () -> Unit,
+    onSpeed: () -> Unit,
     onQueue: () -> Unit,
     onInteract: () -> Unit,
     modifier: Modifier = Modifier
@@ -146,6 +151,15 @@ fun VideoPlayerControls(
                     }
                     IconButton(onClick = { onInteract(); onSubtitles() }) {
                         Icon(Icons.Filled.Subtitles, contentDescription = "زیرنویس", tint = if (state.subtitlesOn) MaterialTheme.colorScheme.primary else Color.White)
+                    }
+                    IconButton(onClick = { onInteract(); onAudio() }) {
+                        Icon(
+                            Icons.Filled.Audiotrack, contentDescription = "انتخاب صدا",
+                            tint = if (state.audioTracks.size > 1) MaterialTheme.colorScheme.primary else Color.White
+                        )
+                    }
+                    TextButton(onClick = { onInteract(); onSpeed() }) {
+                        Text(PlaybackSpeeds.label(state.speed), color = if (state.speed != 1f) MaterialTheme.colorScheme.primary else Color.White)
                     }
                     Box(Modifier.weight(1f))
                     Icon(Icons.Filled.VolumeUp, contentDescription = "صدا", tint = Color.White)

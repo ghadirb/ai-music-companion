@@ -27,7 +27,13 @@ import com.ghadirb.aimusic.AiMusicApp
 import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
 import com.ghadirb.aimusic.video.VideoPlaybackController
 import com.ghadirb.aimusic.video.VlcFallbackPolicy
+import androidx.compose.runtime.snapshotFlow
+import com.ghadirb.aimusic.video.VideoController
+import com.ghadirb.aimusic.video.VlcPlaybackController
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -40,7 +46,8 @@ import kotlinx.coroutines.launch
  */
 class VideoPlayerActivity : ComponentActivity() {
 
-    private lateinit var controller: VideoPlaybackController
+    /** The active engine; swapped in place (same screen) when ExoPlayer cannot play a file. */
+    private var controller by mutableStateOf<VideoController?>(null)
     private var inPip by mutableStateOf(false)
     private var fullscreenRequested by mutableStateOf(false)
     private var landscape by mutableStateOf(false)
@@ -57,8 +64,8 @@ class VideoPlayerActivity : ComponentActivity() {
                 if (c.moveToFirst()) c.getString(0) else null
             }
         }.getOrNull()
-        if (!controller.addExternalSubtitle(uri, name)) {
-            Toast.makeText(this, "فقط فایل‌های زیرنویس SRT و VTT پشتیبانی می‌شوند.", Toast.LENGTH_LONG).show()
+        if (controller?.addExternalSubtitle(uri, name) == false) {
+            Toast.makeText(this, "این قالب زیرنویس پشتیبانی نمی‌شود (SRT و VTT).", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -70,28 +77,26 @@ class VideoPlayerActivity : ComponentActivity() {
         landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
         val app = application as AiMusicApp
-        controller = VideoPlaybackController(this, app.videoRepository, lifecycleScope)
-
         val startId = intent.getLongExtra(EXTRA_VIDEO_ID, -1L)
         val ids = intent.getLongArrayExtra(EXTRA_QUEUE)?.toList().orEmpty().ifEmpty { listOf(startId) }
-        lifecycleScope.launch { controller.load(ids, startId) }
-
-        // Hand the file to the libVLC engine when ExoPlayer cannot play it (AVI/WMV..., or decoder failures).
         lifecycleScope.launch {
-            controller.state
-                .map { st -> Triple(st.current, st.needsFallbackEngine, st.positionMs) }
-                .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
-                .collect { (video, needsFallback, pos) ->
-                    if (video != null && (needsFallback || VlcFallbackPolicy.prefersVlc(video.displayName))) {
-                        openFallbackEngine(video.id, if (needsFallback) pos else -1L)
-                    }
-                }
+            // Legacy containers (AVI, WMV ...) go straight to the libVLC engine; everything else starts on ExoPlayer.
+            val first = app.videoRepository.getMany(listOf(startId)).firstOrNull()
+            val vlc = if (first != null && VlcFallbackPolicy.prefersVlc(first.displayName)) createVlc() else null
+            val engine: VideoController = vlc ?: VideoPlaybackController(this@VideoPlayerActivity, app.videoRepository, lifecycleScope)
+            controller = engine
+            engine.load(ids, startId)
+        }
+
+        // Follow whichever engine is active: hand over to libVLC when ExoPlayer cannot play the file.
+        lifecycleScope.launch {
+            activeStates().collect { st -> if (st.needsFallbackEngine) switchToVlc() }
         }
 
         // Keep the PiP window's aspect ratio / auto-enter flag in sync with what is playing.
         if (supportsPip) {
             lifecycleScope.launch {
-                controller.state
+                activeStates()
                     .map { Triple(it.isPlaying, it.videoWidth, it.videoHeight) }
                     .distinctUntilChanged()
                     .collect { runCatching { setPictureInPictureParams(pipParams()) } }
@@ -100,8 +105,9 @@ class VideoPlayerActivity : ComponentActivity() {
 
         setContent {
             AiMusicCompanionTheme(darkTheme = true) {
-                VideoPlayerScreen(
-                    controller = controller,
+                val active = controller
+                if (active != null) VideoPlayerScreen(
+                    controller = active,
                     inPip = inPip,
                     isFullscreen = fullscreenRequested || landscape,
                     canPip = supportsPip,
@@ -109,21 +115,33 @@ class VideoPlayerActivity : ComponentActivity() {
                     onToggleFullscreen = ::toggleFullscreen,
                     onEnterPip = ::enterPip,
                     onPickSubtitleFile = { pickSubtitle.launch(arrayOf("*/*")) },
-                    onOpenFallbackEngine = {
-                        controller.state.value.current?.let { openFallbackEngine(it.id, controller.state.value.positionMs) }
-                    }
+                    onOpenFallbackEngine = ::switchToVlc
                 )
             }
         }
         applySystemBars()
     }
 
-    private var fallbackLaunched = false
-    private fun openFallbackEngine(videoId: Long, startMs: Long) {
-        if (fallbackLaunched) return
-        fallbackLaunched = true
-        VlcPlayerActivity.start(this, videoId, startMs, controller.state.value.queue.map { it.id })
-        finish()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun activeStates() = snapshotFlow { controller }.filterNotNull().flatMapLatest { it.state }
+
+    private fun createVlc(): VlcPlaybackController? = runCatching {
+        VlcPlaybackController(this, (application as AiMusicApp).videoRepository, lifecycleScope)
+    }.getOrNull()
+
+    /** Replaces ExoPlayer by libVLC in the SAME screen, continuing at the same video and position. */
+    private fun switchToVlc() {
+        val old = controller as? VideoPlaybackController ?: return
+        val s = old.state.value
+        val id = s.current?.id ?: return
+        val vlc = createVlc()
+        if (vlc == null) {
+            Toast.makeText(this, "موتور پخش جایگزین در این دستگاه اجرا نشد.", Toast.LENGTH_LONG).show()
+            return
+        }
+        old.release()
+        controller = vlc
+        lifecycleScope.launch { vlc.load(s.queue.map { it.id }, id, s.positionMs) }
     }
 
     // ---- orientation / fullscreen ----
@@ -166,7 +184,7 @@ class VideoPlayerActivity : ComponentActivity() {
     // ---- Picture-in-Picture ----
     private fun pipParams(): PictureInPictureParams {
         val builder = PictureInPictureParams.Builder()
-        val s = controller.state.value
+        val s = controller?.state?.value ?: return builder.build()
         if (s.videoWidth > 0 && s.videoHeight > 0) {
             // The system only accepts ratios between roughly 1:2.39 and 2.39:1.
             val ratio = (s.videoWidth.toFloat() / s.videoHeight).coerceIn(0.42f, 2.38f)
@@ -191,7 +209,7 @@ class VideoPlayerActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         // Android 8-11 have no auto-enter: Home button while playing -> small window.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ::controller.isInitialized && controller.player.isPlaying) enterPip()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && controller?.state?.value?.isPlaying == true) enterPip()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
@@ -203,21 +221,21 @@ class VideoPlayerActivity : ComponentActivity() {
     // ---- lifecycle: save position on pause / stop, release on exit ----
     override fun onPause() {
         super.onPause()
-        if (::controller.isInitialized) controller.saveCurrent()
+        controller?.saveCurrent()
     }
 
     override fun onStop() {
         super.onStop()
-        if (!::controller.isInitialized) return
+        val active = controller ?: return
         // While the PiP window is visible the activity is NOT stopped, so reaching onStop means the
         // user left the player (or closed the PiP window): pause, keep the position.
-        controller.saveCurrent()
-        controller.player.pause()
+        active.saveCurrent()
+        active.pause()
         if (inPip) finish()
     }
 
     override fun onDestroy() {
-        if (::controller.isInitialized) controller.release()
+        controller?.release()
         super.onDestroy()
     }
 

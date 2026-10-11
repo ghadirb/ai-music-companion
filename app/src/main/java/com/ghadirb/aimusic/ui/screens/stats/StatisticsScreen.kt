@@ -12,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,6 +30,9 @@ import com.ghadirb.aimusic.stats.InsightPeriods
 import com.ghadirb.aimusic.stats.InsightRange
 import com.ghadirb.aimusic.stats.JalaliCalendar
 import com.ghadirb.aimusic.stats.PeriodBounds
+import com.ghadirb.aimusic.stats.PeriodComparison
+import com.ghadirb.aimusic.stats.StatsInsights
+import com.ghadirb.aimusic.stats.Streak
 import com.ghadirb.aimusic.stats.StatsCalculator
 import com.ghadirb.aimusic.stats.StatsSummary
 import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
@@ -44,7 +49,15 @@ private val FREE_FLOW = MutableStateFlow(Entitlement.FREE)
 
 sealed interface StatsUiState {
     data object Loading : StatsUiState
-    data class Ready(val summary: StatsSummary, val profile: UserPreferenceEntity?, val range: InsightRange, val periodLabel: String) : StatsUiState
+    data class Ready(
+        val summary: StatsSummary,
+        val profile: UserPreferenceEntity?,
+        val range: InsightRange,
+        val periodLabel: String,
+        val comparison: PeriodComparison? = null,
+        val streak: Streak = Streak(0, 0, 0),
+        val nowMs: Long = 0L
+    ) : StatsUiState
     data object Error : StatsUiState
 }
 
@@ -83,10 +96,16 @@ class StatisticsViewModel(private val repository: MusicRepository) : ViewModel()
                 val now = System.currentTimeMillis()
                 val zone = TimeZone.getDefault()
                 val bounds = InsightPeriods.current(range, now, zone, persian = true)
-                val summary = withContext(Dispatchers.Default) {
-                    StatsCalculator.compute(tracks, history, now, sinceMs = bounds.startMs, untilMs = bounds.endMs, zone = zone)
+                val previousBounds = InsightPeriods.previous(range, now, zone, persian = true)
+                val computed = withContext(Dispatchers.Default) {
+                    val current = StatsCalculator.compute(tracks, history, now, sinceMs = bounds.startMs, untilMs = bounds.endMs, zone = zone)
+                    val comparison = previousBounds?.let { pb ->
+                        StatsInsights.compare(current, StatsCalculator.compute(tracks, history, now, sinceMs = pb.startMs, untilMs = pb.endMs, zone = zone))
+                    }
+                    val known = tracks.mapTo(HashSet()) { it.id }
+                    Triple(current, comparison, StatsInsights.streak(history.filter { it.trackId in known }.map { it.startTime }, now, zone))
                 }
-                StatsUiState.Ready(summary, profile, range, periodLabel(range, bounds, zone))
+                StatsUiState.Ready(computed.first, profile, range, periodLabel(range, bounds, zone), computed.second, computed.third, now)
             } catch (e: Exception) {
                 StatsUiState.Error
             }
@@ -125,8 +144,49 @@ fun StatisticsScreen(repository: MusicRepository) {
                     Text("برای این بازه هنوز داده‌ای نیست. چند آهنگ گوش کنید تا آمار ساخته شود.", style = MaterialTheme.typography.bodyMedium)
                     return@Column
                 }
-                StatRow("آهنگ‌های پخش‌شده", "${s.completedPlays} بار (${s.uniqueTracks} آهنگ متفاوت)")
-                StatRow("زمان گوش دادن", formatDuration(s.listenMs))
+                val previousLabel = StatsInsights.previousLabel(current.range)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HeroCard(
+                        "زمان گوش دادن", StatsInsights.duration(s.listenMs),
+                        current.comparison?.let { StatsInsights.deltaText(it.listenTime, previousLabel) },
+                        Modifier.weight(1f)
+                    )
+                    HeroCard(
+                        "پخش‌ها", "${s.completedPlays}",
+                        current.comparison?.let { StatsInsights.deltaText(it.plays, previousLabel) },
+                        Modifier.weight(1f)
+                    )
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HeroCard(
+                        "روزهای پیاپی 🔥", "${current.streak.current}",
+                        if (current.streak.best > 0) "بیشترین: ${current.streak.best} روز" else null,
+                        Modifier.weight(1f)
+                    )
+                    HeroCard(
+                        "آهنگ‌های متفاوت", "${s.uniqueTracks}",
+                        current.comparison?.let { StatsInsights.deltaText(it.uniqueTracks, previousLabel) },
+                        Modifier.weight(1f)
+                    )
+                }
+                val context = LocalContext.current
+                TextButton(onClick = {
+                    val text = StatsInsights.recapText(current.periodLabel, s, current.streak)
+                    context.startActivity(
+                        android.content.Intent.createChooser(
+                            android.content.Intent(android.content.Intent.ACTION_SEND)
+                                .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text),
+                            "اشتراک‌گذاری خلاصه"
+                        )
+                    )
+                }) { Text("اشتراک‌گذاری خلاصه") }
+
+                SectionTitle("روند ۱۴ روز اخیر (دقیقه)")
+                Bars(
+                    s.dailyMinutes,
+                    labels = StatsInsights.lastDaysInitials(current.nowMs, TimeZone.getDefault(), s.dailyMinutes.size),
+                    caption = s.dailyMinutes.maxOrNull()?.takeIf { it > 0 }?.let { "بیشترین: $it دقیقه" }
+                )
                 StatRow("میزان رد کردن", "${(s.skipRate * 100).toInt()}٪")
                 StatRow("علاقه‌مندی‌ها در کتابخانه", "${s.favoriteCount}")
 
@@ -148,11 +208,9 @@ fun StatisticsScreen(repository: MusicRepository) {
                     s.peakWeekday?.let { StatRow("پرشنیده‌ترین روز", WEEKDAYS[it]) }
                     StatRow("آهنگ‌های تازه‌کشف‌شده", "${s.discoveredTracks} (${(s.discoveryRate * 100).toInt()}٪ از آهنگ‌های شنیده‌شده)")
                     SectionTitle("ساعت‌های گوش دادن")
-                    Bars(s.playsByHour, labels = List(24) { if (it % 6 == 0) "$it" else "" })
+                    Bars(s.playsByHour, labels = List(24) { if (it % 6 == 0) "$it" else "" }, caption = s.peakHour?.let { "اوج: ساعت $it" })
                     SectionTitle("روزهای هفته (از یکشنبه)")
-                    Bars(s.playsByWeekday, labels = listOf("ی", "د", "س", "چ", "پ", "ج", "ش"))
-                    SectionTitle("روند ۱۴ روز اخیر (دقیقه)")
-                    Bars(s.dailyMinutes, labels = List(14) { "" })
+                    Bars(s.playsByWeekday, labels = listOf("ی", "د", "س", "چ", "پ", "ج", "ش"), caption = s.peakWeekday?.let { "اوج: ${WEEKDAYS[it]}" })
                     if (s.topSkipped.isNotEmpty()) {
                         SectionTitle("بیشترین ردشده‌ها")
                         s.topSkipped.forEach { Text("• ${it.track.title} — ${it.plays} بار", style = MaterialTheme.typography.bodyMedium) }
@@ -194,10 +252,7 @@ internal fun moodLabel(mood: String) = when (mood) {
     "calm" -> "آرام"; "energetic" -> "پرانرژی"; "happy" -> "شاد"; "sad" -> "غمگین"; "neutral" -> "خنثی"; else -> mood
 }
 
-internal fun formatDuration(ms: Long): String {
-    val minutes = ms / 60_000
-    return if (minutes >= 60) "${minutes / 60} ساعت و ${minutes % 60} دقیقه" else "$minutes دقیقه"
-}
+internal fun formatDuration(ms: Long): String = StatsInsights.duration(ms)
 
 @Composable
 internal fun SectionTitle(text: String) {
@@ -213,18 +268,39 @@ internal fun StatRow(label: String, value: String) {
 }
 
 @Composable
-private fun Bars(values: List<Int>, labels: List<String>) {
+private fun Bars(values: List<Int>, labels: List<String>, caption: String? = null) {
     val max = (values.maxOrNull() ?: 0).coerceAtLeast(1)
+    val peak = values.indexOf(values.maxOrNull() ?: 0).takeIf { (values.maxOrNull() ?: 0) > 0 }
+    caption?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp)) }
     Row(Modifier.fillMaxWidth().height(96.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-        values.forEach { v ->
+        values.forEachIndexed { i, v ->
             Box(
                 Modifier.weight(1f).fillMaxHeight(v.toFloat() / max * 0.95f + 0.02f)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = if (v == 0) 0.15f else 0.85f))
+                    .background(
+                        if (i == peak) MaterialTheme.colorScheme.tertiary
+                        else MaterialTheme.colorScheme.primary.copy(alpha = if (v == 0) 0.15f else 0.85f)
+                    )
             )
         }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        labels.forEach { Text(it, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f)) }
+        labels.forEach { Text(it, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) }
+    }
+}
+
+@Composable
+private fun HeroCard(title: String, value: String, note: String?, modifier: Modifier = Modifier) {
+    Card(modifier = modifier) {
+        Column(Modifier.padding(12.dp)) {
+            Text(title, style = MaterialTheme.typography.labelMedium)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 2.dp))
+            note?.let {
+                Text(
+                    it, style = MaterialTheme.typography.labelSmall,
+                    color = if (it.startsWith("▼")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+            }
+        }
     }
 }
 

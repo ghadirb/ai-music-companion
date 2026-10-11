@@ -84,6 +84,7 @@ fun LibraryScreen(
     val state by viewModel.uiState.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
+    val scanMessage by viewModel.scanMessage.collectAsState()
     var trackForPlaylistPicker by remember { mutableStateOf<TrackEntity?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -115,41 +116,32 @@ fun LibraryScreen(
         val ready = state as? LibraryUiState.Ready
         (ready?.tracks.orEmpty() + ready?.search?.tracks.orEmpty()).associateBy { it.id }
     }
-    var pendingDeleteIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var pendingCopyIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var pendingMove by remember { mutableStateOf(false) }
     var copyOrMoveTarget by remember { mutableStateOf<Set<Long>?>(null) }
     var trackPendingDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
 
-    val deleteLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && pendingDeleteIds.isNotEmpty()) {
-            viewModel.removeFromLibrary(pendingDeleteIds)
-            scope.launch { snackbarHostState.showSnackbar("${pendingDeleteIds.size} آهنگ حذف شد") }
-        }
-        pendingDeleteIds = emptySet()
+    LaunchedEffect(scanMessage) {
+        scanMessage?.let { snackbarHostState.showSnackbar(it); viewModel.consumeScanMessage() }
     }
+    // Real deletion from the phone (see rememberDeleteFlow): only files that are truly gone leave the Library.
+    val idByUri = remember { mutableMapOf<Uri, Long>() }
+    val deleteFlow = com.ghadirb.aimusic.ui.common.rememberDeleteFlow(
+        onDeleted = { uris ->
+            val ids = uris.mapNotNull { idByUri[it] }
+            if (ids.isNotEmpty()) {
+                viewModel.removeFromLibrary(ids)
+                scope.launch { snackbarHostState.showSnackbar("${ids.size} آهنگ از دستگاه حذف شد") }
+            }
+        },
+        onMessage = { text -> scope.launch { snackbarHostState.showSnackbar(text) } }
+    )
 
     fun requestDeleteTracks(targets: List<TrackEntity>) {
         if (targets.isEmpty()) return
-        scope.launch {
-            val idByUri = targets.mapNotNull { t -> runCatching { Uri.parse(t.path) }.getOrNull()?.let { it to t.id } }.toMap()
-            when (val outcome = TrackFileOps.requestDelete(context, idByUri.keys.toList())) {
-                is TrackFileOps.DeleteOutcome.Deleted -> {
-                    val ids = outcome.uris.mapNotNull { idByUri[it] }
-                    viewModel.removeFromLibrary(ids)
-                    snackbarHostState.showSnackbar("${ids.size} آهنگ حذف شد")
-                }
-                is TrackFileOps.DeleteOutcome.NeedsConfirmation -> {
-                    pendingDeleteIds = outcome.uris.mapNotNull { idByUri[it] }.toSet()
-                    deleteLauncher.launch(IntentSenderRequest.Builder(outcome.intentSender).build())
-                }
-                is TrackFileOps.DeleteOutcome.Failed -> {
-                    snackbarHostState.showSnackbar(outcome.reason)
-                }
-            }
-        }
+        idByUri.clear()
+        targets.forEach { t -> runCatching { Uri.parse(t.path) }.getOrNull()?.let { idByUri[it] = t.id } }
+        deleteFlow(idByUri.keys.toList())
     }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -251,9 +243,11 @@ fun LibraryScreen(
         },
         floatingActionButton = {
             if (!isSelectionMode) {
-                FloatingActionButton(onClick = { viewModel.scanLibrary() }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.scan_library))
-                }
+                ExtendedFloatingActionButton(
+                    onClick = { viewModel.scanLibrary() },
+                    icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
+                    text = { Text(if (isScanning) "در حال جستجو…" else "جستجوی آهنگ جدید") }
+                )
             }
         }
     ) { padding ->

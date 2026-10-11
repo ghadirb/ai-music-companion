@@ -160,12 +160,17 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
     LaunchedEffect(Unit) { vm.refresh() }
 
     var pendingDelete by remember { mutableStateOf<VideoEntity?>(null) }
-    var awaitingSystemConfirm by remember { mutableStateOf<VideoEntity?>(null) }
-    val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        val video = awaitingSystemConfirm
-        awaitingSystemConfirm = null
-        if (video != null && result.resultCode == android.app.Activity.RESULT_OK) vm.onDeleted(listOf(video))
-    }
+    val deletingByUri = remember { mutableMapOf<Uri, VideoEntity>() }
+    val deleteFlow = com.ghadirb.aimusic.ui.common.rememberDeleteFlow(
+        onDeleted = { uris ->
+            val gone = uris.mapNotNull { deletingByUri[it] }
+            if (gone.isNotEmpty()) {
+                vm.onDeleted(gone)
+                android.widget.Toast.makeText(context, "ویدئو از حافظهٔ گوشی حذف شد", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        },
+        onMessage = { text -> android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show() }
+    )
 
     fun open(video: VideoEntity) {
         VideoPlayerActivity.start(context, video.id, state.videos.map { it.id })
@@ -179,16 +184,10 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
             confirmButton = {
                 TextButton(onClick = {
                     pendingDelete = null
-                    scope.launch {
-                        when (val outcome = TrackFileOps.requestDelete(context, listOf(Uri.parse(video.contentUri)))) {
-                            is TrackFileOps.DeleteOutcome.Deleted -> if (outcome.uris.isNotEmpty()) vm.onDeleted(listOf(video))
-                            is TrackFileOps.DeleteOutcome.NeedsConfirmation -> {
-                                awaitingSystemConfirm = video
-                                deleteLauncher.launch(IntentSenderRequest.Builder(outcome.intentSender).build())
-                            }
-                            is TrackFileOps.DeleteOutcome.Failed -> android.widget.Toast.makeText(context, outcome.reason, android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                    val uri = Uri.parse(video.contentUri)
+                    deletingByUri.clear()
+                    deletingByUri[uri] = video
+                    deleteFlow(listOf(uri))
                 }) { Text("حذف") }
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("انصراف") } }

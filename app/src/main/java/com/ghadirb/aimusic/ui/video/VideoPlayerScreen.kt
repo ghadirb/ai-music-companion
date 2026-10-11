@@ -43,7 +43,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.ghadirb.aimusic.video.PlaybackSpeeds
+import com.ghadirb.aimusic.video.VideoController
 import com.ghadirb.aimusic.video.VideoPlaybackController
+import com.ghadirb.aimusic.video.VlcPlaybackController
+import org.videolan.libvlc.util.VLCVideoLayout
 import kotlinx.coroutines.delay
 
 private const val CONTROLS_HIDE_MS = 3_500L
@@ -55,7 +59,7 @@ private const val CONTROLS_HIDE_MS = 3_500L
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(
-    controller: VideoPlaybackController,
+    controller: VideoController,
     inPip: Boolean,
     isFullscreen: Boolean,
     canPip: Boolean,
@@ -74,11 +78,12 @@ fun VideoPlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var interactions by remember { mutableIntStateOf(0) }
     var showSubtitles by remember { mutableStateOf(false) }
+    var showAudio by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
 
     // Auto-hide while playing; any interaction restarts the timer.
-    LaunchedEffect(controlsVisible, state.isPlaying, interactions, showSubtitles, showQueue) {
-        if (controlsVisible && state.isPlaying && !showSubtitles && !showQueue) {
+    LaunchedEffect(controlsVisible, state.isPlaying, interactions, showSubtitles, showQueue, showAudio) {
+        if (controlsVisible && state.isPlaying && !showSubtitles && !showQueue && !showAudio) {
             delay(CONTROLS_HIDE_MS)
             controlsVisible = false
         }
@@ -92,19 +97,27 @@ fun VideoPlayerScreen(
         onTap = { controlsVisible = !controlsVisible },
         modifier = Modifier.background(Color.Black)
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    keepScreenOn = true
-                    player = controller.player
-                }
-            },
-            update = { it.player = controller.player },
-            onRelease = { it.player = null }
-        )
+        when (controller) {
+            is VideoPlaybackController -> AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        useController = false
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        keepScreenOn = true
+                        player = controller.player
+                    }
+                },
+                update = { it.player = controller.player },
+                onRelease = { it.player = null }
+            )
+            is VlcPlaybackController -> AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx -> VLCVideoLayout(ctx).also { controller.attachViews(it) } },
+                onRelease = { controller.detachViews() }
+            )
+            else -> Unit
+        }
 
         if (state.audioUnsupported && state.error == null && !inPip) {
             Column(
@@ -147,6 +160,8 @@ fun VideoPlayerScreen(
                 onToggleFullscreen = onToggleFullscreen,
                 onEnterPip = onEnterPip,
                 onSubtitles = { showSubtitles = true },
+                onAudio = { showAudio = true },
+                onSpeed = { controller.setSpeed(PlaybackSpeeds.next(state.speed)) },
                 onQueue = { showQueue = true },
                 onInteract = { interactions++ }
             )
@@ -193,6 +208,24 @@ fun VideoPlayerScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showSubtitles = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showAudio) {
+        AlertDialog(
+            onDismissRequest = { showAudio = false },
+            title = { Text("انتخاب صدا") },
+            text = {
+                Column {
+                    if (state.audioTracks.isEmpty()) {
+                        Text("صدای دیگری برای انتخاب وجود ندارد.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    state.audioTracks.forEach { option ->
+                        SubtitleRow(option.label, selected = option.selected) { controller.selectAudio(option.index); showAudio = false }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAudio = false }) { Text("بستن") } }
         )
     }
 
