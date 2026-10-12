@@ -225,6 +225,36 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        val rescueScope = rememberCoroutineScope()
+        var rescueBusy by remember { mutableStateOf(false) }
+        var rescueResult by remember { mutableStateOf<String?>(null) }
+        ListItem(
+            headlineContent = { Text("یافتن فایل‌های ناشناخته در حافظه") },
+            supportingContent = {
+                Column {
+                    Text("اگر آهنگ یا ویدیویی روی گوشی هست و در فایل‌ها پخش می‌شود ولی در برنامه دیده نمی‌شود (مثلاً بعد از یک حذف نیمه‌کاره)، اینجا دوباره به سیستم معرفی می‌شود.")
+                    rescueResult?.let { Text(it) }
+                    TextButton(enabled = !rescueBusy, onClick = {
+                        rescueBusy = true
+                        rescueResult = null
+                        rescueScope.launch {
+                            val app = context.applicationContext as com.ghadirb.aimusic.AiMusicApp
+                            val found = runCatching {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.rescueUnindexedMedia() }
+                            }.getOrDefault(-1)
+                            rescueResult = when {
+                                found < 0 -> "دسترسی به حافظه ممکن نشد. اجازهٔ دسترسی به موسیقی و ویدیو را بررسی کنید."
+                                found == 0 -> "فایل ناشناخته‌ای پیدا نشد."
+                                else -> "$found فایل پیدا و دوباره معرفی شد. تب‌های موسیقی و ویدیو را باز کنید."
+                            }
+                            rescueBusy = false
+                        }
+                    }) { Text(if (rescueBusy) "در حال جستجو…" else "جستجو و معرفی دوباره") }
+                }
+            }
+        )
+        HorizontalDivider()
+
         val libraryWatchStore = remember { com.ghadirb.aimusic.library.LibraryWatchStore(context) }
         var libraryWatchEnabled by remember { mutableStateOf(libraryWatchStore.enabled) }
         var libraryWatchSummary by remember { mutableStateOf(libraryWatchStore.pendingSummary) }

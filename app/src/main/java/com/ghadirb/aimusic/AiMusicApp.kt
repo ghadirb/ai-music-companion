@@ -94,6 +94,21 @@ class AiMusicApp : Application() {
     @Volatile private var lastForegroundScan = 0L
 
     /**
+     * Re-indexes songs/videos that are on the phone but unknown to Android's media database (so the app could
+     * not see them, even after a reinstall), then refreshes the library. Returns how many files were found,
+     * or -1 when storage is not readable yet (no permission). Videos are re-synced when the video tab opens.
+     */
+    suspend fun rescueUnindexedMedia(): Int {
+        val result = com.ghadirb.aimusic.library.MediaRescue.scanAll(this)
+        if (!result.readable) return -1
+        if (result.found > 0) {
+            val added = runCatching { repository.rescanLibrary() }.getOrDefault(emptyList())
+            if (added.isNotEmpty()) com.ghadirb.aimusic.analysis.AudioAnalysisWorker.enqueueNow(this)
+        }
+        return result.found
+    }
+
+    /**
      * Cheap on-device MediaStore re-sync whenever the app comes to the foreground (at most once a minute),
      * so a song copied to the phone shows up when the app is opened - no setting needed. New songs are
      * handed to the analyzer like after a manual scan.
@@ -102,6 +117,19 @@ class AiMusicApp : Application() {
         val now = System.currentTimeMillis()
         if (now - lastForegroundScan < 60_000L) return
         lastForegroundScan = now
+        // One time after this update: bring back files that exist on the phone but are missing from MediaStore.
+        val rescuePrefs = getSharedPreferences("media_rescue", MODE_PRIVATE)
+        if (!rescuePrefs.getBoolean("done_v1", false)) {
+            appScope.launch {
+                try {
+                    if (rescueUnindexedMedia() >= 0) rescuePrefs.edit().putBoolean("done_v1", true).apply()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Try again next time the app comes to the foreground.
+                }
+            }
+        }
         appScope.launch {
             try {
                 val added = repository.rescanLibrary()
