@@ -96,6 +96,9 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
     private val downloader: OnlineDownloader = app.onlineDownloader
     private val importer = ArchiveImporter(downloader, File(app.cacheDir, "zipcache"))
     private val controller = PlayerController(application)
+    private val downloadQuota = com.ghadirb.aimusic.premium.DailyDownloadQuota(
+        com.ghadirb.aimusic.premium.PrefsQuotaStorage(application.getSharedPreferences("freemium_quota", android.content.Context.MODE_PRIVATE))
+    )
 
     private val _ui = MutableStateFlow(OnlineUiState())
     val ui: StateFlow<OnlineUiState> = _ui.asStateFlow()
@@ -144,6 +147,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
     // ------------------------------------------------------------------ list of new songs
 
     fun setTab(tab: OnlineTab) {
+        if (tab == OnlineTab.SINGERS && !SINGERS_ENABLED) return // ZIP singer collections are switched off
         _ui.update { it.copy(tab = tab, openArtist = null, collections = emptyList(), archive = null) }
         if (tab == OnlineTab.SINGERS && _ui.value.artists.isEmpty()) loadSingers()
     }
@@ -180,6 +184,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
     // ------------------------------------------------------------------ singer collections
 
     private fun loadSingers() {
+        if (!SINGERS_ENABLED) return
         singersJob?.cancel()
         singersJob = viewModelScope.launch {
             _ui.update { it.copy(artistsLoading = true) }
@@ -212,6 +217,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun openCollection(c: OnlineCollection) {
+        if (!SINGERS_ENABLED) return
         _ui.update { it.copy(archive = ArchiveState(c)) }
         viewModelScope.launch {
             val outcome = try { repo.archive(c) } catch (e: CancellationException) { throw e } catch (_: Exception) { ArchiveOutcome.Offline }
@@ -349,10 +355,23 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
 
     fun cancel() { cancelDownload = true }
 
+    private fun isPremiumNow(): Boolean = app.entitlements.isAllowed(com.ghadirb.aimusic.premium.PremiumFeature.UNLIMITED_ONLINE_DOWNLOADS)
+
+    /** Free downloads left today, or null when the plan has no daily limit. [premium] lets the UI pass its observed plan state. */
+    fun freeDownloadsLeft(premium: Boolean = isPremiumNow()): Int? =
+        if (premium) null else downloadQuota.remaining(com.ghadirb.aimusic.premium.FreemiumPolicy.config.freeDailyOnlineDownloads, System.currentTimeMillis())
+
+    fun canDownload(premium: Boolean = isPremiumNow()): Boolean = freeDownloadsLeft(premium).let { it == null || it > 0 }
+
     private fun busy() = downloadJob?.isActive == true
 
     fun downloadSong(t: OnlineTrack) {
         if (busy()) return
+        val premium = isPremiumNow()
+        if (!canDownload(premium)) {
+            say(UiMessage(R.string.online_free_limit_reached, listOf(com.ghadirb.aimusic.premium.FreemiumPolicy.config.freeDailyOnlineDownloads)))
+            return
+        }
         cancelDownload = false
         downloadJob = viewModelScope.launch {
             _ui.update { it.copy(downloadPercent = -1) }
@@ -369,7 +388,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
             }
             _ui.update { it.copy(downloadPercent = null) }
             when (result) {
-                is DownloadResult.Ok -> { addToLibrary(listOf(result.file), t.title, t.artist); say(UiMessage(R.string.online_downloaded_one, listOf(t.display))) }
+                is DownloadResult.Ok -> { if (!premium) downloadQuota.record(System.currentTimeMillis()); addToLibrary(listOf(result.file), t.title, t.artist); say(UiMessage(R.string.online_downloaded_one, listOf(t.display))) }
                 is DownloadResult.Failed -> say(UiMessage(R.string.online_download_failed, listOf(result.reason)))
                 null -> say(UiMessage(R.string.online_no_link))
             }
@@ -378,7 +397,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
 
     /** [paths] = one song of the archive, null = the whole collection. */
     fun downloadFromArchive(c: OnlineCollection, paths: Set<String>?) {
-        if (busy()) return
+        if (!SINGERS_ENABLED || busy()) return
         cancelDownload = false
         downloadJob = viewModelScope.launch {
             _ui.update { it.copy(downloadPercent = -1) }
@@ -405,7 +424,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
 
     /** Plays one song of an archive: the archive is downloaded first (cached for an hour), the song extracted, then played as a local file. */
     fun playFromArchive(c: OnlineCollection, entry: ArchiveTrack) {
-        if (busy()) return
+        if (!SINGERS_ENABLED || busy()) return
         cancelDownload = false
         downloadJob = viewModelScope.launch {
             _ui.update { it.copy(downloadPercent = -1) }

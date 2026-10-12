@@ -54,6 +54,9 @@ enum class PremiumFeature(val titleFa: String, val descriptionFa: String) {
     ADVANCED_REDISCOVER("کشف مجدد پیشرفته", "آهنگ‌هایی که مدت‌هاست نشنیده‌اید را با فاصلهٔ زمانی دلخواه پیدا کنید."),
     ADVANCED_INSIGHTS("بینش‌های شنیداری", "تحلیل سلیقه: BPM، محدودهٔ انرژی، ساعت‌های اوج شنیدن و رفتار رد کردن."),
     ADVANCED_STATISTICS("آمار پیشرفته", "ژانرها، حال‌وهوا، روزهای هفته و روند شنیدن شما."),
+    UNLIMITED_ONLINE_DOWNLOADS("دانلود نامحدود آهنگ‌های جدید", "کاربر رایگان هر روز چند آهنگ از تب «آهنگ‌های جدید» را به کتابخانه اضافه می‌کند؛ با پرمیوم این سقف روزانه برداشته می‌شود. پخش آنلاین همیشه رایگان است."),
+    ALL_OCCASION_MIXES("همهٔ میکس‌های «برای هر موقعیت»", "علاوه بر چند موقعیت رایگان، همهٔ موقعیت‌ها (شاد، تمرکز، شب، غمگین، شروع روز، پرانرژی) را کامل پخش و ذخیره کنید."),
+    PERSONAL_MIXES("میکس‌های شخصی‌سازی‌شده", "میکس‌های فراموش‌شده‌ها، گنج‌های پنهان، میکس فارسی و تصادفی از سلیقهٔ شما را کامل پخش، رادیو و ذخیره کنید."),
     ONLINE_LYRICS("متن آنلاین (بعداً)", "متن آهنگ از سرویس دارای مجوز؛ به‌محض افزوده‌شدن فعال می‌شود.")
 }
 
@@ -71,6 +74,9 @@ object FeatureGate {
         PremiumFeature.ADVANCED_REDISCOVER to Plan.PREMIUM,
         PremiumFeature.ADVANCED_INSIGHTS to Plan.PREMIUM,
         PremiumFeature.ADVANCED_STATISTICS to Plan.PREMIUM,
+        PremiumFeature.UNLIMITED_ONLINE_DOWNLOADS to Plan.PREMIUM,
+        PremiumFeature.ALL_OCCASION_MIXES to Plan.PREMIUM,
+        PremiumFeature.PERSONAL_MIXES to Plan.PREMIUM,
         PremiumFeature.ONLINE_LYRICS to Plan.PREMIUM
     )
 

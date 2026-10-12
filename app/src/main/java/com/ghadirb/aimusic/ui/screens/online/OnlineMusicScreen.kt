@@ -75,6 +75,20 @@ import java.util.Locale
  */
 const val SINGERS_ENABLED = false
 
+/**
+ * One entry point for "add to library" from the list and from the full player: free users have a daily
+ * allowance; when it is used up the (non-intrusive) upgrade dialog is shown instead of downloading.
+ */
+@Composable
+internal fun rememberDownloadAction(vm: OnlineMusicViewModel): (OnlineTrack) -> Unit {
+    val access = com.ghadirb.aimusic.ui.premium.LocalPremiumAccess.current
+    return { track ->
+        val premium = access?.isAllowed(com.ghadirb.aimusic.premium.PremiumFeature.UNLIMITED_ONLINE_DOWNLOADS) == true
+        if (vm.canDownload(premium) || access == null) vm.downloadSong(track)
+        else access.require(com.ghadirb.aimusic.premium.PremiumFeature.UNLIMITED_ONLINE_DOWNLOADS) { vm.downloadSong(track) }
+    }
+}
+
 private fun mb(bytes: Long): String = String.format(Locale.US, "%.1f", bytes / 1048576.0)
 
 /** "آهنگ‌های جدید": new songs of the last 3/6 months, singer collections (ZIP) and online favourites. */
@@ -195,6 +209,12 @@ private fun TrackList(tracks: List<OnlineTrack>, state: OnlineUiState, vm: Onlin
 @Composable
 private fun TrackRow(t: OnlineTrack, favorite: Boolean, onPlay: () -> Unit, vm: OnlineMusicViewModel) {
     var menu by remember { mutableStateOf(false) }
+    val access = com.ghadirb.aimusic.ui.premium.LocalPremiumAccess.current
+    // Subscribing to the entitlement makes the label update right after an upgrade.
+    val plan by (access?.entitlement ?: kotlinx.coroutines.flow.MutableStateFlow(com.ghadirb.aimusic.premium.Entitlement.FREE)).collectAsState()
+    val premium = plan.isPremiumAt(System.currentTimeMillis())
+    val left = vm.freeDownloadsLeft(premium)
+    val download = rememberDownloadAction(vm)
     val best = t.versions.firstOrNull()
     val sub = buildString {
         if (!t.artist.isNullOrBlank()) append(t.artist)
@@ -217,7 +237,15 @@ private fun TrackRow(t: OnlineTrack, favorite: Boolean, onPlay: () -> Unit, vm: 
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text(stringResource(R.string.online_play_next)) }, onClick = { menu = false; vm.addNext(t) })
                         DropdownMenuItem(text = { Text(stringResource(R.string.online_add_queue)) }, onClick = { menu = false; vm.addLast(t) })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.online_download_song)) }, onClick = { menu = false; vm.downloadSong(t) })
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (left == null) stringResource(R.string.online_download_song)
+                                    else stringResource(R.string.online_download_song_quota, left, com.ghadirb.aimusic.premium.FreemiumPolicy.config.freeDailyOnlineDownloads)
+                                )
+                            },
+                            onClick = { menu = false; download(t) }
+                        )
                     }
                 }
             }

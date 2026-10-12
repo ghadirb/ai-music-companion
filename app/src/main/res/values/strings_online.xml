@@ -37,6 +37,8 @@
     <string name="online_downloaded_one">«%1$s» به کتابخانه اضافه شد.</string>
     <string name="online_downloaded_many">%1$d آهنگ به کتابخانه اضافه شد.</string>
     <string name="online_downloaded_partial">%1$d آهنگ اضافه شد، %2$d آهنگ قابل استفاده نبود.</string>
+    <string name="online_download_song_quota">افزودن به کتابخانه (%1$d از %2$d امروز)</string>
+    <string name="online_free_limit_reached">سقف دانلود رایگان امروز (%1$d آهنگ) تمام شد. پخش آنلاین همچنان رایگان است؛ برای دانلود نامحدود پرمیوم را فعال کنید یا فردا دوباره امتحان کنید.</string>
     <string name="online_download_failed">دانلود انجام نشد (%1$s).</string>
     <string name="online_now_playing">در حال پخش</string>
     <string name="online_last_updated">آخرین تاریخ: %1$s</string>

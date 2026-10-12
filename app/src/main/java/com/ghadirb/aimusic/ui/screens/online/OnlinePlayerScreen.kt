@@ -63,6 +63,7 @@ import kotlinx.coroutines.delay
  */
 @Composable
 internal fun OnlinePlayerScreen(state: OnlineUiState, vm: OnlineMusicViewModel, onCollapse: () -> Unit) {
+    val download = rememberDownloadAction(vm)
     LaunchedEffect(Unit) {
         while (true) { vm.tick(); delay(500) }
     }
@@ -145,7 +146,7 @@ internal fun OnlinePlayerScreen(state: OnlineUiState, vm: OnlineMusicViewModel, 
                     IconButton(onClick = { vm.toggleFavorite(track) }) {
                         Icon(if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, contentDescription = if (favorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
                     }
-                    IconButton(onClick = { vm.downloadSong(track) }) {
+                    IconButton(onClick = { download(track) }) {
                         Icon(Icons.Filled.Download, contentDescription = "دانلود آهنگ")
                     }
                 }
