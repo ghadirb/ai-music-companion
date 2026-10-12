@@ -180,6 +180,8 @@ class PlayerController(private val context: Context) {
     fun currentUri(): String? = controller?.currentMediaItem?.localConfiguration?.uri?.toString()
     fun currentTitle(): String? = controller?.currentMediaItem?.mediaMetadata?.title?.toString()
     fun currentArtist(): String? = controller?.currentMediaItem?.mediaMetadata?.artist?.toString()
+    /** Cover bytes of the current item: the embedded ID3 picture Media3 reads from a streamed file (null when the file has none). */
+    fun currentArtworkData(): ByteArray? = controller?.mediaMetadata?.artworkData
     fun hasNext(): Boolean = controller?.hasNextMediaItem() ?: false
     fun shuffleEnabled(): Boolean = controller?.shuffleModeEnabled ?: false
     fun repeatMode(): Int = controller?.repeatMode ?: Player.REPEAT_MODE_OFF

@@ -1,7 +1,12 @@
 package com.ghadirb.aimusic.ui.screens.online
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +90,10 @@ fun OnlineMusicScreen(viewModel: OnlineMusicViewModel) {
         snackbar.showSnackbar(ctx.getString(m.res, *m.args.toTypedArray()))
         viewModel.messageShown()
     }
+    var playerOpen by rememberSaveable { mutableStateOf(false) }
+    // Nothing streamed is playing any more -> the full player has nothing to show.
+    LaunchedEffect(state.nowTitle) { if (state.nowTitle == null) playerOpen = false }
+    BackHandler(enabled = playerOpen) { playerOpen = false }
     BackHandler(enabled = state.tab == OnlineTab.SINGERS && (state.openArtist != null || state.archive != null)) { viewModel.back() }
 
     Box(Modifier.fillMaxSize()) {
@@ -107,8 +117,9 @@ fun OnlineMusicScreen(viewModel: OnlineMusicViewModel) {
                     OnlineTab.FAVORITES -> TrackList(state.favorites, state, viewModel, stringResource(R.string.online_empty_favorites))
                 }
             }
-            if (state.nowTitle != null) NowPlayingBar(state, viewModel)
+            if (state.nowTitle != null) NowPlayingBar(state, viewModel, onOpen = { playerOpen = true })
         }
+        if (playerOpen && state.nowTitle != null) OnlinePlayerScreen(state, viewModel, onCollapse = { playerOpen = false })
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
 }
@@ -129,10 +140,15 @@ private fun DownloadBar(percent: Int, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun NowPlayingBar(state: OnlineUiState, vm: OnlineMusicViewModel) {
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+private fun NowPlayingBar(state: OnlineUiState, vm: OnlineMusicViewModel, onOpen: () -> Unit) {
+    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+            val cover = state.nowArtwork
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
+                if (cover != null) Image(cover, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp))
+                else CoverPlaceholder(state.nowTitle.orEmpty(), Modifier.size(44.dp), iconSize = 22)
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(state.nowTitle.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                 if (!state.nowArtist.isNullOrBlank()) Text(state.nowArtist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             }

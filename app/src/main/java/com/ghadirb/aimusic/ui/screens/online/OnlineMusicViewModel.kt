@@ -3,8 +3,11 @@ package com.ghadirb.aimusic.ui.screens.online
 import android.app.Application
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.graphics.BitmapFactory
 import android.os.Environment
 import androidx.annotation.StringRes
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -72,6 +75,14 @@ data class OnlineUiState(
     val nowTitle: String? = null,
     val nowArtist: String? = null,
     val isPlaying: Boolean = false,
+    /** The streamed song now playing (null for ZIP entries / after a process restart), used for favourite + download in the expanded player. */
+    val nowTrack: OnlineTrack? = null,
+    /** Embedded cover art of the playing file, null when it has none (the UI shows a placeholder). */
+    val nowArtwork: ImageBitmap? = null,
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+    val shuffle: Boolean = false,
+    val repeatMode: Int = Player.REPEAT_MODE_OFF,
     /** 0..100 while a download runs, -1 = running without a known size, null = idle. */
     val downloadPercent: Int? = null,
     val message: UiMessage? = null,
@@ -106,6 +117,9 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = syncNowPlaying()
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) = refreshArtwork()
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = syncNowPlaying()
+        override fun onRepeatModeChanged(repeatMode: Int) = syncNowPlaying()
         override fun onPlayerError(error: PlaybackException) {
             val id = onlineTrackIdOf(controller.currentMediaId()) ?: return
             val track = queued[id] ?: return
@@ -248,6 +262,17 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
 
     fun togglePlayPause() = controller.togglePlayPause()
     fun skipNext() = controller.skipNext()
+    fun skipPrevious() = controller.skipPrevious()
+    fun toggleShuffle() { controller.setShuffle(!controller.shuffleEnabled()); syncNowPlaying() }
+    fun cycleRepeat() { controller.cycleRepeatMode(); syncNowPlaying() }
+    fun seekTo(positionMs: Long) { controller.seekTo(positionMs); _ui.update { it.copy(positionMs = positionMs) } }
+
+    /** Polled by the expanded player (twice a second while it is open); a no-op when nothing changed. */
+    fun tick() {
+        val p = controller.currentPosition()
+        val d = controller.duration()
+        _ui.update { if (it.positionMs == p && it.durationMs == d) it else it.copy(positionMs = p, durationMs = d) }
+    }
 
     /** Another source's copy of the SAME song, or a skip when nobody has one that works. */
     private suspend fun recover(track: OnlineTrack, index: Int, badUri: String?) {
@@ -267,15 +292,46 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun syncNowPlaying() {
-        val online = onlineTrackIdOf(controller.currentMediaId()) != null || controller.currentMediaId()?.startsWith("zip:") == true
+        val mediaId = controller.currentMediaId()
+        val online = onlineTrackIdOf(mediaId) != null || mediaId?.startsWith("zip:") == true
         _ui.update {
             it.copy(
                 nowTitle = if (online) controller.currentTitle() else null,
                 nowArtist = if (online) controller.currentArtist() else null,
                 isPlaying = online && controller.isPlaying(),
+                nowTrack = if (online) onlineTrackIdOf(mediaId)?.let { id -> queued[id] } else null,
+                shuffle = controller.shuffleEnabled(),
+                repeatMode = controller.repeatMode(),
             )
         }
+        refreshArtwork()
     }
+
+    private var artworkKey: String? = null
+
+    /** Decodes the embedded cover of the current streamed file (downscaled), or clears it. Cheap when nothing changed. */
+    private fun refreshArtwork() {
+        val mediaId = controller.currentMediaId()
+        val online = onlineTrackIdOf(mediaId) != null || mediaId?.startsWith("zip:") == true
+        val data = if (online) controller.currentArtworkData() else null
+        val key = if (data == null) null else "$mediaId:${data.size}"
+        if (key == artworkKey) return
+        artworkKey = key
+        if (data == null) { _ui.update { it.copy(nowArtwork = null) }; return }
+        viewModelScope.launch {
+            val bitmap = withContext(Dispatchers.Default) { decodeCover(data) }
+            if (artworkKey == key) _ui.update { it.copy(nowArtwork = bitmap) }
+        }
+    }
+
+    private fun decodeCover(data: ByteArray): ImageBitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1024) sample *= 2
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        BitmapFactory.decodeByteArray(data, 0, data.size, opts)?.asImageBitmap()
+    }.getOrNull()
 
     // ------------------------------------------------------------------ favourites
 
