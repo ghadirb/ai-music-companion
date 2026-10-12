@@ -150,7 +150,9 @@ dependencies {
     implementation("androidx.media3:media3-common:1.4.1")
 
     // Fallback video engine (LGPL-2.1): AVI/WMV/RMVB/VOB, DTS/AC3, codecs the phone lacks.
-    implementation("org.videolan.android:libvlc-all:3.6.0")
+    // 3.7.x = newest stable 3.x line on Maven Central (4.0.0-eap* are previews and deliberately NOT used).
+    // Upgraded from 3.6.0 for newer FFmpeg/dav1d codec updates and fixes. Does NOT add H.266/VVC (see docs/video-engine.md).
+    implementation("org.videolan.android:libvlc-all:3.7.6")
 
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
