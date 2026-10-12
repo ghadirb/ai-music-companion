@@ -29,6 +29,12 @@ import com.ghadirb.aimusic.video.VideoPlaybackController
 import com.ghadirb.aimusic.video.VlcFallbackPolicy
 import androidx.compose.runtime.snapshotFlow
 import com.ghadirb.aimusic.video.VideoController
+import com.ghadirb.aimusic.video.DeviceDecoderCaps
+import com.ghadirb.aimusic.video.MediaProbe
+import com.ghadirb.aimusic.video.VideoDiagnosis
+import com.ghadirb.aimusic.video.VideoEngineAdvisor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.ghadirb.aimusic.video.VlcPlaybackController
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -57,6 +63,9 @@ class VideoPlayerActivity : ComponentActivity() {
             packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
+    /** Why this file cannot play (codec names only); shown under the error message when playback fails. */
+    private val diagnosisState = androidx.compose.runtime.mutableStateOf<String?>(null)
+
     private val pickSubtitle = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
         val name = runCatching {
@@ -80,9 +89,19 @@ class VideoPlayerActivity : ComponentActivity() {
         val startId = intent.getLongExtra(EXTRA_VIDEO_ID, -1L)
         val ids = intent.getLongArrayExtra(EXTRA_QUEUE)?.toList().orEmpty().ifEmpty { listOf(startId) }
         lifecycleScope.launch {
-            // Legacy containers (AVI, WMV ...) go straight to the libVLC engine; everything else starts on ExoPlayer.
+            // The engine is chosen from what the file really contains and what this phone can decode (not the extension
+            // alone): legacy containers, missing video/audio decoders and H.266 start on libVLC, the rest on ExoPlayer.
             val first = app.videoRepository.getMany(listOf(startId)).firstOrNull()
-            val vlc = if (first != null && VlcFallbackPolicy.prefersVlc(first.displayName)) createVlc() else null
+            var useVlc = false
+            if (first != null) {
+                val caps = DeviceDecoderCaps()
+                val probe = withContext(Dispatchers.IO) {
+                    MediaProbe.probe(this@VideoPlayerActivity, android.net.Uri.parse(first.contentUri))
+                }
+                useVlc = VideoEngineAdvisor.advise(first.displayName, probe, caps).engine == VideoEngineAdvisor.Engine.VLC
+                diagnosisState.value = VideoDiagnosis.explain(probe, caps)
+            }
+            val vlc = if (useVlc) createVlc() else null
             val engine: VideoController = vlc ?: VideoPlaybackController(this@VideoPlayerActivity, app.videoRepository, lifecycleScope)
             controller = engine
             engine.load(ids, startId)
@@ -115,7 +134,8 @@ class VideoPlayerActivity : ComponentActivity() {
                     onToggleFullscreen = ::toggleFullscreen,
                     onEnterPip = ::enterPip,
                     onPickSubtitleFile = { pickSubtitle.launch(arrayOf("*/*")) },
-                    onOpenFallbackEngine = ::switchToVlc
+                    onOpenFallbackEngine = ::switchToVlc,
+                    diagnosis = diagnosisState.value
                 )
             }
         }

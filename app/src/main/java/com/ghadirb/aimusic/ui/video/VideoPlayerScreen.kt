@@ -68,7 +68,9 @@ fun VideoPlayerScreen(
     onToggleFullscreen: () -> Unit,
     onEnterPip: () -> Unit,
     onPickSubtitleFile: () -> Unit,
-    onOpenFallbackEngine: () -> Unit = {}
+    onOpenFallbackEngine: () -> Unit = {},
+    /** Why the file cannot play (real codecs vs this phone's decoders), shown under the error. */
+    diagnosis: String? = null
 ) {
     val state by controller.state.collectAsState()
     val context = LocalContext.current
@@ -189,6 +191,9 @@ fun VideoPlayerScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(message, color = Color.White, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
+                    if (diagnosis != null) {
+                        Text(diagnosis, color = Color(0xFFCCCCCC), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (state.queue.isNotEmpty()) Button(onClick = controller::retry) { Text("تلاش دوباره") }
                         if (!state.softwareDecoding && state.queue.isNotEmpty()) {
