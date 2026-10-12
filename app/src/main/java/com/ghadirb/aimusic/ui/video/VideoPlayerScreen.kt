@@ -102,6 +102,9 @@ fun VideoPlayerScreen(
 
     PlayerGestureLayer(
         onTap = { controlsVisible = !controlsVisible },
+        positionMs = { state.positionMs },
+        durationMs = { state.durationMs },
+        onSeekTo = { ms -> controller.seekTo(ms); interactions++ },
         modifier = Modifier.background(Color.Black)
     ) {
         when (controller) {
