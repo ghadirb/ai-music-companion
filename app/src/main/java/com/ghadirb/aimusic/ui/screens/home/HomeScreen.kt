@@ -32,7 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.ghadirb.aimusic.premium.Entitlement
+import com.ghadirb.aimusic.premium.FreemiumPolicy
 import com.ghadirb.aimusic.premium.PremiumFeature
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.ghadirb.aimusic.recommendation.TuningStore
 import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
 import androidx.compose.runtime.collectAsState
@@ -100,6 +103,15 @@ fun HomeScreen(
     val isReanalyzing by viewModel.isReanalyzing.collectAsState()
     val progress by viewModel.analysisProgress.collectAsState()
     val message by viewModel.message.collectAsState()
+    // Subscribing re-composes Home the moment the plan changes (trial started, purchase restored, expiry).
+    val plan by (access?.entitlement ?: FREE_FLOW).collectAsState()
+    val nowMs = System.currentTimeMillis()
+    /** The premium feature this mix still needs for THIS user, or null when it is fully available. */
+    fun lockFor(type: MixType): PremiumFeature? {
+        val gate = FreemiumPolicy.gateFor(type) ?: return null
+        return if (plan.isPremiumAt(nowMs) || access?.isAllowed(gate) == true) null else gate
+    }
+    val previewCount = FreemiumPolicy.config.lockedPreviewCount
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text(stringResource(R.string.home_greeting), style = MaterialTheme.typography.headlineMedium)
@@ -276,46 +288,47 @@ fun HomeScreen(
         } else {
             val suggested = remember { MixType.suggestedFor(TimeBuckets.bucketOf(System.currentTimeMillis())) }
             var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+            // Default to a mix the user can actually play; locked ones are one tap away as a preview.
             val selected = occasionMixes.firstOrNull { it.type.name == chosen }
-                ?: occasionMixes.firstOrNull { it.type == suggested }
+                ?: occasionMixes.firstOrNull { it.type == suggested && lockFor(it.type) == null }
+                ?: occasionMixes.firstOrNull { lockFor(it.type) == null }
                 ?: occasionMixes.first()
             LazyRow(Modifier.padding(bottom = 8.dp)) {
                 items(MixType.values().filter { it.occasion }, key = { it.name }) { type ->
                     val count = occasionMixes.firstOrNull { it.type == type }?.tracks?.size ?: 0
+                    val lock = if (lockFor(type) != null) "🔒 " else ""
                     FilterChip(
                         selected = selected.type == type,
                         enabled = count > 0,
                         onClick = { chosen = type.name },
-                        label = { Text("${type.emoji} ${type.titleFa} ($count)") },
+                        label = { Text("$lock${type.emoji} ${type.titleFa} ($count)") },
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
             }
-            SectionHeader(
-                emoji = selected.type.emoji,
-                title = selected.type.titleFa,
-                actions = {
-                    TextButton(onClick = { selected.tracks.firstOrNull()?.let { onTrackClick(it.track, selected.trackList) } }) { Text("پخش همه") }
-                    TextButton(onClick = { queueActions?.let { it.startRadio(selected.trackList, selected.type.titleFa) } }) { Text("📻 رادیو") }
-                    TextButton(onClick = { viewModel.saveMixAsPlaylist(selected) }) { Text("ذخیره") }
-                }
+            MixBlock(
+                mix = selected,
+                lockedFeature = lockFor(selected.type),
+                previewCount = previewCount,
+                onUpgrade = { feature -> access?.require(feature) {} },
+                onPlay = onTrackClick,
+                onRadio = { mix -> queueActions?.let { it.startRadio(mix.trackList, mix.type.titleFa) } },
+                onSave = viewModel::saveMixAsPlaylist
             )
-            RecommendationRail(selected.tracks) { onTrackClick(it, selected.trackList) }
         }
 
         // ---- personal mixes ----
         personalMixes.forEach { mix ->
             Spacer(Modifier.height(24.dp))
-            SectionHeader(
-                emoji = mix.type.emoji,
-                title = mix.type.titleFa,
-                actions = {
-                    TextButton(onClick = { mix.tracks.firstOrNull()?.let { onTrackClick(it.track, mix.trackList) } }) { Text("پخش همه") }
-                    TextButton(onClick = { queueActions?.let { it.startRadio(mix.trackList, mix.type.titleFa) } }) { Text("📻 رادیو") }
-                    TextButton(onClick = { viewModel.saveMixAsPlaylist(mix) }) { Text("ذخیره") }
-                }
+            MixBlock(
+                mix = mix,
+                lockedFeature = lockFor(mix.type),
+                previewCount = previewCount,
+                onUpgrade = { feature -> access?.require(feature) {} },
+                onPlay = onTrackClick,
+                onRadio = { m -> queueActions?.let { it.startRadio(m.trackList, m.type.titleFa) } },
+                onSave = viewModel::saveMixAsPlaylist
             )
-            RecommendationRail(mix.tracks) { onTrackClick(it, mix.trackList) }
         }
 
         if (recentlyAdded.isNotEmpty()) {
@@ -331,6 +344,53 @@ fun HomeScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         ) {
             Text(if (isReanalyzing) "در صف تحلیل…" else "تحلیل دوبارهٔ پیشنهادهای هوشمند")
+        }
+    }
+}
+
+private val FREE_FLOW = MutableStateFlow(Entitlement.FREE)
+
+/**
+ * One mix: header with play / radio / save, and its tracks. When the mix is locked for the user it shows
+ * a short preview (first [previewCount] tracks), and every action opens the upgrade dialog instead —
+ * the content is visible, never hidden, so the user knows what Premium adds.
+ */
+@Composable
+private fun MixBlock(
+    mix: SmartMix,
+    lockedFeature: PremiumFeature?,
+    previewCount: Int,
+    onUpgrade: (PremiumFeature) -> Unit,
+    onPlay: (TrackEntity, List<TrackEntity>) -> Unit,
+    onRadio: (SmartMix) -> Unit,
+    onSave: (SmartMix) -> Unit
+) {
+    val locked = lockedFeature != null
+    SectionHeader(
+        emoji = mix.type.emoji,
+        title = if (locked) "🔒 ${mix.type.titleFa}" else mix.type.titleFa,
+        actions = {
+            if (!locked) {
+                TextButton(onClick = { mix.tracks.firstOrNull()?.let { onPlay(it.track, mix.trackList) } }) { Text("پخش همه") }
+                TextButton(onClick = { onRadio(mix) }) { Text("📻 رادیو") }
+                TextButton(onClick = { onSave(mix) }) { Text("ذخیره") }
+            } else {
+                TextButton(onClick = { onUpgrade(lockedFeature!!) }) { Text("پرمیوم") }
+            }
+        }
+    )
+    if (!locked) {
+        RecommendationRail(mix.tracks) { onPlay(it, mix.trackList) }
+    } else {
+        RecommendationRail(mix.tracks.take(previewCount)) { onUpgrade(lockedFeature!!) }
+        Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Column(Modifier.padding(14.dp)) {
+                Text(
+                    "این میکس ویژهٔ پرمیوم است؛ ${previewCount.coerceAtMost(mix.tracks.size)} آهنگ اول را به‌عنوان پیش‌نمایش می‌بینید (از ${mix.tracks.size} آهنگ).",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(onClick = { onUpgrade(lockedFeature!!) }) { Text("فعال‌سازی پرمیوم") }
+            }
         }
     }
 }
