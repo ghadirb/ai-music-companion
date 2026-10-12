@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.OnlineMergeTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-12T17:08:08" hostname="runnervmmprz5" time="0.007">
+  <properties/>
+  <testcase name="sortingFollowsDateNotSourcePriority" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.002"/>
+  <testcase name="nextVersionNeverLeavesTheSameSong" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.0"/>
+  <testcase name="deviceIdIsStable" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.0"/>
+  <testcase name="deadLinksSinkToTheEndOfTheVersionList" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.0"/>
+  <testcase name="sameSongBetterQualityComesFirstWithinASource" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.0"/>
+  <testcase name="windowAndQueryFilters" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.002"/>
+  <testcase name="duplicatesAcrossSourcesMergeAndKeepEveryLink" classname="com.ghadirb.aimusic.music.OnlineMergeTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

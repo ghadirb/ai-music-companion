@@ -1,0 +1,18 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V2 Signer: certificate DN: CN=Ghadir Baraty, O=AI Music Companion, C=IR
+V2 Signer: certificate SHA-256 digest: c33c83a876d15465e076c342c28eb1275146ecff9422f11dc3b71f53e4263f58
+V2 Signer: certificate SHA-1 digest: 0fcbb31c471c4cd41d34fdf5ed831328485008e4
+V2 Signer: certificate MD5 digest: e8e6d89f9716230cd8b164689eb195ec
+V2 Signer: key algorithm: RSA
+V2 Signer: key size (bits): 4096
+V2 Signer: public key SHA-256 digest: 4c1dfd2f5dad3deba660a78d880b7e8fcb9176925e2e9ffc81ccb1ea9b65bf54
+V2 Signer: public key SHA-1 digest: ea11b082e042760999e1a620466fbb2fb8605117
+V2 Signer: public key MD5 digest: bdc9c5fcd07271afd37f5e231873464a

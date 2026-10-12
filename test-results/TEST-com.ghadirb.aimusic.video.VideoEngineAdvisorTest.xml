@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-10-12T17:08:09" hostname="runnervmmprz5" time="0.006">
+  <properties/>
+  <testcase name="diagnosis for vvc explains the limit and a way out" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.001"/>
+  <testcase name="legacy container goes to vlc even when the probe is fine" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.001"/>
+  <testcase name="pcm audio needs no decoder" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="an unreadable file is left to exoplayer and the runtime fallback" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="diagnosis names the missing audio codec" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.001"/>
+  <testcase name="diagnosis reports an unreadable file" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="vvc without a decoder is flagged and sent to vlc" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="diagnosis names the missing video codec" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="diagnosis is empty when the codecs are fine" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="one playable audio track is enough to stay on exoplayer" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.002"/>
+  <testcase name="codec names are friendly and the diagnosis never contains a path" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="plain h264 aac mp4 stays on exoplayer" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="ac3 or dts audio with no decoder goes to vlc so it is not silent" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="mkv is decided by its codecs not its extension" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.001"/>
+  <testcase name="vvc with a device decoder is tried on exoplayer first" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <testcase name="audio only file with a supported codec stays on exoplayer" classname="com.ghadirb.aimusic.video.VideoEngineAdvisorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

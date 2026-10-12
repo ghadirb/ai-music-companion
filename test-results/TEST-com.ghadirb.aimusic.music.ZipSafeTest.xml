@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.ZipSafeTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-12T17:08:08" hostname="runnervmmprz5" time="0.063">
+  <properties/>
+  <testcase name="networkErrorsAreTemporary" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <testcase name="compressionBombsAreRejected" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.048"/>
+  <testcase name="executablesAreRejected" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.002"/>
+  <testcase name="zipSlipPathsAreRejected" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <testcase name="listsAudioAndSkipsTheRest" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <testcase name="encryptedEntriesAreRejected" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <testcase name="audioSniffer" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.0"/>
+  <testcase name="extractWritesOnlyInsideTheDestination" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.005"/>
+  <testcase name="archiveWithoutAudioIsRejected" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <testcase name="garbageAndTinyFilesAreRejected" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.0"/>
+  <testcase name="extractRejectsUnsafeNamesAndLyingSizes" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.0"/>
+  <testcase name="extractRefusesNonAudioContentAndLeavesNoFiles" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <testcase name="oversizedArchivesAreRefusedWithoutReading" classname="com.ghadirb.aimusic.music.ZipSafeTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

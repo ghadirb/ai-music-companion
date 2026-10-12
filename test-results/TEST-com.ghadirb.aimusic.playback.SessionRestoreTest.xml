@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.playback.SessionRestoreTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-12T17:08:08" hostname="runnervmmprz5" time="0.006">
+  <properties/>
+  <testcase name="long queue keeps a window that contains the current track" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.003"/>
+  <testcase name="missing current track continues with next survivor from the start" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.001"/>
+  <testcase name="only the current track and a short look-ahead get a real file check" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <testcase name="missing track before current shifts the index but keeps position" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <testcase name="missing current and all later tracks falls back to the first survivor" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <testcase name="short queue is not trimmed" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <testcase name="out of range saved index never crashes" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <testcase name="everything available keeps queue index and position" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.001"/>
+  <testcase name="negative saved position is clamped" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <testcase name="nothing left means nothing to restore" classname="com.ghadirb.aimusic.playback.SessionRestoreTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

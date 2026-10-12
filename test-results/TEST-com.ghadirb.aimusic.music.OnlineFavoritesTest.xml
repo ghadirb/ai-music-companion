@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.OnlineFavoritesTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-12T17:08:08" hostname="runnervmmprz5" time="0.007">
+  <properties/>
+  <testcase name="toggleAddsAndRemovesAndSurvivesReload" classname="com.ghadirb.aimusic.music.OnlineFavoritesTest" time="0.005"/>
+  <testcase name="newestFirstAndCorruptDataIgnored" classname="com.ghadirb.aimusic.music.OnlineFavoritesTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

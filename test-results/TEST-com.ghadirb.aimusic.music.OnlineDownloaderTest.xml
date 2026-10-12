@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.OnlineDownloaderTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-12T17:08:08" hostname="runnervmmprz5" time="0.034">
+  <properties/>
+  <testcase name="truncatedTransferIsTemporaryAndCleanedUp" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.005"/>
+  <testcase name="tooLargeIsRefusedUsingContentLength" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.002"/>
+  <testcase name="cancelStopsAndCleansUp" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.003"/>
+  <testcase name="downloadsAudioAndLeavesNoPartFile" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.003"/>
+  <testcase name="htmlContentTypeIsRejectedBeforeReading" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.003"/>
+  <testcase name="fileNamesAreSafe" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.002"/>
+  <testcase name="htmlBodyWithStatus200IsNotKept" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.002"/>
+  <testcase name="plainHttpIsRefusedByDefault" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.002"/>
+  <testcase name="zipMustStartWithPkAndAudioMustNotBeAcceptedAsZip" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.005"/>
+  <testcase name="permanentAndTemporaryHttpErrorsAreTold" classname="com.ghadirb.aimusic.music.OnlineDownloaderTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
