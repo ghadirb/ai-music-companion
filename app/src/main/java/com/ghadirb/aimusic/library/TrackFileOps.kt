@@ -116,7 +116,9 @@ object TrackFileOps {
             val kept = mutableListOf<Uri>()
             for (uri in uris) {
                 var present = stillOnDevice(context, uri, paths[uri])
-                if (present && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+                if (present) {
+                    // The system dialog said "deleted" but the file is still there (some phones/ROMs, or a file in a
+                    // folder the media provider does not own): remove the file itself, then the leftover row.
                     paths[uri]?.let { runCatching { File(it).delete() } }
                     runCatching { context.contentResolver.delete(uri, null, null) }
                     present = stillOnDevice(context, uri, paths[uri])

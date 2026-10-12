@@ -24,6 +24,7 @@ import com.ghadirb.aimusic.music.OnlineArtist
 import com.ghadirb.aimusic.music.OnlineCollection
 import com.ghadirb.aimusic.music.OnlineDownloader
 import com.ghadirb.aimusic.music.OnlineTrack
+import com.ghadirb.aimusic.music.PublicMusicStore
 import com.ghadirb.aimusic.music.ZipFetch
 import com.ghadirb.aimusic.playback.PlayerController
 import com.ghadirb.aimusic.playback.onlineTrackIdOf
@@ -119,6 +120,11 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
         controller.connect { syncNowPlaying() }
         refreshFavorites()
         reload(refreshSources = true)
+        // Songs downloaded by earlier versions sit in the app's private folder; move them into Music/Navasa.
+        viewModelScope.launch {
+            val old = withContext(Dispatchers.IO) { PublicMusicStore.legacyFiles(musicDir()) }
+            if (old.isNotEmpty()) addToLibrary(old)
+        }
     }
 
     // ------------------------------------------------------------------ list of new songs
@@ -307,7 +313,7 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
             }
             _ui.update { it.copy(downloadPercent = null) }
             when (result) {
-                is DownloadResult.Ok -> { addToLibrary(listOf(result.file)); say(UiMessage(R.string.online_downloaded_one, listOf(t.display))) }
+                is DownloadResult.Ok -> { addToLibrary(listOf(result.file), t.title, t.artist); say(UiMessage(R.string.online_downloaded_one, listOf(t.display))) }
                 is DownloadResult.Failed -> say(UiMessage(R.string.online_download_failed, listOf(result.reason)))
                 null -> say(UiMessage(R.string.online_no_link))
             }
@@ -363,10 +369,21 @@ class OnlineMusicViewModel(application: Application) : AndroidViewModel(applicat
         if (p != _ui.value.downloadPercent) _ui.update { it.copy(downloadPercent = p) }
     }
 
-    private suspend fun addToLibrary(files: List<File>) {
+    /**
+     * Moves downloaded files into the public Music folder (so they are indexed, visible in the file manager and
+     * deletable), then refreshes the Library. Files that cannot be published stay where they are and are indexed in place.
+     */
+    private suspend fun addToLibrary(files: List<File>, title: String? = null, artist: String? = null) {
         withContext(Dispatchers.IO) {
             try {
-                MediaScannerConnection.scanFile(app, files.map { it.absolutePath }.toTypedArray(), null, null)
+                val root = musicDir()
+                val single = files.size == 1
+                val unpublished = files.filter {
+                    PublicMusicStore.publish(app, it, root, if (single) title else null, if (single) artist else null) == null
+                }
+                if (unpublished.isNotEmpty()) {
+                    MediaScannerConnection.scanFile(app, unpublished.map { it.absolutePath }.toTypedArray(), null, null)
+                }
                 delay(800) // let MediaStore index the new files before the library re-reads it
                 app.repository.rescanLibrary()
             } catch (e: CancellationException) {

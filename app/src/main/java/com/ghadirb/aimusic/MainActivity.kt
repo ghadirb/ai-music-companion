@@ -316,11 +316,6 @@ private fun MainScaffold(
                     }
                 },
                 actions = {
-                    if (currentRoute != ROUTE_ONLINE) {
-                        IconButton(onClick = { navController.navigate(ROUTE_ONLINE) { launchSingleTop = true } }) {
-                            Icon(Icons.Filled.NewReleases, contentDescription = stringResource(R.string.nav_online))
-                        }
-                    }
                     if (currentRoute != Screen.Favorites.route) {
                         IconButton(onClick = { navController.navigate(Screen.Favorites.route) }) {
                             Icon(Icons.Filled.Favorite, contentDescription = "علاقه‌مندی‌ها")

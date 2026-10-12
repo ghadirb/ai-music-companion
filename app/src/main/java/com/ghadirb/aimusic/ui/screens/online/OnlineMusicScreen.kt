@@ -63,6 +63,12 @@ import com.ghadirb.aimusic.music.OnlineCollection
 import com.ghadirb.aimusic.music.OnlineTrack
 import java.util.Locale
 
+/**
+ * «گلچین خوانندگان» (singer ZIP collections) is switched off for now: detection of singer collections was
+ * unreliable (mixed in albums and mixes). The code stays; flip this to true to bring the tab back.
+ */
+const val SINGERS_ENABLED = false
+
 private fun mb(bytes: Long): String = String.format(Locale.US, "%.1f", bytes / 1048576.0)
 
 /** "آهنگ‌های جدید": new songs of the last 3/6 months, singer collections (ZIP) and online favourites. */
@@ -82,10 +88,16 @@ fun OnlineMusicScreen(viewModel: OnlineMusicViewModel) {
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            TabRow(selectedTabIndex = state.tab.ordinal) {
-                Tab(selected = state.tab == OnlineTab.NEW, onClick = { viewModel.setTab(OnlineTab.NEW) }, text = { Text(stringResource(R.string.online_tab_new)) })
-                Tab(selected = state.tab == OnlineTab.SINGERS, onClick = { viewModel.setTab(OnlineTab.SINGERS) }, text = { Text(stringResource(R.string.online_tab_singers)) })
-                Tab(selected = state.tab == OnlineTab.FAVORITES, onClick = { viewModel.setTab(OnlineTab.FAVORITES) }, text = { Text(stringResource(R.string.online_tab_favorites)) })
+            val tabs = remember { OnlineTab.values().filter { it != OnlineTab.SINGERS || SINGERS_ENABLED } }
+            TabRow(selectedTabIndex = tabs.indexOf(state.tab).coerceAtLeast(0)) {
+                tabs.forEach { tab ->
+                    val label = when (tab) {
+                        OnlineTab.NEW -> R.string.online_tab_new
+                        OnlineTab.SINGERS -> R.string.online_tab_singers
+                        OnlineTab.FAVORITES -> R.string.online_tab_favorites
+                    }
+                    Tab(selected = state.tab == tab, onClick = { viewModel.setTab(tab) }, text = { Text(stringResource(label)) })
+                }
             }
             if (state.downloadPercent != null) DownloadBar(state.downloadPercent!!, viewModel::cancel)
             Box(Modifier.weight(1f)) {
