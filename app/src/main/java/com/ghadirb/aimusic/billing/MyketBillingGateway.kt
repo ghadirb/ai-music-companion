@@ -1,9 +1,13 @@
 package com.ghadirb.aimusic.billing
 
 import android.app.Activity
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.IBinder
 import android.util.Log
 import com.ghadirb.aimusic.BuildConfig
 import ir.myket.billingclient.IabHelper
@@ -83,6 +87,9 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
                     failure = if (isStoreInstalled()) BillingFailure.STORE_UNAVAILABLE else BillingFailure.STORE_NOT_INSTALLED
                     Log.w(TAG, "queryOwned: attempt=$attempt connection failed reason=$failure")
                     if (failure == BillingFailure.STORE_NOT_INSTALLED) break
+                    // Diagnose + warm up: bind Myket's billing service ourselves. If this connects while the SDK's setup
+                    // did not, the SDK is at fault; if it does not connect either, Myket's process/service is unreachable.
+                    if (attempt < MAX_ATTEMPTS) probeStoreService()
                     resetConnection()
                     continue
                 }
@@ -122,6 +129,32 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         val answer = withTimeoutOrNull(QUERY_TIMEOUT_MS) { result.await() }
         if (answer == null) Log.w(TAG, "queryOwned: no usable answer from the store (failure or ${QUERY_TIMEOUT_MS}ms timeout)")
         return answer
+    }
+
+    /**
+     * Binds Myket's billing service directly for a few seconds and logs the outcome (no purchase, no account data),
+     * then unbinds. Starting the bind also wakes Myket's process, so the next SDK setup has a better chance.
+     */
+    private suspend fun probeStoreService(): Boolean {
+        val connected = CompletableDeferred<Boolean>()
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) { connected.complete(true) }
+            override fun onServiceDisconnected(name: ComponentName?) {}
+            override fun onNullBinding(name: ComponentName?) { connected.complete(false) }
+            override fun onBindingDied(name: ComponentName?) { connected.complete(false) }
+        }
+        val appContext = activity.applicationContext
+        val bound = try {
+            appContext.bindService(Intent(MYKET_BIND_ACTION).setPackage(MYKET_PACKAGE), connection, Context.BIND_AUTO_CREATE)
+        } catch (e: Exception) {
+            Log.w(TAG, "probe: bindService threw (${e.javaClass.simpleName})")
+            false
+        }
+        Log.i(TAG, "probe: bindService returned $bound")
+        val ok = bound && (withTimeoutOrNull(PROBE_TIMEOUT_MS) { connected.await() } ?: false)
+        Log.i(TAG, "probe: serviceConnected=$ok")
+        try { appContext.unbindService(connection) } catch (_: Exception) { /* not bound */ }
+        return ok
     }
 
     /** Drops the current store connection so the next call builds a fresh one. Does not touch a pending purchase. */
@@ -224,6 +257,7 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         const val SETUP_TIMEOUT_MS = 15_000L
         const val QUERY_TIMEOUT_MS = 15_000L
         const val MAX_ATTEMPTS = 2
+        const val PROBE_TIMEOUT_MS = 8_000L
         const val USER_CANCELED = 1
         // IabHelper.IABHELPER_USER_CANCELLED: what Myket actually returns when the user backs out (seen in logcat as -1005).
         const val IABHELPER_USER_CANCELLED = -1005

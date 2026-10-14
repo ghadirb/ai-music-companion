@@ -194,6 +194,7 @@ class PurchaseRepository(
     private fun restoreFailureMessage(reason: BillingFailure): String = when (reason) {
         BillingFailure.STORE_NOT_INSTALLED -> "برنامه مایکت روی این دستگاه پیدا نشد. مایکت را نصب کنید و دوباره تلاش کنید."
         BillingFailure.BUSY -> "عملیات دیگری در حال انجام است؛ چند لحظه بعد دوباره تلاش کنید."
+        BillingFailure.STORE_UNAVAILABLE -> "بازیابی خرید انجام نشد؛ نواسا نتوانست به مایکت وصل شود. اگر مایکت بسته است، آن را یک‌بار باز کنید، به نواسا برگردید و دوباره بزنید."
         else -> "بازیابی خرید انجام نشد؛ لطفاً اتصال به مایکت را بررسی کرده و دوباره تلاش کنید."
     }
 
