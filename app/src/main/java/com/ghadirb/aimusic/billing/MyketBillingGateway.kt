@@ -100,7 +100,7 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
                 outcome.complete(
                     when {
                         result.isSuccess && purchase != null -> PurchaseOutcome.Purchased(purchase.sku, purchase.token, purchase.developerPayload ?: developerPayload)
-                        result.response == USER_CANCELED -> PurchaseOutcome.Cancelled
+                        result.response == USER_CANCELED || result.response == IABHELPER_USER_CANCELLED -> PurchaseOutcome.Cancelled
                         else -> PurchaseOutcome.Failed(result.message ?: "خرید کامل نشد.")
                     }
                 )
@@ -164,5 +164,7 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         const val SETUP_TIMEOUT_MS = 15_000L
         const val QUERY_TIMEOUT_MS = 15_000L
         const val USER_CANCELED = 1
+        // IabHelper.IABHELPER_USER_CANCELLED: what Myket actually returns when the user backs out (seen in logcat as -1005).
+        const val IABHELPER_USER_CANCELLED = -1005
     }
 }

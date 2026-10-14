@@ -52,7 +52,7 @@ class AiMusicApp : Application() {
     val entitlements: EntitlementRepository by lazy {
         EntitlementRepository(this, cloudApi, EntitlementTokenVerifier(BuildConfig.ENTITLEMENT_PUBLIC_KEY))
     }
-    val purchases: PurchaseRepository by lazy { PurchaseRepository(cloudApi, entitlements) }
+    val purchases: PurchaseRepository by lazy { PurchaseRepository(cloudApi, entitlements, this) }
 
     /** New songs + singer collections from the music sources (the "آهنگ‌های جدید" screen). Nothing runs until that screen is opened. */
     val onlineMusic: OnlineMusicRepository by lazy {

@@ -5,6 +5,8 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -103,6 +105,13 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         (application as AiMusicApp).rescanLibraryIfStale()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Self-heal a paid-but-unconfirmed purchase (lost network, recreated Activity, killed process, reinstall).
+        // Throttled and silent inside PurchaseRepository; a no-op for users who are already Premium.
+        lifecycleScope.launch { (application as AiMusicApp).purchases.recover() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
