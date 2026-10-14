@@ -1,6 +1,7 @@
 package com.ghadirb.aimusic.billing
 
 import android.content.Context
+import android.util.Log
 import com.ghadirb.aimusic.BuildConfig
 import com.ghadirb.aimusic.cloud.CloudApi
 import com.ghadirb.aimusic.premium.EntitlementRepository
@@ -85,12 +86,30 @@ class PurchaseRepository(
         val billing = gateway
         if (billing == null || !billing.isConfigured) { _state.value = PurchaseUiState.NotConfigured; return }
         _state.value = PurchaseUiState.Loading("در حال جست‌وجوی خریدهای شما در مایکت…")
-        val owned = billing.queryOwned(offeredSkus)
-        if (owned.isEmpty()) { _state.value = PurchaseUiState.Error("خرید قبلی برای این حساب مایکت پیدا نشد."); return }
+        Log.i(TAG, "restore: started")
+        var answer = billing.queryOwned(offeredSkus)
+        if (answer is OwnedResult.Success && answer.purchases.isEmpty()) {
+            // The store answered "nothing owned". Myket may still be starting up, so double-check ONCE with a fresh connection.
+            Log.i(TAG, "restore: empty answer, re-checking once with a fresh connection")
+            kotlinx.coroutines.delay(EMPTY_RECHECK_DELAY_MS)
+            answer = billing.queryOwned(offeredSkus, freshConnection = true)
+        }
+        val owned = when (answer) {
+            is OwnedResult.Success -> answer.purchases
+            is OwnedResult.Unavailable -> {
+                // A connection/SDK/timeout failure is NOT "no purchase found": say what really happened.
+                Log.w(TAG, "restore: store unavailable reason=${answer.reason}")
+                _state.value = if (answer.reason == BillingFailure.NOT_CONFIGURED) PurchaseUiState.NotConfigured
+                else PurchaseUiState.Error(restoreFailureMessage(answer.reason))
+                return
+            }
+        }
+        Log.i(TAG, "restore: store answered, ownedCount=${owned.size}")
+        if (owned.isEmpty()) { _state.value = PurchaseUiState.Error("خرید قبلی برای این حساب مایکت پیدا نشد. اگر مطمئن هستید خرید کرده‌اید، مطمئن شوید با همان حساب مایکت وارد شده‌اید و دوباره تلاش کنید."); return }
         for (purchase in owned) {
             val response = api.post("/v1/myket/restore", JSONObject().put("sku", purchase.sku).put("tokenId", purchase.token))
             val result = handleVerification(response, "بازیابی خرید کامل نشد.")
-            if (result is PurchaseUiState.Success) { _state.value = result; return }
+            if (result is PurchaseUiState.Success) { clearPending(); _state.value = result; return }
             _state.value = result
         }
     }
@@ -124,7 +143,15 @@ class PurchaseRepository(
             if (!billing.isConfigured || offeredSkus.isEmpty()) return
             if (now - lastSilentRestoreAt < SILENT_RESTORE_MS) return
             lastSilentRestoreAt = now
-            for (purchase in billing.queryOwned(offeredSkus)) {
+            val ownedNow = when (val answer = billing.queryOwned(offeredSkus)) {
+                is OwnedResult.Success -> answer.purchases
+                is OwnedResult.Unavailable -> {
+                    Log.w(TAG, "recover: store unavailable reason=${answer.reason}, will retry soon")
+                    lastSilentRestoreAt = now - SILENT_RESTORE_MS + UNAVAILABLE_RETRY_MS
+                    return
+                }
+            }
+            for (purchase in ownedNow) {
                 val response = api.post("/v1/myket/restore", JSONObject().put("sku", purchase.sku).put("tokenId", purchase.token))
                 if (response.isOffline) return
                 val result = handleVerification(response, "")
@@ -156,12 +183,23 @@ class PurchaseRepository(
         const val KEY_TOKEN = "token"
         const val KEY_PAYLOAD = "payload"
         const val PENDING_RETRY_MS = 15_000L
+        const val EMPTY_RECHECK_DELAY_MS = 2_000L
+        const val UNAVAILABLE_RETRY_MS = 30_000L
+        const val TAG = "PurchaseRestore"
         const val SILENT_RESTORE_MS = 5 * 60_000L
         /** Server answers that will never succeed on retry for this purchase. */
         val TERMINAL_ERRORS = setOf("purchase_already_claimed", "transfer_limit_reached")
     }
 
+    private fun restoreFailureMessage(reason: BillingFailure): String = when (reason) {
+        BillingFailure.STORE_NOT_INSTALLED -> "برنامه مایکت روی این دستگاه پیدا نشد. مایکت را نصب کنید و دوباره تلاش کنید."
+        BillingFailure.BUSY -> "عملیات دیگری در حال انجام است؛ چند لحظه بعد دوباره تلاش کنید."
+        else -> "بازیابی خرید انجام نشد؛ لطفاً اتصال به مایکت را بررسی کرده و دوباره تلاش کنید."
+    }
+
     private fun handleVerification(response: CloudApi.Response, fallbackError: String): PurchaseUiState {
+        // Diagnostic only: HTTP status + server error code. Never the purchase token or any account data.
+        Log.i(TAG, "verification: http=${response.code} error=${response.error} premium=${response.body.optBoolean("premium", false)}")
         if (response.isOffline) return PurchaseUiState.Error("اتصال اینترنت برقرار نیست.")
         if (!response.isSuccess) {
             return PurchaseUiState.Error(

@@ -8,6 +8,8 @@ import android.util.Log
 import com.ghadirb.aimusic.BuildConfig
 import ir.myket.billingclient.IabHelper
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -22,6 +24,9 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
     private var helper: IabHelper? = null
     private var setup: CompletableDeferred<Boolean>? = null
     private var pendingPurchase: CompletableDeferred<PurchaseOutcome>? = null
+
+    /** One store operation at a time: the SDK throws if a second async call starts while one is running. */
+    private val opLock = Mutex()
 
     override suspend fun awaitReady(): Boolean {
         if (!isConfigured) {
@@ -59,31 +64,86 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         return ok
     }
 
-    override suspend fun queryOwned(skus: List<String>): List<OwnedPurchase> {
-        // awaitReady() is what actually sets `helper` — call it unconditionally first.
-        // `helper?.takeIf { awaitReady() }` looked equivalent but isn't: Kotlin's safe-call
-        // skips the takeIf lambda entirely whenever `helper` is still null, so awaitReady()
-        // (and the connection attempt inside it) would never run on the very first call.
-        val ready = awaitReady()
-        val client = helper.takeIf { ready } ?: return emptyList()
-        val result = CompletableDeferred<List<OwnedPurchase>>()
+    override suspend fun queryOwned(skus: List<String>, freshConnection: Boolean): OwnedResult {
+        if (!isConfigured) return OwnedResult.Unavailable(BillingFailure.NOT_CONFIGURED)
+        if (!opLock.tryLock()) {
+            Log.i(TAG, "queryOwned: skipped, another billing operation is running")
+            return OwnedResult.Unavailable(BillingFailure.BUSY)
+        }
+        try {
+            if (freshConnection) {
+                Log.i(TAG, "queryOwned: discarding the cached store connection")
+                resetConnection()
+            }
+            var failure = BillingFailure.STORE_UNAVAILABLE
+            // Bounded: attempt 1 re-uses a live connection, attempt 2 (only if 1 failed) rebuilds it. Never more than two.
+            for (attempt in 1..MAX_ATTEMPTS) {
+                Log.i(TAG, "queryOwned: attempt=$attempt connecting")
+                if (!awaitReady()) {
+                    failure = if (isStoreInstalled()) BillingFailure.STORE_UNAVAILABLE else BillingFailure.STORE_NOT_INSTALLED
+                    Log.w(TAG, "queryOwned: attempt=$attempt connection failed reason=$failure")
+                    if (failure == BillingFailure.STORE_NOT_INSTALLED) break
+                    resetConnection()
+                    continue
+                }
+                Log.i(TAG, "queryOwned: attempt=$attempt connected, querying inventory")
+                val owned = runInventoryQuery(skus)
+                if (owned != null) {
+                    Log.i(TAG, "queryOwned: attempt=$attempt answered, ownedCount=${owned.size}")
+                    return OwnedResult.Success(owned)
+                }
+                failure = BillingFailure.QUERY_FAILED
+                Log.w(TAG, "queryOwned: attempt=$attempt inventory query failed, rebuilding the connection")
+                resetConnection()
+            }
+            return OwnedResult.Unavailable(failure)
+        } finally {
+            opLock.unlock()
+        }
+    }
+
+    /** Null = the query failed, threw or timed out (NOT "nothing owned"); an empty list = the store answered with no purchases. */
+    private suspend fun runInventoryQuery(skus: List<String>): List<OwnedPurchase>? {
+        val client = helper ?: return null
+        val result = CompletableDeferred<List<OwnedPurchase>?>()
         try {
             client.queryInventoryAsync(true, skus) { inventoryResult, inventory ->
                 if (!inventoryResult.isSuccess || inventory == null) {
                     Log.w(TAG, "queryInventoryAsync failed: response=${inventoryResult.response} message=${inventoryResult.message}")
-                    result.complete(emptyList())
+                    result.complete(null)
                 } else {
                     result.complete(skus.mapNotNull { sku -> inventory.getPurchase(sku)?.let { OwnedPurchase(sku, it.token) } })
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "queryOwned: queryInventoryAsync threw", e)
-            result.complete(emptyList())
+            result.complete(null)
         }
-        return withTimeoutOrNull(QUERY_TIMEOUT_MS) { result.await() } ?: emptyList()
+        val answer = withTimeoutOrNull(QUERY_TIMEOUT_MS) { result.await() }
+        if (answer == null) Log.w(TAG, "queryOwned: no usable answer from the store (failure or ${QUERY_TIMEOUT_MS}ms timeout)")
+        return answer
     }
 
-    override suspend fun purchase(sku: String, developerPayload: String): PurchaseOutcome {
+    /** Drops the current store connection so the next call builds a fresh one. Does not touch a pending purchase. */
+    private fun resetConnection() {
+        try { helper?.dispose() } catch (e: Exception) { Log.w(TAG, "resetConnection: dispose threw (${e.javaClass.simpleName})") }
+        helper = null
+        setup = null
+    }
+
+    private fun isStoreInstalled(): Boolean = try {
+        activity.packageManager.getPackageInfo(MYKET_PACKAGE, 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    } catch (e: Exception) {
+        true // can't tell: assume installed so the user sees the generic "try again" message, not "not installed"
+    }
+
+    override suspend fun purchase(sku: String, developerPayload: String): PurchaseOutcome =
+        opLock.withLock { purchaseLocked(sku, developerPayload) }
+
+    private suspend fun purchaseLocked(sku: String, developerPayload: String): PurchaseOutcome {
         // Same fix as queryOwned(): must call awaitReady() unconditionally, not inside
         // helper?.takeIf{}, or a still-null `helper` skips the connection attempt entirely.
         val ready = awaitReady()
@@ -163,6 +223,7 @@ class MyketBillingGateway(private val activity: Activity) : BillingGateway {
         const val MYKET_BIND_ACTION = "ir.mservices.market.InAppBillingService.BIND"
         const val SETUP_TIMEOUT_MS = 15_000L
         const val QUERY_TIMEOUT_MS = 15_000L
+        const val MAX_ATTEMPTS = 2
         const val USER_CANCELED = 1
         // IabHelper.IABHELPER_USER_CANCELLED: what Myket actually returns when the user backs out (seen in logcat as -1005).
         const val IABHELPER_USER_CANCELLED = -1005
