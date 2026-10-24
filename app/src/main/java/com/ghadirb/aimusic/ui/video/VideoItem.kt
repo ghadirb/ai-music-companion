@@ -18,6 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Replay
@@ -102,7 +105,7 @@ private fun meta(video: VideoEntity): String = listOfNotNull(
 ).joinToString(" • ")
 
 @Composable
-private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -> Unit, onStartOver: () -> Unit, onAddToPlaylist: () -> Unit) {
+private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -> Unit, onStartOver: () -> Unit, onAddToPlaylist: () -> Unit, onRename: () -> Unit, onCopy: () -> Unit, onMove: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌ها") }
@@ -125,6 +128,21 @@ private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -
                 )
             }
             DropdownMenuItem(
+                text = { Text("تغییر نام") },
+                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                onClick = { open = false; onRename() }
+            )
+            DropdownMenuItem(
+                text = { Text("کپی به پوشه…") },
+                leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                onClick = { open = false; onCopy() }
+            )
+            DropdownMenuItem(
+                text = { Text("انتقال به پوشه…") },
+                leadingIcon = { Icon(Icons.Filled.DriveFileMove, contentDescription = null) },
+                onClick = { open = false; onMove() }
+            )
+            DropdownMenuItem(
                 text = { Text("حذف از حافظهٔ گوشی") },
                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                 onClick = { open = false; onDelete() }
@@ -135,7 +153,7 @@ private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -
 
 /** Grid cell. */
 @Composable
-fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}) {
+fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}, onRename: () -> Unit = {}, onCopy: () -> Unit = {}, onMove: () -> Unit = {}) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)) {
         VideoThumbnail(video, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)))
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
@@ -143,14 +161,14 @@ fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
                 Text(video.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(meta(video), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            VideoMenu(video, onDelete, onFavorite, onStartOver, onAddToPlaylist)
+            VideoMenu(video, onDelete, onFavorite, onStartOver, onAddToPlaylist, onRename, onCopy, onMove)
         }
     }
 }
 
 /** List row. */
 @Composable
-fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}) {
+fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}, onRename: () -> Unit = {}, onCopy: () -> Unit = {}, onMove: () -> Unit = {}) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -162,6 +180,6 @@ fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
             Spacer(Modifier.size(2.dp))
             Text(meta(video), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        VideoMenu(video, onDelete, onFavorite, onStartOver, onAddToPlaylist)
+        VideoMenu(video, onDelete, onFavorite, onStartOver, onAddToPlaylist, onRename, onCopy, onMove)
     }
 }

@@ -185,6 +185,91 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         onMessage = { text -> android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show() }
     )
 
+    // ---- file operations: rename (MediaStore), copy / move (system folder picker + shared delete flow) ----
+    var renameTarget by remember { mutableStateOf<VideoEntity?>(null) }
+    var pendingRename by remember { mutableStateOf<Pair<VideoEntity, String>?>(null) }
+    var copyMoveTarget by remember { mutableStateOf<Pair<VideoEntity, Boolean>?>(null) }
+    var busyText by remember { mutableStateOf<String?>(null) }
+    fun toast(text: String) = android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_LONG).show()
+    val renameRef = remember { arrayOfNulls<(VideoEntity, String) -> Unit>(1) }
+
+    val renamePermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val p = pendingRename
+        pendingRename = null
+        if (p != null && result.resultCode == android.app.Activity.RESULT_OK) renameRef[0]?.invoke(p.first, p.second)
+        else toast("تغییر نام لغو شد.")
+    }
+    renameRef[0] = { video, newName ->
+        scope.launch {
+            when (val o = com.ghadirb.aimusic.library.VideoFileOps.rename(context, Uri.parse(video.contentUri), newName)) {
+                is com.ghadirb.aimusic.library.VideoFileOps.RenameOutcome.Done -> { toast("نام فایل تغییر کرد."); vm.refresh() }
+                is com.ghadirb.aimusic.library.VideoFileOps.RenameOutcome.NeedsPermission -> {
+                    pendingRename = video to newName
+                    renamePermissionLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(o.intentSender).build())
+                }
+                is com.ghadirb.aimusic.library.VideoFileOps.RenameOutcome.Failed -> toast(o.reason)
+            }
+        }
+    }
+
+    val treeLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+    ) { tree ->
+        val op = copyMoveTarget
+        copyMoveTarget = null
+        if (tree == null || op == null) return@rememberLauncherForActivityResult
+        val (video, isMove) = op
+        busyText = if (isMove) "در حال انتقال…" else "در حال کپی…"
+        scope.launch {
+            val uri = Uri.parse(video.contentUri)
+            val result = com.ghadirb.aimusic.library.TrackFileOps.copyToFolder(
+                context, tree, listOf(uri to video.displayName.substringBeforeLast('.'))
+            )
+            busyText = null
+            when {
+                result.succeeded.isEmpty() ->
+                    toast("کپی انجام نشد (فضای کافی نیست یا دسترسی رد شد). فایل اصلی دست‌نخورده ماند.")
+                isMove -> {
+                    // The original is deleted ONLY after the copy succeeded, and only with the user's system confirmation.
+                    toast("کپی شد؛ برای تکمیل انتقال، حذف فایل اصلی را تأیید کنید.")
+                    deletingByUri.clear(); deletingByUri[uri] = video
+                    deleteFlow(listOf(uri))
+                    vm.refresh(deep = true)
+                }
+                else -> { toast("فایل کپی شد."); vm.refresh(deep = true) }
+            }
+        }
+    }
+
+    renameTarget?.let { video ->
+        var text by remember(video.id) { mutableStateOf(video.displayName.substringBeforeLast('.')) }
+        val check = com.ghadirb.aimusic.video.VideoFileNames.check(text, video.displayName)
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text("تغییر نام") },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true)
+                    if (check.error != null && text.isNotBlank()) Text(check.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = check.name != null, onClick = { renameTarget = null; renameRef[0]?.invoke(video, check.name!!) }) { Text("ذخیره") }
+            },
+            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("انصراف") } }
+        )
+    }
+    busyText?.let { msg ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(msg) },
+            text = { androidx.compose.material3.CircularProgressIndicator() },
+            confirmButton = {}
+        )
+    }
+
     fun open(video: VideoEntity) {
         VideoPlayerActivity.start(context, video.id, state.videos.map { it.id })
     }
@@ -321,12 +406,12 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v })
+                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v }, onRename = { renameTarget = v }, onCopy = { copyMoveTarget = v to false; treeLauncher.launch(null) }, onMove = { copyMoveTarget = v to true; treeLauncher.launch(null) })
                 }
             }
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v })
+                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v }, onRename = { renameTarget = v }, onCopy = { copyMoveTarget = v to false; treeLauncher.launch(null) }, onMove = { copyMoveTarget = v to true; treeLauncher.launch(null) })
                 }
             }
         }

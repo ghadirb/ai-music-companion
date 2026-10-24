@@ -160,10 +160,12 @@ object TrackFileOps {
         val succeeded = mutableListOf<Uri>()
         val failed = mutableListOf<Uri>()
         for ((sourceUri, fallbackTitle) in tracks) {
+            var created: DocumentFile? = null
             val ok = runCatching {
                 val mime = resolver.getType(sourceUri) ?: "audio/*"
                 val name = uniqueNameIn(destDir, resolveDisplayName(resolver, sourceUri, mime, fallbackTitle))
                 val destFile = destDir.createFile(mime, name) ?: return@runCatching false
+                created = destFile
                 resolver.openInputStream(sourceUri).use { input ->
                     resolver.openOutputStream(destFile.uri).use { output ->
                         if (input == null || output == null) return@runCatching false
@@ -172,6 +174,8 @@ object TrackFileOps {
                 }
                 true
             }.getOrDefault(false)
+            // A failed copy (disk full, cancelled...) must not leave a broken half file in the destination.
+            if (!ok) runCatching { created?.delete() }
             if (ok) succeeded += sourceUri else failed += sourceUri
         }
         CopyResult(succeeded, failed)
