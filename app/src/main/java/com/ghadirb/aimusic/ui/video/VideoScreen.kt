@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -211,7 +213,7 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         )
         // Filter chips + sort / view / refresh
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 VideoFilter.values().forEach { f ->
                     FilterChip(selected = state.filter == f, onClick = { vm.setFilter(f) }, label = { Text(f.label) })
                 }
@@ -238,6 +240,17 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 if (state.grid) Icon(Icons.Filled.ViewList, contentDescription = "نمایش فهرستی")
                 else Icon(Icons.Filled.GridView, contentDescription = "نمایش شبکه‌ای")
             }
+            var confirmClear by remember { mutableStateOf(false) }
+            if (state.filter == VideoFilter.RECENT || state.filter == VideoFilter.UNFINISHED) {
+                IconButton(onClick = { confirmClear = true }) { Icon(Icons.Filled.Clear, contentDescription = "پاک‌کردن تاریخچه") }
+            }
+            if (confirmClear) AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                title = { Text("پاک‌کردن تاریخچه") },
+                text = { Text("فهرست «اخیراً پخش‌شده» و محل ادامهٔ تماشا پاک می‌شود. خود ویدئوها و پسندیده‌ها حذف نمی‌شوند.") },
+                confirmButton = { TextButton(onClick = { confirmClear = false; vm.clearHistory() }) { Text("پاک کن") } },
+                dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("انصراف") } }
+            )
             IconButton(onClick = { vm.refresh(deep = true) }) { Icon(Icons.Filled.Refresh, contentDescription = "بازخوانی") }
         }
         if (state.syncing && state.videos.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -264,7 +277,13 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
             )
             state.videos.isEmpty() -> EmptyState(
                 Icons.Filled.VideoLibrary,
-                if (state.filter == VideoFilter.RECENT && state.query.isBlank()) "هنوز ویدئویی پخش نکرده‌اید" else "نتیجه‌ای پیدا نشد"
+                if (state.query.isNotBlank()) "نتیجه‌ای پیدا نشد" else when (state.filter) {
+                    VideoFilter.RECENT -> "هنوز ویدئویی پخش نکرده‌اید"
+                    VideoFilter.FAVORITES -> "هنوز ویدئویی را پسند نکرده‌اید"
+                    VideoFilter.UNFINISHED -> "ویدئوی ناتمامی ندارید"
+                    VideoFilter.NEW -> "ویدئوی جدیدی نیست"
+                    else -> "نتیجه‌ای پیدا نشد"
+                }
             )
             state.byFolder && state.openFolder == null -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.folders, key = { it.key }) { f ->
@@ -284,12 +303,12 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v })
+                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) })
                 }
             }
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v })
+                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) })
                 }
             }
         }

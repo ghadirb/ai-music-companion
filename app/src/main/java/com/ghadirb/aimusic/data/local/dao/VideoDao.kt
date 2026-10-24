@@ -36,4 +36,14 @@ interface VideoDao {
 
     @Query("UPDATE videos SET isFavorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: Long, favorite: Boolean)
+
+    /** Forgets watch history only (position + last played). Files and favourites are untouched. */
+    @Query("UPDATE videos SET lastPositionMs = 0, lastPlayedAt = 0")
+    suspend fun clearHistory()
+
+    @Query("UPDATE videos SET isFavorite = :favorite WHERE id IN (:ids)")
+    suspend fun setFavorites(ids: List<Long>, favorite: Boolean)
+
+    @Query("UPDATE videos SET lastPositionMs = 0 WHERE id = :id")
+    suspend fun resetPosition(id: Long)
 }

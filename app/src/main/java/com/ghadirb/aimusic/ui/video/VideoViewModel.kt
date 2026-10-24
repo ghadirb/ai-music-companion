@@ -88,6 +88,14 @@ class VideoViewModel(private val repository: VideoRepository) : ViewModel() {
         }
     }
 
+    fun toggleFavorite(video: VideoEntity) {
+        viewModelScope.launch { repository.setFavorite(video.id, !video.isFavorite) }
+    }
+
+    fun clearHistory() { viewModelScope.launch { repository.clearHistory() } }
+
+    fun startOver(video: VideoEntity) { viewModelScope.launch { repository.resetPosition(video.id) } }
+
     /** The system confirmed that these videos were deleted from the device. */
     fun onDeleted(videos: List<VideoEntity>) {
         viewModelScope.launch {

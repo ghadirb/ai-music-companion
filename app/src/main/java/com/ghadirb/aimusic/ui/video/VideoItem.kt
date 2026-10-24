@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
@@ -63,6 +66,13 @@ fun VideoThumbnail(video: VideoEntity, modifier: Modifier = Modifier) {
         } else {
             Icon(Icons.Filled.VideoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
         }
+        if (video.isFavorite) {
+            Icon(
+                Icons.Filled.Favorite, contentDescription = "پسندیده",
+                tint = Color(0xFFFF5A7A),
+                modifier = Modifier.align(Alignment.TopStart).padding(6.dp).size(18.dp)
+            )
+        }
         // Duration badge
         Text(
             VideoLibraryQuery.formatDuration(video.durationMs),
@@ -91,13 +101,25 @@ private fun meta(video: VideoEntity): String = listOfNotNull(
 ).joinToString(" • ")
 
 @Composable
-private fun VideoMenu(onDelete: () -> Unit) {
+private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -> Unit, onStartOver: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌ها") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
-                text = { Text("حذف") },
+                text = { Text(if (video.isFavorite) "حذف از پسندیده‌ها" else "افزودن به پسندیده‌ها") },
+                leadingIcon = { Icon(if (video.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, contentDescription = null) },
+                onClick = { open = false; onFavorite() }
+            )
+            if (VideoResume.hasResume(video.lastPositionMs, video.durationMs)) {
+                DropdownMenuItem(
+                    text = { Text("شروع از ابتدا") },
+                    leadingIcon = { Icon(Icons.Filled.Replay, contentDescription = null) },
+                    onClick = { open = false; onStartOver() }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("حذف از حافظهٔ گوشی") },
                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                 onClick = { open = false; onDelete() }
             )
@@ -107,7 +129,7 @@ private fun VideoMenu(onDelete: () -> Unit) {
 
 /** Grid cell. */
 @Composable
-fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)) {
         VideoThumbnail(video, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)))
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
@@ -115,14 +137,14 @@ fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
                 Text(video.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(meta(video), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            VideoMenu(onDelete)
+            VideoMenu(video, onDelete, onFavorite, onStartOver)
         }
     }
 }
 
 /** List row. */
 @Composable
-fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -134,6 +156,6 @@ fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
             Spacer(Modifier.size(2.dp))
             Text(meta(video), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        VideoMenu(onDelete)
+        VideoMenu(video, onDelete, onFavorite, onStartOver)
     }
 }

@@ -82,4 +82,14 @@ class VideoRepository(
     }
 
     suspend fun setFavorite(id: Long, favorite: Boolean) = dao.setFavorite(id, favorite)
+
+    suspend fun setFavorites(ids: List<Long>, favorite: Boolean) {
+        ids.chunked(500).forEach { dao.setFavorites(it, favorite) }
+    }
+
+    /** Clears "recent" and "continue watching" only; never touches files or favourites. */
+    suspend fun clearHistory() = dao.clearHistory()
+
+    /** Marks as watched / starts over: next play begins at 0. */
+    suspend fun resetPosition(id: Long) = dao.resetPosition(id)
 }

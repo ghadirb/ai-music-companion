@@ -13,25 +13,39 @@ enum class VideoSort(val label: String) {
 
 enum class VideoFilter(val label: String) {
     ALL("همه"),
+    NEW("جدید"),
+    UNFINISHED("ناتمام"),
+    FAVORITES("پسندیده‌ها"),
     RECENT("اخیراً پخش‌شده")
 }
 
 /** Pure search / sort / filter for the video library (JVM unit tested). */
 object VideoLibraryQuery {
 
+    /** A never-played video counts as "جدید" for this long after it was added (14 days). */
+    const val NEW_WINDOW_SEC = 14L * 24 * 3600
+
     fun apply(
         videos: List<VideoEntity>,
         query: String,
         sort: VideoSort,
-        filter: VideoFilter
+        filter: VideoFilter,
+        nowSec: Long = System.currentTimeMillis() / 1000
     ): List<VideoEntity> {
-        val base = if (filter == VideoFilter.RECENT) videos.filter { it.lastPlayedAt > 0L } else videos
+        val base = when (filter) {
+            VideoFilter.ALL -> videos
+            VideoFilter.RECENT -> videos.filter { it.lastPlayedAt > 0L }
+            VideoFilter.FAVORITES -> videos.filter { it.isFavorite }
+            VideoFilter.UNFINISHED -> videos.filter { VideoResume.hasResume(it.lastPositionMs, it.durationMs) }
+            VideoFilter.NEW -> videos.filter { it.lastPlayedAt == 0L && nowSec - it.dateAdded <= NEW_WINDOW_SEC }
+        }
         val q = normalize(query)
         val searched = if (q.isEmpty()) base else base.filter {
             normalize(it.displayName).contains(q) || normalize(it.folderName).contains(q)
         }
         // "اخیراً پخش‌شده" is always ordered by last play time; the sort menu applies to "همه".
-        if (filter == VideoFilter.RECENT) return searched.sortedByDescending { it.lastPlayedAt }
+        if (filter == VideoFilter.RECENT || filter == VideoFilter.UNFINISHED) return searched.sortedByDescending { it.lastPlayedAt }
+        if (filter == VideoFilter.NEW) return searched.sortedByDescending { it.dateAdded }
         return when (sort) {
             VideoSort.NEWEST -> searched.sortedByDescending { it.dateAdded }
             VideoSort.OLDEST -> searched.sortedBy { it.dateAdded }
