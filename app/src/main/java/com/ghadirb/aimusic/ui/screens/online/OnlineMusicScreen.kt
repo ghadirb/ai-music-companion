@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -123,6 +124,7 @@ fun OnlineMusicScreen(viewModel: OnlineMusicViewModel) {
                     Tab(selected = state.tab == tab, onClick = { viewModel.setTab(tab) }, text = { Text(stringResource(label)) })
                 }
             }
+            OnlineBadge()
             if (state.downloadPercent != null) DownloadBar(state.downloadPercent!!, viewModel::cancel)
             Box(Modifier.weight(1f)) {
                 when (state.tab) {
@@ -135,6 +137,25 @@ fun OnlineMusicScreen(viewModel: OnlineMusicViewModel) {
         }
         if (playerOpen && state.nowTitle != null) OnlinePlayerScreen(state, viewModel, onCollapse = { playerOpen = false })
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** One glance tells the user these songs are online (streamed), not files on the phone. */
+@Composable
+private fun OnlineBadge() {
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(
+                stringResource(R.string.online_badge),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
     }
 }
 

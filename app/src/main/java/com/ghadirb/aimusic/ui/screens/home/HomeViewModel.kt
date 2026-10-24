@@ -163,7 +163,7 @@ class HomeViewModel(
         viewModelScope.launch {
             _isReanalyzing.value = true
             try {
-                repository.rescanLibrary()
+                repository.rescanLibrary(deep = true)
             } catch (e: Exception) {
                 _message.value = "اسکن کتابخانه انجام نشد. دوباره تلاش کنید."
             } finally {

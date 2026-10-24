@@ -73,7 +73,14 @@ class MusicRepository(
      * Most existing callers just discard this (a manual rescan from Library only cares
      * that it ran, not what changed).
      */
-    suspend fun rescanLibrary(): List<TrackEntity> {
+    suspend fun rescanLibrary(deep: Boolean = false): List<TrackEntity> {
+        // Same mechanism as Settings > "find unknown files": songs on the phone that Android's media database
+        // does not know are indexed first, so a normal scan sees them too. Manual scans always do it, automatic
+        // ones at most every few minutes. Harmless where storage is not readable (Android 11+ without all-files).
+        runCatching {
+            if (deep) com.ghadirb.aimusic.library.MediaRescue.scanAll(appContext)
+            else com.ghadirb.aimusic.library.MediaRescue.scanAllIfStale(appContext)
+        }
         val scanned = scanner.scan()
         val existingPaths = trackDao.getAllPaths().toSet()
         val scannedPaths = scanned.map { it.path }.toSet()

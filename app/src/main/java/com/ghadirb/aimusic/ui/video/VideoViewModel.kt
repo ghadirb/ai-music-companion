@@ -80,10 +80,10 @@ class VideoViewModel(private val repository: VideoRepository) : ViewModel() {
     fun closeFolder() = controls.update { it.copy(openFolder = null) }
 
     /** Re-syncs with MediaStore (off the main thread inside the repository/scanner). */
-    fun refresh() {
+    fun refresh(deep: Boolean = false) {
         viewModelScope.launch {
             controls.update { it.copy(syncing = true) }
-            val ok = repository.sync()
+            val ok = repository.sync(deep)
             controls.update { it.copy(syncing = false, syncFailed = !ok) }
         }
     }

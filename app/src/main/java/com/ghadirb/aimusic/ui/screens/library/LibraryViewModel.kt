@@ -147,7 +147,7 @@ class LibraryViewModel(
             _isScanning.value = true
             _scanError.value = null
             try {
-                val added = repository.rescanLibrary()
+                val added = repository.rescanLibrary(deep = true)
                 // New tracks have no energy/mood yet — kick the (unique, cancellable) analyzer.
                 onLibraryChanged()
                 _scanMessage.value = if (added.isEmpty()) "آهنگ جدیدی پیدا نشد." else "${added.size} آهنگ جدید اضافه شد."

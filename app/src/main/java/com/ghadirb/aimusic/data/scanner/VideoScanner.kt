@@ -4,7 +4,9 @@ import android.content.ContentUris
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.MediaStore.Files.FileColumns as F
 import com.ghadirb.aimusic.data.local.entity.VideoEntity
+import com.ghadirb.aimusic.video.VideoFileTypes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -88,6 +90,10 @@ object VideoScanner {
                         dateModified = c.getLong(modifiedCol)
                     )
                 }
+                // Videos Android did not classify as video (often .mkv/.ts/.avi copied from other apps) are
+                // only visible through the generic Files table: add them, without duplicating known ids.
+                val known = result.mapTo(HashSet()) { it.id }
+                result += scanUnclassified(context, collection, known)
                 result
             }
         } catch (e: SecurityException) {
@@ -97,5 +103,52 @@ object VideoScanner {
             // A vendor MediaStore without one of the optional columns: treat as "could not scan".
             null
         }
+    }
+
+    /**
+     * Files MediaStore holds with media type NONE but whose name/mime says "video". Best effort: failures
+     * here never break the normal scan (returns an empty list). MediaStore ids are shared across the Files,
+     * Video and Audio tables, so the id also works with the Video content uri.
+     */
+    private fun scanUnclassified(context: Context, videoCollection: android.net.Uri, known: Set<Long>): List<VideoEntity> {
+        val out = ArrayList<VideoEntity>()
+        try {
+            val files = MediaStore.Files.getContentUri("external")
+            val projection = arrayOf(F._ID, F.DISPLAY_NAME, F.SIZE, F.MIME_TYPE, F.DATE_ADDED, F.DATE_MODIFIED)
+            val cursor = context.contentResolver.query(
+                files, projection,
+                "${F.MEDIA_TYPE} = ${F.MEDIA_TYPE_NONE} AND ${F.SIZE} > 0", null, "${F.DATE_ADDED} DESC"
+            ) ?: return out
+            cursor.use { c ->
+                val idCol = c.getColumnIndexOrThrow(F._ID)
+                val nameCol = c.getColumnIndexOrThrow(F.DISPLAY_NAME)
+                val sizeCol = c.getColumnIndexOrThrow(F.SIZE)
+                val mimeCol = c.getColumnIndexOrThrow(F.MIME_TYPE)
+                val addedCol = c.getColumnIndexOrThrow(F.DATE_ADDED)
+                val modifiedCol = c.getColumnIndexOrThrow(F.DATE_MODIFIED)
+                while (c.moveToNext()) {
+                    val id = c.getLong(idCol)
+                    if (id in known) continue
+                    val name = c.getString(nameCol).orEmpty()
+                    val mime = c.getString(mimeCol)
+                    if (!VideoFileTypes.isUnclassifiedVideo(name, mime)) continue
+                    out += VideoEntity(
+                        id = id,
+                        contentUri = ContentUris.withAppendedId(videoCollection, id).toString(),
+                        displayName = name.ifBlank { "video_$id" },
+                        durationMs = 0L, // unknown until played; the player probes the real file
+                        sizeBytes = c.getLong(sizeCol).coerceAtLeast(0L),
+                        width = 0, height = 0,
+                        mimeType = mime.orEmpty(),
+                        folderName = "", relativePath = "",
+                        dateAdded = c.getLong(addedCol),
+                        dateModified = c.getLong(modifiedCol)
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            // Optional extra source: ignore (SecurityException, vendor provider quirks...).
+        }
+        return out
     }
 }

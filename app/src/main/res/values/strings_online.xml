@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="nav_online">آهنگ‌های جدید</string>
+    <string name="nav_online">آهنگ‌های جدید (آنلاین)</string>
+    <string name="nav_online_bar">جدید (آنلاین)</string>
+    <string name="online_badge">آنلاین · از اینترنت پخش می‌شود و روی گوشی شما نیست</string>
     <string name="online_tab_new">جدیدها</string>
     <string name="online_tab_singers">گلچین خوانندگان</string>
     <string name="online_tab_favorites">علاقه‌مندی‌ها</string>

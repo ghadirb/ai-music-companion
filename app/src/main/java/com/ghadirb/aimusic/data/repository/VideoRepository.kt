@@ -32,7 +32,14 @@ class VideoRepository(
      * Re-scans MediaStore and reconciles the database. Returns false (and changes nothing) when the
      * scan could not run, e.g. the video permission was revoked, so a failed scan never wipes the cache.
      */
-    suspend fun sync(): Boolean {
+    suspend fun sync(deep: Boolean = false): Boolean {
+        // Videos that are on the phone but unknown to Android's media database are re-indexed first (same
+        // mechanism as Settings > "find unknown files"). Manual refresh always does it; the automatic sync on
+        // tab open only if the last run is older than a few minutes. Harmless where storage is not readable.
+        runCatching {
+            if (deep) com.ghadirb.aimusic.library.MediaRescue.scanAll(context)
+            else com.ghadirb.aimusic.library.MediaRescue.scanAllIfStale(context)
+        }
         val scanned = VideoScanner.scan(context) ?: return false
         val existing = dao.getAll().associateBy { it.id }
         val merged = scanned.map { fresh ->

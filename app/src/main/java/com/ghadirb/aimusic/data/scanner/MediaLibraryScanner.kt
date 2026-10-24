@@ -31,11 +31,16 @@ class MediaLibraryScanner(private val context: Context) {
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.IS_MUSIC,
+            MediaStore.Audio.Media.IS_RINGTONE,
+            MediaStore.Audio.Media.IS_ALARM,
+            MediaStore.Audio.Media.IS_NOTIFICATION,
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.DATE_ADDED
         )
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= 15000"
+        // Only the duration is filtered in SQL; "is this a song?" is decided per row by AudioEligibility, because
+        // IS_MUSIC alone hid many real songs (see that class).
+        val selection = "${MediaStore.Audio.Media.DURATION} >= ${AudioEligibility.MIN_DURATION_MS}"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
         // MediaStore.Audio.Media.GENRE only exists as a queryable column on API 30+, and even
@@ -70,6 +75,10 @@ class MediaLibraryScanner(private val context: Context) {
             val albumIdCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val durationCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val dataCol = c.getColumnIndex(MediaStore.Audio.Media.DATA)
+            val isMusicCol = c.getColumnIndex(MediaStore.Audio.Media.IS_MUSIC)
+            val isRingtoneCol = c.getColumnIndex(MediaStore.Audio.Media.IS_RINGTONE)
+            val isAlarmCol = c.getColumnIndex(MediaStore.Audio.Media.IS_ALARM)
+            val isNotificationCol = c.getColumnIndex(MediaStore.Audio.Media.IS_NOTIFICATION)
             val displayNameCol = c.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
             val dateAddedCol = c.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
             val genreColIndex = if (includesGenre) c.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
@@ -77,6 +86,16 @@ class MediaLibraryScanner(private val context: Context) {
             while (c.moveToNext()) {
                 // One malformed row (odd metadata, OEM quirks) must never abort the whole scan.
                 try {
+                    val rowPath = if (dataCol >= 0) c.getString(dataCol) else null
+                    val eligible = AudioEligibility.isLibraryCandidate(
+                        isMusic = isMusicCol < 0 || c.getInt(isMusicCol) != 0,
+                        isRingtone = isRingtoneCol >= 0 && c.getInt(isRingtoneCol) != 0,
+                        isAlarm = isAlarmCol >= 0 && c.getInt(isAlarmCol) != 0,
+                        isNotification = isNotificationCol >= 0 && c.getInt(isNotificationCol) != 0,
+                        durationMs = c.getLong(durationCol),
+                        path = rowPath
+                    )
+                    if (!eligible) continue
                     val id = c.getLong(idCol)
                     val contentUri = ContentUris.withAppendedId(collection, id)
                     val albumId = c.getLong(albumIdCol)

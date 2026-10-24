@@ -6,7 +6,10 @@ import android.os.Environment
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
@@ -26,27 +29,48 @@ object MediaRescue {
     )
     private const val MAX_DEPTH = 8
     private const val MAX_FILES = 5000
+    private const val INDEX_TIMEOUT_MS = 90_000L
+
+    /** One walk at a time: the library, the video tab and the foreground sync may all ask at once. */
+    private val lock = Mutex()
+    @Volatile private var lastRunAt = 0L
 
     data class Result(val readable: Boolean, val found: Int)
 
     /** Walks shared storage, indexes every media file MediaStore does not know yet. */
-    suspend fun scanAll(context: Context): Result = withContext(Dispatchers.IO) {
-        val root = Environment.getExternalStorageDirectory()
-        if (root?.listFiles() == null) return@withContext Result(readable = false, found = 0)
-        val indexed = indexedPaths(context)
-        val missing = ArrayList<String>()
-        walk(root, 0, indexed, missing)
-        if (missing.isNotEmpty()) scanPaths(context, missing)
-        Result(readable = true, found = missing.size)
+    suspend fun scanAll(context: Context): Result = lock.withLock {
+        withContext(Dispatchers.IO) {
+            val root = Environment.getExternalStorageDirectory()
+            if (root?.listFiles() == null) return@withContext Result(readable = false, found = 0)
+            val indexed = indexedPaths(context)
+            val missing = ArrayList<String>()
+            walk(root, 0, indexed, missing)
+            if (missing.isNotEmpty()) scanPaths(context, missing)
+            lastRunAt = System.currentTimeMillis()
+            Result(readable = true, found = missing.size)
+        }
+    }
+
+    /**
+     * Same as [scanAll] but skipped when it already ran less than [minIntervalMs] ago. Used by the automatic
+     * paths (app comes to the foreground, a tab opens) so ordinary scans find unindexed files too without
+     * walking the whole storage every time. Returns null when skipped.
+     */
+    suspend fun scanAllIfStale(context: Context, minIntervalMs: Long = 10 * 60_000L): Result? {
+        if (System.currentTimeMillis() - lastRunAt < minIntervalMs) return null
+        return scanAll(context)
     }
 
     /** Asks the system to (re)index exactly these files and waits until it is done. */
     suspend fun scanPaths(context: Context, paths: List<String>) {
         if (paths.isEmpty()) return
-        suspendCancellableCoroutine<Unit> { cont ->
-            val left = AtomicInteger(paths.size)
-            MediaScannerConnection.scanFile(context.applicationContext, paths.toTypedArray(), null) { _, _ ->
-                if (left.decrementAndGet() == 0 && cont.isActive) cont.resume(Unit)
+        // A vendor media scanner that never calls back must not hang the scan forever.
+        withTimeoutOrNull(INDEX_TIMEOUT_MS) {
+            suspendCancellableCoroutine<Unit> { cont ->
+                val left = AtomicInteger(paths.size)
+                MediaScannerConnection.scanFile(context.applicationContext, paths.toTypedArray(), null) { _, _ ->
+                    if (left.decrementAndGet() == 0 && cont.isActive) cont.resume(Unit)
+                }
             }
         }
     }

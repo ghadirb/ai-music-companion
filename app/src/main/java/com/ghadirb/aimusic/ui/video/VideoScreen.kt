@@ -238,7 +238,7 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 if (state.grid) Icon(Icons.Filled.ViewList, contentDescription = "نمایش فهرستی")
                 else Icon(Icons.Filled.GridView, contentDescription = "نمایش شبکه‌ای")
             }
-            IconButton(onClick = vm::refresh) { Icon(Icons.Filled.Refresh, contentDescription = "بازخوانی") }
+            IconButton(onClick = { vm.refresh(deep = true) }) { Icon(Icons.Filled.Refresh, contentDescription = "بازخوانی") }
         }
         if (state.syncing && state.videos.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
 
