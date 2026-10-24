@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Replay
@@ -101,7 +102,7 @@ private fun meta(video: VideoEntity): String = listOfNotNull(
 ).joinToString(" • ")
 
 @Composable
-private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -> Unit, onStartOver: () -> Unit) {
+private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -> Unit, onStartOver: () -> Unit, onAddToPlaylist: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌ها") }
@@ -110,6 +111,11 @@ private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -
                 text = { Text(if (video.isFavorite) "حذف از پسندیده‌ها" else "افزودن به پسندیده‌ها") },
                 leadingIcon = { Icon(if (video.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, contentDescription = null) },
                 onClick = { open = false; onFavorite() }
+            )
+            DropdownMenuItem(
+                text = { Text("افزودن به پلی‌لیست") },
+                leadingIcon = { Icon(Icons.Filled.PlaylistAdd, contentDescription = null) },
+                onClick = { open = false; onAddToPlaylist() }
             )
             if (VideoResume.hasResume(video.lastPositionMs, video.durationMs)) {
                 DropdownMenuItem(
@@ -129,7 +135,7 @@ private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -
 
 /** Grid cell. */
 @Composable
-fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}) {
+fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)) {
         VideoThumbnail(video, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)))
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
@@ -137,14 +143,14 @@ fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
                 Text(video.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(meta(video), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            VideoMenu(video, onDelete, onFavorite, onStartOver)
+            VideoMenu(video, onDelete, onFavorite, onStartOver, onAddToPlaylist)
         }
     }
 }
 
 /** List row. */
 @Composable
-fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}) {
+fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -156,6 +162,6 @@ fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
             Spacer(Modifier.size(2.dp))
             Text(meta(video), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        VideoMenu(video, onDelete, onFavorite, onStartOver)
+        VideoMenu(video, onDelete, onFavorite, onStartOver, onAddToPlaylist)
     }
 }

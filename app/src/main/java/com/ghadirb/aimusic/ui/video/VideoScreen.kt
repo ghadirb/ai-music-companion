@@ -154,6 +154,17 @@ private fun VideoPermissionState(
 @Composable
 private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier = Modifier) {
     val vm: VideoViewModel = viewModel(factory = viewModelFactory { initializer { VideoViewModel(repository) } })
+    val appContext = LocalContext.current.applicationContext as com.ghadirb.aimusic.AiMusicApp
+    val plVm: VideoPlaylistViewModel = viewModel(factory = viewModelFactory {
+        initializer {
+            VideoPlaylistViewModel(
+                com.ghadirb.aimusic.data.repository.VideoPlaylistRepository(appContext.database.videoPlaylistDao()),
+                repository
+            )
+        }
+    })
+    var showPlaylists by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var addTarget by remember { mutableStateOf<VideoEntity?>(null) }
     val state by vm.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -177,6 +188,8 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
     fun open(video: VideoEntity) {
         VideoPlayerActivity.start(context, video.id, state.videos.map { it.id })
     }
+
+    addTarget?.let { AddToPlaylistDialog(it, plVm, onDismiss = { addTarget = null }) }
 
     pendingDelete?.let { video ->
         AlertDialog(
@@ -214,8 +227,9 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         // Filter chips + sort / view / refresh
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = showPlaylists, onClick = { showPlaylists = !showPlaylists }, label = { Text("پلی‌لیست‌ها") })
                 VideoFilter.values().forEach { f ->
-                    FilterChip(selected = state.filter == f, onClick = { vm.setFilter(f) }, label = { Text(f.label) })
+                    FilterChip(selected = !showPlaylists && state.filter == f, onClick = { showPlaylists = false; vm.setFilter(f) }, label = { Text(f.label) })
                 }
             }
             var sortOpen by remember { mutableStateOf(false) }
@@ -268,6 +282,10 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         }
 
         when {
+            showPlaylists -> VideoPlaylistsPane(
+                vm = plVm,
+                onPlay = { queue, start -> VideoPlayerActivity.start(context, start.id, queue.map { it.id }) }
+            )
             state.videos.isEmpty() && state.syncing && state.totalCount == 0 -> LoadingState()
             state.videos.isEmpty() && state.totalCount == 0 -> EmptyState(
                 Icons.Filled.VideoLibrary,
@@ -303,12 +321,12 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) })
+                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v })
                 }
             }
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) })
+                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v })
                 }
             }
         }

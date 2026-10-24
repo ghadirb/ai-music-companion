@@ -14,6 +14,7 @@ import com.ghadirb.aimusic.data.local.dao.RecommendationEventDao
 import com.ghadirb.aimusic.data.local.dao.TrackDao
 import com.ghadirb.aimusic.data.local.dao.UserPreferenceDao
 import com.ghadirb.aimusic.data.local.dao.VideoDao
+import com.ghadirb.aimusic.data.local.dao.VideoPlaylistDao
 import com.ghadirb.aimusic.data.local.entity.BehaviorEventEntity
 import com.ghadirb.aimusic.data.local.entity.ListeningHistoryEntity
 import com.ghadirb.aimusic.data.local.entity.PlaylistEntity
@@ -23,6 +24,8 @@ import com.ghadirb.aimusic.data.local.entity.RecommendationEventEntity
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.local.entity.UserPreferenceEntity
 import com.ghadirb.aimusic.data.local.entity.VideoEntity
+import com.ghadirb.aimusic.data.local.entity.VideoPlaylistEntity
+import com.ghadirb.aimusic.data.local.entity.VideoPlaylistEntryEntity
 
 /**
  * Single Room database for the whole app. Everything here is local-only —
@@ -37,6 +40,7 @@ import com.ghadirb.aimusic.data.local.entity.VideoEntity
  * v6 adds `tracks.notInterested` (explicit negative feedback, v1.1).
  * v7 adds the on-device recommendation engine storage: `behavior_event`, `recommendation_event`,
  * `recommendation_cache` and `user_preference.profileJson`. Purely additive (no data is touched).
+ * v9 adds independent video playlists (`video_playlists`, `video_playlist_entries`); purely additive.
  * v8 adds the independent `videos` table for the local "ویدئو" tab (resume position, last played).
  * Purely additive: music, playlists and favourites are not touched.
  */
@@ -50,9 +54,11 @@ import com.ghadirb.aimusic.data.local.entity.VideoEntity
         BehaviorEventEntity::class,
         RecommendationEventEntity::class,
         RecommendationCacheEntity::class,
-        VideoEntity::class
+        VideoEntity::class,
+        VideoPlaylistEntity::class,
+        VideoPlaylistEntryEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,6 +71,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recommendationEventDao(): RecommendationEventDao
     abstract fun recommendationCacheDao(): RecommendationCacheDao
     abstract fun videoDao(): VideoDao
+    abstract fun videoPlaylistDao(): VideoPlaylistDao
 
     companion object {
         @Volatile
@@ -142,6 +149,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v8 -> v9: video playlists. Only new tables; music playlists and every existing row stay untouched. */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `video_playlists` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `video_playlist_entries` (`playlistId` INTEGER NOT NULL, " +
+                        "`videoId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`playlistId`, `videoId`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_video_playlist_entries_videoId` ON `video_playlist_entries` (`videoId`)")
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tracks ADD COLUMN energyLevel REAL")
@@ -163,7 +186,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ai_music_companion.db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     // v1 predates any real install (never released), so the only
                     // gap we can't hand-migrate is v1->v2; destructive fallback
                     // only kicks in for that very old case.
