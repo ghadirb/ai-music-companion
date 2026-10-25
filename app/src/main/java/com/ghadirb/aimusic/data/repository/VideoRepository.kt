@@ -66,7 +66,7 @@ class VideoRepository(
 
     /** Videos for [ids] (unordered; unknown ids are simply absent). */
     suspend fun getMany(ids: List<Long>): List<VideoEntity> =
-        ids.chunked(500).flatMap { dao.getByIds(it) }
+        ids.filter { it > 0 }.chunked(500).flatMap { dao.getByIds(it) } + com.ghadirb.aimusic.video.StreamUrl.find(ids)
 
     /**
      * Re-scans MediaStore and reconciles the database. Returns false (and changes nothing) when the

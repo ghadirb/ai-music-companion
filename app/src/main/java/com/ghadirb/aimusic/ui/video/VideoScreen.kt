@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DriveFileMove
@@ -484,6 +485,41 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("انصراف") } }
             )
             IconButton(onClick = { vm.refresh(deep = true) }) { Icon(Icons.Filled.Refresh, contentDescription = "بازخوانی") }
+            var showUrl by remember { mutableStateOf(false) }
+            IconButton(onClick = { showUrl = true }) { Icon(Icons.Filled.Link, contentDescription = "پخش از لینک") }
+            if (showUrl) {
+                var link by remember { mutableStateOf("") }
+                val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+                val parsed = if (link.isBlank()) null else com.ghadirb.aimusic.video.StreamUrl.parse(link)
+                AlertDialog(
+                    onDismissRequest = { showUrl = false },
+                    title = { Text("پخش از لینک") },
+                    text = {
+                        Column {
+                            Text("لینک مستقیم ویدئو (https) را وارد کنید. فایل روی گوشی ذخیره نمی‌شود.", style = MaterialTheme.typography.labelMedium)
+                            OutlinedTextField(
+                                value = link, onValueChange = { link = it }, singleLine = true,
+                                placeholder = { Text("https://…") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            )
+                            if (parsed is com.ghadirb.aimusic.video.StreamUrl.Result.Bad)
+                                Text(parsed.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                            TextButton(onClick = { clipboard.getText()?.text?.let { link = it.trim() } }) { Text("چسباندن از کلیپ‌بورد") }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            enabled = parsed is com.ghadirb.aimusic.video.StreamUrl.Result.Ok,
+                            onClick = {
+                                val ok = parsed as com.ghadirb.aimusic.video.StreamUrl.Result.Ok
+                                showUrl = false
+                                val v = com.ghadirb.aimusic.video.StreamUrl.register(ok.url, ok.title)
+                                VideoPlayerActivity.start(context, v.id, listOf(v.id))
+                            }
+                        ) { Text("پخش") }
+                    },
+                    dismissButton = { TextButton(onClick = { showUrl = false }) { Text("انصراف") } }
+                )
+            }
         }
         if (state.syncing && state.videos.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
 

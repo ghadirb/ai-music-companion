@@ -6,6 +6,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -87,7 +90,10 @@ fun VideoPlayerScreen(
     var showQueue by remember { mutableStateOf(false) }
     // Sleep timer + repeat-all live with the screen (video stops when the screen closes anyway).
     var sleep by remember { mutableStateOf<com.ghadirb.aimusic.video.SleepMode>(com.ghadirb.aimusic.video.SleepMode.Off) }
-    var loopAll by remember { mutableStateOf(false) }
+    val ctxForPrefs = androidx.compose.ui.platform.LocalContext.current
+    var loopAll by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.loadLoopAll(ctxForPrefs)) }
+    var subStyle by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.load(ctxForPrefs)) }
+    var showSubStyle by remember { mutableStateOf(false) }
     var showTimer by remember { mutableStateOf(false) }
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(loopAll, controller) { controller.setLoopAll(loopAll) }
@@ -149,6 +155,17 @@ fun VideoPlayerScreen(
                 },
                 update = {
                     it.player = controller.player
+                    it.subtitleView?.apply {
+                        setApplyEmbeddedStyles(false)
+                        setFractionalTextSize(subStyle.fractionalTextSize())
+                        setStyle(
+                            androidx.media3.ui.CaptionStyleCompat(
+                                subStyle.textColor(), subStyle.backgroundColor(), android.graphics.Color.TRANSPARENT,
+                                if (subStyle.outline) androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE else androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE,
+                                android.graphics.Color.BLACK, null
+                            )
+                        )
+                    }
                     it.resizeMode = when (aspect) {
                         VideoAspect.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                         VideoAspect.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -268,9 +285,51 @@ fun VideoPlayerScreen(
                         )
                     }
                     SubtitleRow("افزودن زیرنویس از فایل…", selected = false) { showSubtitles = false; onPickSubtitleFile() }
+                    SubtitleRow("ظاهر زیرنویس (اندازه، رنگ، پس‌زمینه)…", selected = false) { showSubtitles = false; showSubStyle = true }
                 }
             },
             confirmButton = { TextButton(onClick = { showSubtitles = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showSubStyle) {
+        fun update(new: com.ghadirb.aimusic.video.SubtitleStyle) {
+            subStyle = new.sanitized()
+            com.ghadirb.aimusic.video.SubtitleStyleStore.save(ctxForPrefs, subStyle)
+        }
+        AlertDialog(
+            onDismissRequest = { showSubStyle = false },
+            title = { Text("ظاهر زیرنویس") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.fillMaxWidth().background(Color(0xFF222222)).padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "نمونهٔ زیرنویس فارسی",
+                            color = Color(subStyle.textColor()),
+                            fontSize = (13 + 4 * subStyle.size).sp,
+                            modifier = Modifier.background(Color(subStyle.backgroundColor())).padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    @Composable
+                    fun group(title: String, labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
+                        Text(title, style = MaterialTheme.typography.labelLarge)
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            labels.forEachIndexed { i, l ->
+                                androidx.compose.material3.FilterChip(selected = i == selected, onClick = { onPick(i) }, label = { Text(l) })
+                            }
+                        }
+                    }
+                    group("اندازه", com.ghadirb.aimusic.video.SubtitleStyle.SIZE_LABELS, subStyle.size) { update(subStyle.copy(size = it)) }
+                    group("رنگ", com.ghadirb.aimusic.video.SubtitleStyle.COLOR_LABELS, subStyle.color) { update(subStyle.copy(color = it)) }
+                    group("پس‌زمینه", com.ghadirb.aimusic.video.SubtitleStyle.BG_LABELS, subStyle.background) { update(subStyle.copy(background = it)) }
+                    group("حاشیهٔ متن", listOf("بدون حاشیه", "با حاشیه"), if (subStyle.outline) 1 else 0) { update(subStyle.copy(outline = it == 1)) }
+                    if (controller is com.ghadirb.aimusic.video.VlcPlaybackController) {
+                        Text("در این موتور پخش، تغییر بعد از بستن و باز کردن دوبارهٔ پلیر اعمال می‌شود.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSubStyle = false }) { Text("تمام") } },
+            dismissButton = { TextButton(onClick = { update(com.ghadirb.aimusic.video.SubtitleStyle()) }) { Text("پیش‌فرض") } }
         )
     }
 
@@ -315,7 +374,10 @@ fun VideoPlayerScreen(
                     }
                     SubtitleRow("خاموش کردن تایمر", selected = sleep is com.ghadirb.aimusic.video.SleepMode.Off) { sleep = com.ghadirb.aimusic.video.SleepMode.Off }
                     androidx.compose.material3.HorizontalDivider()
-                    SubtitleRow(if (loopAll) "تکرار همهٔ صف: روشن" else "تکرار همهٔ صف: خاموش", selected = loopAll) { loopAll = !loopAll }
+                    SubtitleRow(if (loopAll) "تکرار همهٔ صف: روشن" else "تکرار همهٔ صف: خاموش", selected = loopAll) {
+                        loopAll = !loopAll
+                        com.ghadirb.aimusic.video.SubtitleStyleStore.saveLoopAll(ctxForPrefs, loopAll)
+                    }
                 }
             },
             confirmButton = { TextButton(onClick = { showTimer = false }) { Text("بستن") } }

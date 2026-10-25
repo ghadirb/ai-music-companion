@@ -36,7 +36,7 @@ class VlcPlaybackController(
 ) : VideoController {
 
     private val appContext = context.applicationContext
-    private val libVlc = LibVLC(appContext, arrayListOf("--audio-time-stretch"))
+    private val libVlc = LibVLC(appContext, arrayListOf("--audio-time-stretch") + SubtitleStyleStore.load(appContext).vlcArgs())
     private val mp = MediaPlayer(libVlc)
 
     private var fd: ParcelFileDescriptor? = null
@@ -125,13 +125,20 @@ class VlcPlaybackController(
         try {
             mp.stop()
             runCatching { fd?.close() }
-            val pfd = appContext.contentResolver.openFileDescriptor(Uri.parse(video.contentUri), "r")
-            if (pfd == null) {
-                _state.value = _state.value.copy(error = "فایل ویدئو قابل باز کردن نیست.")
-                return
+            val uri = Uri.parse(video.contentUri)
+            val media = if (StreamUrl.isStream(video)) {
+                // A link (https): libVLC streams it itself, there is no file descriptor.
+                fd = null
+                Media(libVlc, uri)
+            } else {
+                val pfd = appContext.contentResolver.openFileDescriptor(uri, "r")
+                if (pfd == null) {
+                    _state.value = _state.value.copy(error = "فایل ویدئو قابل باز کردن نیست.")
+                    return
+                }
+                fd = pfd
+                Media(libVlc, pfd.fileDescriptor)
             }
-            fd = pfd
-            val media = Media(libVlc, pfd.fileDescriptor)
             // Hardware decoding when allowed, with automatic software fallback inside libVLC.
             media.setHWDecoderEnabled(!preferSoftware, false)
             mp.media = media
