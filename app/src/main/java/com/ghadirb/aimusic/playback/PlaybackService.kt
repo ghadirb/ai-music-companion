@@ -117,6 +117,7 @@ class PlaybackService : MediaLibraryService() {
             .build()
         player.addListener(persistListener)
         SleepTimerController.attach(player)
+        com.ghadirb.aimusic.audio.AudioEffectsController.attach(this, player)
 
         val app = application as AiMusicApp
         recorder = ListeningRecorder(player, app.repository, scope).also { it.start() }
@@ -154,6 +155,7 @@ class PlaybackService : MediaLibraryService() {
         recorder?.stop()
         recorder = null
         SleepTimerController.detach()
+        com.ghadirb.aimusic.audio.AudioEffectsController.detach()
         scope.cancel()
         mediaSession?.release()
         mediaSession = null

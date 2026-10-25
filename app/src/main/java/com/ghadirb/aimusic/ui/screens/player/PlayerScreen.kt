@@ -80,6 +80,8 @@ fun PlayerScreen(
     val context = LocalContext.current
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showSleepTimer by rememberSaveable { mutableStateOf(false) }
+    var showAudioEffects by rememberSaveable { mutableStateOf(false) }
+    val audioFx by com.ghadirb.aimusic.audio.AudioEffectsController.state.collectAsState()
     var showQueue by rememberSaveable { mutableStateOf(false) }
     var showMore by rememberSaveable { mutableStateOf(false) }
     val currentTrack = uiState.currentTrack
@@ -304,6 +306,12 @@ fun PlayerScreen(
                     color = if (uiState.playbackSpeed != 1f) dynamicAccent else LocalContentColor.current
                 )
             }
+            IconButton(onClick = { showAudioEffects = true }) {
+                Icon(
+                    Icons.Filled.Equalizer, contentDescription = "صدا و اکولایزر",
+                    tint = if (audioFx.settings.enabled || audioFx.abLoop.active || audioFx.settings.skipSilence) dynamicAccent else LocalContentColor.current
+                )
+            }
             IconButton(onClick = { showLyrics = true }) {
                 Icon(Icons.Filled.Lyrics, contentDescription = "متن آهنگ")
             }
@@ -372,6 +380,14 @@ fun PlayerScreen(
             title = { Text("عیب‌یابی متن آهنگ") },
             text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(text, style = MaterialTheme.typography.bodySmall) } },
             confirmButton = { TextButton(onClick = playerViewModel::dismissDiagnosis) { Text("بستن") } }
+        )
+    }
+    if (showAudioEffects) {
+        AudioEffectsSheet(
+            speed = uiState.playbackSpeed,
+            positionMs = uiState.positionMs,
+            onSpeed = playerViewModel::setPlaybackSpeed,
+            onDismiss = { showAudioEffects = false }
         )
     }
     if (showSleepTimer) {

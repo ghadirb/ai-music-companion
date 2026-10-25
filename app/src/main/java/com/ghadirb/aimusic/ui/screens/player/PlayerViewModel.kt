@@ -193,6 +193,13 @@ class PlayerViewModel(
         _uiState.update { it.copy(playbackSpeed = next) }
     }
 
+    /** Exact speed (the audio sheet slider); the cycle button keeps working. */
+    fun setPlaybackSpeed(speed: Float) {
+        val v = speed.coerceIn(0.5f, 2f)
+        controller.setPlaybackSpeed(v)
+        _uiState.update { it.copy(playbackSpeed = v) }
+    }
+
     // ---- Queue ----
 
     fun playNext(track: TrackEntity) {
