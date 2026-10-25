@@ -79,4 +79,8 @@ abstract class VideoPlaylistDao {
         orderedVideoIds.forEachIndexed { index, videoId -> setPosition(playlistId, videoId, index) }
         touch(playlistId, now)
     }
+
+    /** A moved video got a new id: keep it in the same playlists (rows that would clash are left alone). */
+    @Query("UPDATE OR IGNORE video_playlist_entries SET videoId = :newId WHERE videoId = :oldId")
+    abstract suspend fun remapVideo(oldId: Long, newId: Long)
 }

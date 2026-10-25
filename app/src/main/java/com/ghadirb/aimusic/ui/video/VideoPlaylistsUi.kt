@@ -234,3 +234,34 @@ fun AddToPlaylistDialog(video: VideoEntity, vm: VideoPlaylistViewModel, onDismis
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
     )
 }
+
+/** Adds several selected videos to one playlist (existing or new). Videos already inside are skipped. */
+@Composable
+fun AddManyToPlaylistDialog(videos: List<VideoEntity>, vm: VideoPlaylistViewModel, onDone: () -> Unit, onDismiss: () -> Unit) {
+    val state by vm.ui.collectAsState()
+    var newName by remember { mutableStateOf("") }
+    val ids = videos.map { it.id }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("افزودن ${ids.size} ویدئو به پلی‌لیست") },
+        text = {
+            Column {
+                state.playlists.forEach { p ->
+                    Text(
+                        "${p.playlist.name}  (${p.count})",
+                        modifier = Modifier.fillMaxWidth().clickable { vm.add(p.playlist.id, ids); onDone() }.padding(vertical = 12.dp),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                OutlinedTextField(
+                    value = newName, onValueChange = { newName = it.take(60) }, singleLine = true,
+                    placeholder = { Text("پلی‌لیست جدید…") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = newName.isNotBlank(), onClick = { vm.create(newName, ids); onDone() }) { Text("ایجاد و افزودن") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
+    )
+}

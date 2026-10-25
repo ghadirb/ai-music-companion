@@ -2,7 +2,9 @@ package com.ghadirb.aimusic.ui.video
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -152,9 +154,15 @@ private fun VideoMenu(video: VideoEntity, onDelete: () -> Unit, onFavorite: () -
 }
 
 /** Grid cell. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}, onRename: () -> Unit = {}, onCopy: () -> Unit = {}, onMove: () -> Unit = {}) {
-    Column(modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)) {
+fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}, onRename: () -> Unit = {}, onCopy: () -> Unit = {}, onMove: () -> Unit = {}, selected: Boolean = false, onLongClick: () -> Unit = {}) {
+    Column(
+        modifier.clip(RoundedCornerShape(12.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    ) {
+        if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = "انتخاب‌شده", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(4.dp).size(20.dp))
         VideoThumbnail(video, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)))
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
@@ -167,10 +175,14 @@ fun VideoGridItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit,
 }
 
 /** List row. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}, onRename: () -> Unit = {}, onCopy: () -> Unit = {}, onMove: () -> Unit = {}) {
+fun VideoListItem(video: VideoEntity, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onFavorite: () -> Unit = {}, onStartOver: () -> Unit = {}, onAddToPlaylist: () -> Unit = {}, onRename: () -> Unit = {}, onCopy: () -> Unit = {}, onMove: () -> Unit = {}, selected: Boolean = false, onLongClick: () -> Unit = {}) {
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier.fillMaxWidth()
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {

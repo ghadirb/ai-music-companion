@@ -92,6 +92,11 @@ class VideoViewModel(private val repository: VideoRepository) : ViewModel() {
         viewModelScope.launch { repository.setFavorite(video.id, !video.isFavorite) }
     }
 
+    fun setFavorites(ids: List<Long>, favorite: Boolean) { viewModelScope.launch { repository.setFavorites(ids, favorite) } }
+
+    /** Remember favourites/position/playlists of videos about to be moved by copy + delete (their id will change). */
+    fun rememberForMove(videos: List<VideoEntity>) = repository.rememberForMove(videos)
+
     fun clearHistory() { viewModelScope.launch { repository.clearHistory() } }
 
     fun startOver(video: VideoEntity) { viewModelScope.launch { repository.resetPosition(video.id) } }

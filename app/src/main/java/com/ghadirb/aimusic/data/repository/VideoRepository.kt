@@ -4,6 +4,7 @@ import android.content.Context
 import com.ghadirb.aimusic.data.local.dao.VideoDao
 import com.ghadirb.aimusic.data.local.entity.VideoEntity
 import com.ghadirb.aimusic.data.scanner.VideoScanner
+import com.ghadirb.aimusic.video.VideoMoveCarryOver
 import com.ghadirb.aimusic.video.VideoResume
 import kotlinx.coroutines.flow.Flow
 
@@ -16,8 +17,47 @@ import kotlinx.coroutines.flow.Flow
  */
 class VideoRepository(
     private val dao: VideoDao,
-    private val context: Context
+    private val context: Context,
+    private val playlistDao: com.ghadirb.aimusic.data.local.dao.VideoPlaylistDao? = null
 ) {
+    private val prefs by lazy { context.getSharedPreferences("video_move_carry_over", Context.MODE_PRIVATE) }
+
+    private fun loadPending(): List<VideoMoveCarryOver.Pending> =
+        VideoMoveCarryOver.decode(prefs.getString("pending", "").orEmpty())
+
+    private fun savePending(list: List<VideoMoveCarryOver.Pending>) {
+        prefs.edit().putString("pending", VideoMoveCarryOver.encode(list)).apply()
+    }
+
+    /**
+     * Call right before a video is moved by copy + delete (its id will change). Once the new file is indexed,
+     * [sync] hands its favourite flag, resume position and playlists over to it.
+     */
+    fun rememberForMove(videos: List<VideoEntity>, nowMs: Long = System.currentTimeMillis()) {
+        val keep = loadPending().filter { p -> videos.none { it.id == p.oldId } }
+        savePending(keep + videos.map { VideoMoveCarryOver.pendingOf(it, nowMs) })
+    }
+
+    /** Applies pending carry-overs to freshly scanned rows; returns the (id changes) so playlists can follow. */
+    private fun applyCarryOver(merged: List<VideoEntity>, existingIds: Set<Long>, nowMs: Long): Pair<List<VideoEntity>, List<Pair<Long, Long>>> {
+        val pending = loadPending().filterNot { VideoMoveCarryOver.isExpired(it, nowMs) }
+        if (pending.isEmpty()) return merged to emptyList()
+        val result = merged.toMutableList()
+        val remaps = ArrayList<Pair<Long, Long>>()
+        val stillWaiting = ArrayList<VideoMoveCarryOver.Pending>()
+        for (p in pending) {
+            // Only brand-new rows can be the moved copy; the old row (same id) may still be there until it is deleted.
+            val candidates = result.filter { it.id !in existingIds }
+            val target = VideoMoveCarryOver.match(p, candidates)
+            if (target == null) { stillWaiting += p; continue }
+            val i = result.indexOfFirst { it.id == target.id }
+            result[i] = target.copy(lastPositionMs = p.positionMs, lastPlayedAt = p.lastPlayedAt, isFavorite = p.favorite)
+            remaps += p.oldId to target.id
+        }
+        savePending(stillWaiting)
+        return result to remaps
+    }
+
     fun observeVideos(): Flow<List<VideoEntity>> = dao.observeAll()
 
     suspend fun snapshot(): List<VideoEntity> = dao.getAll()
@@ -51,8 +91,11 @@ class VideoRepository(
                 isFavorite = old.isFavorite
             )
         }
+        // A moved video (copy + delete) came back with a new id: give it the old favourite / position / playlists.
+        val (carried, remaps) = applyCarryOver(merged, existing.keys, System.currentTimeMillis())
+        remaps.forEach { (oldId, newId) -> playlistDao?.remapVideo(oldId, newId) }
         // Only rewrite rows that are new or actually changed; large libraries stay cheap.
-        val changed = merged.filter { existing[it.id] != it }
+        val changed = carried.filter { existing[it.id] != it }
         if (changed.isNotEmpty()) dao.upsertAll(changed)
 
         val scannedIds = scanned.mapTo(HashSet()) { it.id }

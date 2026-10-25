@@ -28,6 +28,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
@@ -188,7 +193,15 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
     // ---- file operations: rename (MediaStore), copy / move (system folder picker + shared delete flow) ----
     var renameTarget by remember { mutableStateOf<VideoEntity?>(null) }
     var pendingRename by remember { mutableStateOf<Pair<VideoEntity, String>?>(null) }
-    var copyMoveTarget by remember { mutableStateOf<Pair<VideoEntity, Boolean>?>(null) }
+    var copyMoveTarget by remember { mutableStateOf<Pair<List<VideoEntity>, Boolean>?>(null) }
+    // Selection mode (long press) + bulk actions
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var bulkPlaylist by remember { mutableStateOf<List<VideoEntity>?>(null) }
+    var bulkDelete by remember { mutableStateOf<List<VideoEntity>?>(null) }
+    // Id-preserving move: which videos are waiting for a destination folder / a system permission
+    var moveDialog by remember { mutableStateOf<List<VideoEntity>?>(null) }
+    var pendingMove by remember { mutableStateOf<Pair<List<VideoEntity>, String>?>(null) }
+    val moveRef = remember { arrayOfNulls<(List<VideoEntity>, String) -> Unit>(1) }
     var busyText by remember { mutableStateOf<String?>(null) }
     fun toast(text: String) = android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_LONG).show()
     val renameRef = remember { arrayOfNulls<(VideoEntity, String) -> Unit>(1) }
@@ -214,33 +227,107 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         }
     }
 
+    val movePermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val p = pendingMove
+        pendingMove = null
+        if (p != null && result.resultCode == android.app.Activity.RESULT_OK) moveRef[0]?.invoke(p.first, p.second)
+        else toast("انتقال لغو شد.")
+    }
+    moveRef[0] = { videos, relPath ->
+        scope.launch {
+            val uris = videos.map { Uri.parse(it.contentUri) }
+            when (val o = com.ghadirb.aimusic.library.VideoFileOps.moveToRelativePath(context, uris, relPath)) {
+                is com.ghadirb.aimusic.library.VideoFileOps.MoveOutcome.Done -> {
+                    toast("${o.moved} ویدئو منتقل شد؛ پسندیده‌ها و پلی‌لیست‌ها حفظ شدند.")
+                    selected = emptySet(); vm.refresh(deep = true)
+                }
+                is com.ghadirb.aimusic.library.VideoFileOps.MoveOutcome.NeedsPermission -> {
+                    pendingMove = videos to relPath
+                    movePermissionLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(o.intentSender).build())
+                }
+                is com.ghadirb.aimusic.library.VideoFileOps.MoveOutcome.Unsupported ->
+                    toast(o.reason + " می‌توانید «انتخاب پوشهٔ دیگر» را بزنید.")
+            }
+        }
+    }
+
     val treeLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
     ) { tree ->
         val op = copyMoveTarget
         copyMoveTarget = null
         if (tree == null || op == null) return@rememberLauncherForActivityResult
-        val (video, isMove) = op
+        val (videos, isMove) = op
         busyText = if (isMove) "در حال انتقال…" else "در حال کپی…"
         scope.launch {
-            val uri = Uri.parse(video.contentUri)
-            val result = com.ghadirb.aimusic.library.TrackFileOps.copyToFolder(
-                context, tree, listOf(uri to video.displayName.substringBeforeLast('.'))
-            )
+            val pairs = videos.map { Uri.parse(it.contentUri) to it.displayName.substringBeforeLast('.') }
+            val result = com.ghadirb.aimusic.library.TrackFileOps.copyToFolder(context, tree, pairs)
             busyText = null
+            val copiedUris = result.succeeded.toSet()
             when {
-                result.succeeded.isEmpty() ->
+                copiedUris.isEmpty() ->
                     toast("کپی انجام نشد (فضای کافی نیست یا دسترسی رد شد). فایل اصلی دست‌نخورده ماند.")
                 isMove -> {
-                    // The original is deleted ONLY after the copy succeeded, and only with the user's system confirmation.
+                    // The original is deleted ONLY after its copy succeeded, and only with the user's system confirmation.
+                    // The copy gets a new id, so favourites / resume / playlists are remembered and handed to it later.
+                    val moved = videos.filter { Uri.parse(it.contentUri) in copiedUris }
+                    vm.rememberForMove(moved)
                     toast("کپی شد؛ برای تکمیل انتقال، حذف فایل اصلی را تأیید کنید.")
-                    deletingByUri.clear(); deletingByUri[uri] = video
-                    deleteFlow(listOf(uri))
+                    deletingByUri.clear(); moved.forEach { deletingByUri[Uri.parse(it.contentUri)] = it }
+                    selected = emptySet()
+                    deleteFlow(moved.map { Uri.parse(it.contentUri) })
                     vm.refresh(deep = true)
+                    if (result.failed.isNotEmpty()) toast("${result.failed.size} فایل کپی نشد و دست‌نخورده ماند.")
                 }
-                else -> { toast("فایل کپی شد."); vm.refresh(deep = true) }
+                else -> {
+                    toast(if (result.failed.isEmpty()) "فایل‌ها کپی شدند." else "${copiedUris.size} فایل کپی شد، ${result.failed.size} فایل نشد.")
+                    selected = emptySet(); vm.refresh(deep = true)
+                }
             }
         }
+    }
+
+    moveDialog?.let { videos ->
+        var folder by remember { mutableStateOf("") }
+        val rel = com.ghadirb.aimusic.video.VideoFolderPaths.relativePath(folder)
+        AlertDialog(
+            onDismissRequest = { moveDialog = null },
+            title = { Text("انتقال ${videos.size} ویدئو") },
+            text = {
+                Column {
+                    Text("به پوشهٔ Movies/ … (خالی = خود Movies). پسندیده‌ها و پلی‌لیست‌ها حفظ می‌شوند.", style = MaterialTheme.typography.labelMedium)
+                    androidx.compose.material3.OutlinedTextField(
+                        value = folder, onValueChange = { folder = it }, singleLine = true,
+                        placeholder = { Text("مثلاً Family") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                    if (rel == null) Text("نام پوشه معتبر نیست.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                    else Text("مقصد: $rel", style = MaterialTheme.typography.labelMedium)
+                    TextButton(onClick = { moveDialog = null; copyMoveTarget = videos to true; treeLauncher.launch(null) }) {
+                        Text("انتخاب پوشهٔ دیگر (کپی و حذف)")
+                    }
+                }
+            },
+            confirmButton = { TextButton(enabled = rel != null, onClick = { moveDialog = null; moveRef[0]?.invoke(videos, rel!!) }) { Text("انتقال") } },
+            dismissButton = { TextButton(onClick = { moveDialog = null }) { Text("انصراف") } }
+        )
+    }
+    bulkPlaylist?.let { AddManyToPlaylistDialog(it, plVm, onDone = { bulkPlaylist = null; selected = emptySet() }, onDismiss = { bulkPlaylist = null }) }
+    bulkDelete?.let { list ->
+        AlertDialog(
+            onDismissRequest = { bulkDelete = null },
+            title = { Text("حذف ${list.size} ویدئو") },
+            text = { Text("این ویدئوها از حافظهٔ گوشی حذف می‌شوند و قابل بازگشت نیستند.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    bulkDelete = null; selected = emptySet()
+                    deletingByUri.clear(); list.forEach { deletingByUri[Uri.parse(it.contentUri)] = it }
+                    deleteFlow(list.map { Uri.parse(it.contentUri) })
+                }) { Text("حذف") }
+            },
+            dismissButton = { TextButton(onClick = { bulkDelete = null }) { Text("انصراف") } }
+        )
     }
 
     renameTarget?.let { video ->
@@ -294,7 +381,24 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         )
     }
 
+    if (selected.isNotEmpty()) androidx.activity.compose.BackHandler { selected = emptySet() }
     Column(modifier.fillMaxSize()) {
+        if (selected.isNotEmpty()) {
+            val picked = state.videos.filter { it.id in selected }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Clear, contentDescription = "لغو انتخاب") }
+                Text("${picked.size} انتخاب", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                TextButton(onClick = { selected = state.videos.map { it.id }.toSet() }) { Text("همه") }
+                IconButton(onClick = { vm.setFavorites(picked.map { it.id }, !picked.all { it.isFavorite }); selected = emptySet() }) {
+                    Icon(Icons.Filled.Favorite, contentDescription = "پسندیده")
+                }
+                IconButton(onClick = { bulkPlaylist = picked }) { Icon(Icons.Filled.PlaylistAdd, contentDescription = "افزودن به پلی‌لیست") }
+                IconButton(onClick = { moveDialog = picked }) { Icon(Icons.Filled.DriveFileMove, contentDescription = "انتقال") }
+                IconButton(onClick = { copyMoveTarget = picked to false; treeLauncher.launch(null) }) { Icon(Icons.Filled.ContentCopy, contentDescription = "کپی") }
+                IconButton(onClick = { bulkDelete = picked }) { Icon(Icons.Filled.Delete, contentDescription = "حذف") }
+            }
+            androidx.compose.material3.HorizontalDivider()
+        }
         // Search
         OutlinedTextField(
             value = state.query,
@@ -406,12 +510,14 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoGridItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v }, onRename = { renameTarget = v }, onCopy = { copyMoveTarget = v to false; treeLauncher.launch(null) }, onMove = { copyMoveTarget = v to true; treeLauncher.launch(null) })
+                    VideoGridItem(v, onClick = { if (selected.isNotEmpty()) selected = if (v.id in selected) selected - v.id else selected + v.id else open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v }, onRename = { renameTarget = v }, onCopy = { copyMoveTarget = listOf(v) to false; treeLauncher.launch(null) }, onMove = { moveDialog = listOf(v) },
+                        selected = v.id in selected, onLongClick = { selected = selected + v.id })
                 }
             }
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.videos, key = { it.id }) { v ->
-                    VideoListItem(v, onClick = { open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v }, onRename = { renameTarget = v }, onCopy = { copyMoveTarget = v to false; treeLauncher.launch(null) }, onMove = { copyMoveTarget = v to true; treeLauncher.launch(null) })
+                    VideoListItem(v, onClick = { if (selected.isNotEmpty()) selected = if (v.id in selected) selected - v.id else selected + v.id else open(v) }, onDelete = { pendingDelete = v }, onFavorite = { vm.toggleFavorite(v) }, onStartOver = { vm.startOver(v) }, onAddToPlaylist = { addTarget = v }, onRename = { renameTarget = v }, onCopy = { copyMoveTarget = listOf(v) to false; treeLauncher.launch(null) }, onMove = { moveDialog = listOf(v) },
+                        selected = v.id in selected, onLongClick = { selected = selected + v.id })
                 }
             }
         }

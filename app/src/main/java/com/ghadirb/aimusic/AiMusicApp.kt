@@ -78,7 +78,7 @@ class AiMusicApp : Application() {
             context = this,
             database = database
         )
-        videoRepository = VideoRepository(database.videoDao(), this)
+        videoRepository = VideoRepository(database.videoDao(), this, database.videoPlaylistDao())
         scheduleTasteProfileRefresh()
         scheduleAudioAnalysis()
         // Opt-in only (spec item 7) — nothing scheduled unless the user already turned it on
