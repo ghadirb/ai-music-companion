@@ -80,6 +80,7 @@ import com.ghadirb.aimusic.library.TrackFileOps
 import com.ghadirb.aimusic.ui.components.EmptyState
 import com.ghadirb.aimusic.ui.components.LoadingState
 import com.ghadirb.aimusic.video.VideoFilter
+import com.ghadirb.aimusic.video.VideoLibraryQuery
 import com.ghadirb.aimusic.video.VideoSort
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
@@ -203,6 +204,8 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
     var pendingMove by remember { mutableStateOf<Pair<List<VideoEntity>, String>?>(null) }
     val moveRef = remember { arrayOfNulls<(List<VideoEntity>, String) -> Unit>(1) }
     var busyText by remember { mutableStateOf<String?>(null) }
+    var copyProgress by remember { mutableStateOf<com.ghadirb.aimusic.library.CopyProgress?>(null) }
+    var copyJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     fun toast(text: String) = android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_LONG).show()
     val renameRef = remember { arrayOfNulls<(VideoEntity, String) -> Unit>(1) }
 
@@ -261,30 +264,39 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         if (tree == null || op == null) return@rememberLauncherForActivityResult
         val (videos, isMove) = op
         busyText = if (isMove) "در حال انتقال…" else "در حال کپی…"
-        scope.launch {
-            val pairs = videos.map { Uri.parse(it.contentUri) to it.displayName.substringBeforeLast('.') }
-            val result = com.ghadirb.aimusic.library.TrackFileOps.copyToFolder(context, tree, pairs)
-            busyText = null
-            val copiedUris = result.succeeded.toSet()
-            when {
-                copiedUris.isEmpty() ->
-                    toast("کپی انجام نشد (فضای کافی نیست یا دسترسی رد شد). فایل اصلی دست‌نخورده ماند.")
-                isMove -> {
-                    // The original is deleted ONLY after its copy succeeded, and only with the user's system confirmation.
-                    // The copy gets a new id, so favourites / resume / playlists are remembered and handed to it later.
-                    val moved = videos.filter { Uri.parse(it.contentUri) in copiedUris }
-                    vm.rememberForMove(moved)
-                    toast("کپی شد؛ برای تکمیل انتقال، حذف فایل اصلی را تأیید کنید.")
-                    deletingByUri.clear(); moved.forEach { deletingByUri[Uri.parse(it.contentUri)] = it }
-                    selected = emptySet()
-                    deleteFlow(moved.map { Uri.parse(it.contentUri) })
-                    vm.refresh(deep = true)
-                    if (result.failed.isNotEmpty()) toast("${result.failed.size} فایل کپی نشد و دست‌نخورده ماند.")
+        copyProgress = null
+        copyJob = scope.launch {
+            try {
+                val pairs = videos.map { Uri.parse(it.contentUri) to it.displayName.substringBeforeLast('.') }
+                val result = com.ghadirb.aimusic.library.TrackFileOps.copyToFolder(context, tree, pairs) { p -> copyProgress = p }
+                val copiedUris = result.succeeded.toSet()
+                when {
+                    copiedUris.isEmpty() ->
+                        toast("کپی انجام نشد (فضای کافی نیست یا دسترسی رد شد). فایل اصلی دست‌نخورده ماند.")
+                    isMove -> {
+                        // The original is deleted ONLY after its copy succeeded, and only with the user's system confirmation.
+                        // The copy gets a new id, so favourites / resume / playlists are remembered and handed to it later.
+                        val moved = videos.filter { Uri.parse(it.contentUri) in copiedUris }
+                        vm.rememberForMove(moved)
+                        toast("کپی شد؛ برای تکمیل انتقال، حذف فایل اصلی را تأیید کنید.")
+                        deletingByUri.clear(); moved.forEach { deletingByUri[Uri.parse(it.contentUri)] = it }
+                        selected = emptySet()
+                        deleteFlow(moved.map { Uri.parse(it.contentUri) })
+                        vm.refresh(deep = true)
+                        if (result.failed.isNotEmpty()) toast("${result.failed.size} فایل کپی نشد و دست‌نخورده ماند.")
+                    }
+                    else -> {
+                        toast(if (result.failed.isEmpty()) "فایل‌ها کپی شدند." else "${copiedUris.size} فایل کپی شد، ${result.failed.size} فایل نشد.")
+                        selected = emptySet(); vm.refresh(deep = true)
+                    }
                 }
-                else -> {
-                    toast(if (result.failed.isEmpty()) "فایل‌ها کپی شدند." else "${copiedUris.size} فایل کپی شد، ${result.failed.size} فایل نشد.")
-                    selected = emptySet(); vm.refresh(deep = true)
-                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                toast("لغو شد؛ فایل نیمه‌کاره پاک شد و فایل اصلی دست‌نخورده ماند.")
+                throw e
+            } finally {
+                busyText = null
+                copyProgress = null
+                copyJob = null
             }
         }
     }
@@ -349,11 +361,24 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
         )
     }
     busyText?.let { msg ->
+        val progress = copyProgress
         AlertDialog(
             onDismissRequest = {},
             title = { Text(msg) },
-            text = { androidx.compose.material3.CircularProgressIndicator() },
-            confirmButton = {}
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (progress != null && progress.totalBytes > 0) {
+                        LinearProgressIndicator(progress = { progress.percent / 100f }, modifier = Modifier.fillMaxWidth())
+                        Text("${progress.percent}٪   (${VideoLibraryQuery.formatSize(progress.doneBytes)} از ${VideoLibraryQuery.formatSize(progress.totalBytes)})")
+                        if (progress.fileCount > 1) Text("فایل ${progress.fileIndex} از ${progress.fileCount}", style = MaterialTheme.typography.labelMedium)
+                        Text(progress.fileName, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text("در حال آماده‌سازی…", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { copyJob?.cancel() }) { Text("لغو") } }
         )
     }
 
@@ -414,13 +439,17 @@ private fun VideoLibraryContent(repository: VideoRepository, modifier: Modifier 
             }
         )
         // Filter chips + sort / view / refresh
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = showPlaylists, onClick = { showPlaylists = !showPlaylists }, label = { Text("پلی‌لیست‌ها") })
-                VideoFilter.values().forEach { f ->
-                    FilterChip(selected = !showPlaylists && state.filter == f, onClick = { showPlaylists = false; vm.setFilter(f) }, label = { Text(f.label) })
-                }
+        // Chips get their own full-width, scrollable line (they used to share it with 4 icon buttons and got cut off).
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(selected = showPlaylists, onClick = { showPlaylists = !showPlaylists }, label = { Text("پلی‌لیست‌ها") })
+            VideoFilter.values().forEach { f ->
+                FilterChip(selected = !showPlaylists && state.filter == f, onClick = { showPlaylists = false; vm.setFilter(f) }, label = { Text(f.label) })
             }
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             var sortOpen by remember { mutableStateOf(false) }
             Column {
                 IconButton(onClick = { sortOpen = true }, enabled = state.filter == VideoFilter.ALL) {

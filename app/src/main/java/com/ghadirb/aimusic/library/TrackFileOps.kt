@@ -10,6 +10,8 @@ import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -150,7 +152,9 @@ object TrackFileOps {
     suspend fun copyToFolder(
         context: Context,
         destinationTree: Uri,
-        tracks: List<Pair<Uri, String>>
+        tracks: List<Pair<Uri, String>>,
+        /** Called off the main thread, only when the whole-batch percent changes. Cancelling the coroutine stops the copy and removes the half-written file. */
+        onProgress: ((CopyProgress) -> Unit)? = null
     ): CopyResult = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val destDir = DocumentFile.fromTreeUri(context, destinationTree)
@@ -159,7 +163,13 @@ object TrackFileOps {
         }
         val succeeded = mutableListOf<Uri>()
         val failed = mutableListOf<Uri>()
-        for ((sourceUri, fallbackTitle) in tracks) {
+        val sizes = tracks.map { (uri, _) -> sizeOf(resolver, uri) }
+        val total = sizes.sum()
+        var doneBytes = 0L
+        var lastPercent = -1
+        for ((index, track) in tracks.withIndex()) {
+            val (sourceUri, fallbackTitle) = track
+            currentCoroutineContext().ensureActive()
             var created: DocumentFile? = null
             val ok = runCatching {
                 val mime = resolver.getType(sourceUri) ?: "audio/*"
@@ -169,7 +179,19 @@ object TrackFileOps {
                 resolver.openInputStream(sourceUri).use { input ->
                     resolver.openOutputStream(destFile.uri).use { output ->
                         if (input == null || output == null) return@runCatching false
-                        input.copyTo(output)
+                        val buffer = ByteArray(256 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            currentCoroutineContext().ensureActive()
+                            output.write(buffer, 0, read)
+                            doneBytes += read
+                            val percent = CopyProgress.percentOf(doneBytes, total)
+                            if (onProgress != null && percent != lastPercent) {
+                                lastPercent = percent
+                                onProgress(CopyProgress(doneBytes, total, index + 1, tracks.size, fallbackTitle))
+                            }
+                        }
                     }
                 }
                 true
@@ -180,6 +202,12 @@ object TrackFileOps {
         }
         CopyResult(succeeded, failed)
     }
+
+    private fun sizeOf(resolver: ContentResolver, uri: Uri): Long = runCatching {
+        resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else 0L
+        } ?: 0L
+    }.getOrDefault(0L)
 
     /** Prefers the file's real on-disk name; falls back to the track title + an extension guessed from its mime type. */
     private fun resolveDisplayName(resolver: ContentResolver, uri: Uri, mime: String, fallbackTitle: String): String {
