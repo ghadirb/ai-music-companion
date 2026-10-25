@@ -85,6 +85,28 @@ fun VideoPlayerScreen(
     var showSubtitles by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    // Sleep timer + repeat-all live with the screen (video stops when the screen closes anyway).
+    var sleep by remember { mutableStateOf<com.ghadirb.aimusic.video.SleepMode>(com.ghadirb.aimusic.video.SleepMode.Off) }
+    var loopAll by remember { mutableStateOf(false) }
+    var showTimer by remember { mutableStateOf(false) }
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(loopAll, controller) { controller.setLoopAll(loopAll) }
+    LaunchedEffect(sleep) {
+        val m = sleep
+        if (m is com.ghadirb.aimusic.video.SleepMode.Minutes) {
+            delay((m.endsAtMs - System.currentTimeMillis()).coerceAtLeast(0L))
+            controller.pause()
+            sleep = com.ghadirb.aimusic.video.SleepMode.Off
+        }
+    }
+    LaunchedEffect(sleep, state.index, state.positionMs) {
+        if (com.ghadirb.aimusic.video.VideoSleepTimer.shouldPause(sleep, System.currentTimeMillis(), state.index, state.positionMs, state.durationMs)
+            && sleep is com.ghadirb.aimusic.video.SleepMode.EndOfVideo) {
+            controller.pause()
+            sleep = com.ghadirb.aimusic.video.SleepMode.Off
+        }
+    }
+    LaunchedEffect(showTimer) { while (showTimer) { nowMs = System.currentTimeMillis(); delay(1000) } }
     // Screen lock: controls and drag gestures are off (pocket / child proof); a tap only reveals the unlock button.
     var locked by remember { mutableStateOf(false) }
     var showUnlock by remember { mutableStateOf(false) }
@@ -190,7 +212,9 @@ fun VideoPlayerScreen(
                 aspectLabel = aspect.label,
                 onAspect = { aspect = aspect.next() },
                 onInteract = { interactions++ },
-                onLock = { locked = true; controlsVisible = false; showUnlock = true }
+                onLock = { locked = true; controlsVisible = false; showUnlock = true },
+                onTimer = { showTimer = true },
+                timerActive = sleep !is com.ghadirb.aimusic.video.SleepMode.Off || loopAll
             )
         }
 
@@ -265,6 +289,36 @@ fun VideoPlayerScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showAudio = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showTimer) {
+        val vst = com.ghadirb.aimusic.video.VideoSleepTimer
+        AlertDialog(
+            onDismissRequest = { showTimer = false },
+            title = { Text("تایمر خواب و تکرار") },
+            text = {
+                Column {
+                    val status = when (val m = sleep) {
+                        is com.ghadirb.aimusic.video.SleepMode.Off -> "تایمر خاموش است"
+                        is com.ghadirb.aimusic.video.SleepMode.Minutes -> "توقف پخش تا ${vst.formatRemaining(vst.remainingMs(m, nowMs))} دیگر"
+                        is com.ghadirb.aimusic.video.SleepMode.EndOfVideo -> "توقف در پایان این ویدئو"
+                    }
+                    Text(status, style = MaterialTheme.typography.labelLarge)
+                    vst.PRESETS_MINUTES.forEach { min ->
+                        SubtitleRow("$min دقیقه", selected = false) {
+                            sleep = vst.start(min, System.currentTimeMillis()); showTimer = false
+                        }
+                    }
+                    SubtitleRow("پایان این ویدئو", selected = sleep is com.ghadirb.aimusic.video.SleepMode.EndOfVideo) {
+                        sleep = com.ghadirb.aimusic.video.SleepMode.EndOfVideo(state.index); showTimer = false
+                    }
+                    SubtitleRow("خاموش کردن تایمر", selected = sleep is com.ghadirb.aimusic.video.SleepMode.Off) { sleep = com.ghadirb.aimusic.video.SleepMode.Off }
+                    androidx.compose.material3.HorizontalDivider()
+                    SubtitleRow(if (loopAll) "تکرار همهٔ صف: روشن" else "تکرار همهٔ صف: خاموش", selected = loopAll) { loopAll = !loopAll }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showTimer = false }) { Text("بستن") } }
         )
     }
 

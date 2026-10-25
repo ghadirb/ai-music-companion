@@ -29,6 +29,9 @@ interface VideoController {
     /** Picture fitting. The Media3 engine is handled by its PlayerView; only the libVLC engine needs this. */
     fun setAspect(aspect: VideoAspect) {}
 
+    /** Repeat the whole queue (last video is followed by the first). */
+    fun setLoopAll(enabled: Boolean) {}
+
     fun selectSubtitle(index: Int)
     fun disableSubtitles()
     /** Adds an external subtitle chosen through the system picker; false when the format is unsupported. */

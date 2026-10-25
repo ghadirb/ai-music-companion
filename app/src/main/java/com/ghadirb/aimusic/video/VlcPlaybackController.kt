@@ -70,6 +70,7 @@ class VlcPlaybackController(
                         ended = true
                         saveCurrent(finished = true)
                         if (_state.value.index < _state.value.queue.lastIndex) next()
+                        else if (loopAll && _state.value.queue.isNotEmpty()) openAt(0)
                     }
                     MediaPlayer.Event.EncounteredError ->
                         _state.value = _state.value.copy(
@@ -178,6 +179,9 @@ class VlcPlaybackController(
     }
 
     override fun setSpeed(speed: Float) { mp.setRate(speed); publish() }
+
+    @Volatile private var loopAll = false
+    override fun setLoopAll(enabled: Boolean) { loopAll = enabled }
 
     override fun setAspect(aspect: VideoAspect) {
         // Best effort: scaling only applies once a video output exists, so a failure here must never affect playback.

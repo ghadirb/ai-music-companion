@@ -235,6 +235,10 @@ class VideoPlaybackController(
 
     override fun setSpeed(speed: Float) { player.setPlaybackSpeed(speed); publish() }
 
+    override fun setLoopAll(enabled: Boolean) {
+        player.repeatMode = if (enabled) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+    }
+
     private fun audioGroups(): List<Tracks.Group> =
         player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO && it.isSupported }
 
