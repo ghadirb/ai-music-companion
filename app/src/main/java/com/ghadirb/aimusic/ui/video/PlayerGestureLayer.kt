@@ -55,6 +55,8 @@ fun PlayerGestureLayer(
     positionMs: () -> Long = { 0L },
     durationMs: () -> Long = { 0L },
     onSeekTo: ((Long) -> Unit)? = null,
+    /** False while the player is locked: only taps are handled, drags (seek / brightness / volume) are ignored. */
+    gesturesEnabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
     val currentPosition by rememberUpdatedState(positionMs)
@@ -83,7 +85,8 @@ fun PlayerGestureLayer(
         modifier
             .fillMaxSize()
             .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) }
-            .pointerInput(Unit) {
+            .pointerInput(gesturesEnabled) {
+                if (!gesturesEnabled) return@pointerInput
                 // One drag detector for both axes. The axis is decided by the first movement and then stays fixed
                 // for that gesture: horizontal = seek, vertical = brightness (left half) / volume (right half).
                 val axisNone = 0

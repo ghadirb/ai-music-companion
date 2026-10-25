@@ -83,6 +83,10 @@ fun VideoPlayerScreen(
     var showSubtitles by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    // Screen lock: controls and drag gestures are off (pocket / child proof); a tap only reveals the unlock button.
+    var locked by remember { mutableStateOf(false) }
+    var showUnlock by remember { mutableStateOf(false) }
+    LaunchedEffect(showUnlock) { if (showUnlock) { delay(3000); showUnlock = false } }
     // Picture fitting (fit / fill / zoom). Kept for the whole viewing session, across queue items.
     var aspect by remember { mutableStateOf(VideoAspect.FIT) }
     // libVLC only: re-apply when the video changes, because scaling needs an existing video output.
@@ -101,7 +105,8 @@ fun VideoPlayerScreen(
     }
 
     PlayerGestureLayer(
-        onTap = { controlsVisible = !controlsVisible },
+        onTap = { if (locked) showUnlock = true else controlsVisible = !controlsVisible },
+        gesturesEnabled = !locked,
         positionMs = { state.positionMs },
         durationMs = { state.durationMs },
         onSeekTo = { ms -> controller.seekTo(ms); interactions++ },
@@ -155,7 +160,7 @@ fun VideoPlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = controlsVisible && !inPip && state.error == null,
+            visible = controlsVisible && !locked && !inPip && state.error == null,
             enter = fadeIn(), exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -182,8 +187,18 @@ fun VideoPlayerScreen(
                 onQueue = { showQueue = true },
                 aspectLabel = aspect.label,
                 onAspect = { aspect = aspect.next() },
-                onInteract = { interactions++ }
+                onInteract = { interactions++ },
+                onLock = { locked = true; controlsVisible = false; showUnlock = true }
             )
+        }
+
+        if (locked && showUnlock && !inPip) {
+            androidx.compose.material3.IconButton(
+                onClick = { locked = false; showUnlock = false; controlsVisible = true; interactions++ },
+                modifier = Modifier.align(Alignment.CenterEnd).padding(24.dp).background(Color(0x99000000), androidx.compose.foundation.shape.CircleShape)
+            ) {
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.LockOpen, contentDescription = "باز کردن قفل", tint = Color.White)
+            }
         }
 
         state.error?.let { message ->
