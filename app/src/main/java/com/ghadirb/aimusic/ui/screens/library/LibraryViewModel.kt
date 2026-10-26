@@ -100,6 +100,8 @@ class LibraryViewModel(
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning
+    private val _scanProgress = MutableStateFlow<com.ghadirb.aimusic.library.ScanProgress?>(null)
+    val scanProgress: StateFlow<com.ghadirb.aimusic.library.ScanProgress?> = _scanProgress
 
     /** One-shot result of a manual scan, shown as a snackbar. */
     private val _scanMessage = MutableStateFlow<String?>(null)
@@ -152,7 +154,9 @@ class LibraryViewModel(
             _isScanning.value = true
             _scanError.value = null
             try {
-                val added = repository.rescanLibrary(deep = true)
+                val added = repository.rescanLibrary(deep = true) { done, total ->
+                    _scanProgress.value = com.ghadirb.aimusic.library.ScanProgress(done, total)
+                }
                 // New tracks have no energy/mood yet — kick the (unique, cancellable) analyzer.
                 onLibraryChanged()
                 _scanMessage.value = if (added.isEmpty()) "آهنگ جدیدی پیدا نشد." else "${added.size} آهنگ جدید اضافه شد."
@@ -165,6 +169,7 @@ class LibraryViewModel(
                 _scanError.value = "اسکن کتابخانه کامل نشد. دوباره تلاش کنید."
             } finally {
                 _isScanning.value = false
+                _scanProgress.value = null
             }
         }
     }

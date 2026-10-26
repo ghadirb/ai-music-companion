@@ -73,7 +73,7 @@ class MusicRepository(
      * Most existing callers just discard this (a manual rescan from Library only cares
      * that it ran, not what changed).
      */
-    suspend fun rescanLibrary(deep: Boolean = false): List<TrackEntity> {
+    suspend fun rescanLibrary(deep: Boolean = false, onProgress: ((done: Int, total: Int) -> Unit)? = null): List<TrackEntity> {
         // Same mechanism as Settings > "find unknown files": songs on the phone that Android's media database
         // does not know are indexed first, so a normal scan sees them too. Manual scans always do it, automatic
         // ones at most every few minutes. Harmless where storage is not readable (Android 11+ without all-files).
@@ -81,7 +81,7 @@ class MusicRepository(
             if (deep) com.ghadirb.aimusic.library.MediaRescue.scanAll(appContext)
             else com.ghadirb.aimusic.library.MediaRescue.scanAllIfStale(appContext)
         }
-        val rawScanned = scanner.scan()
+        val rawScanned = scanner.scan(onProgress)
         // Folders the user excluded never enter (and are removed from) the library; files stay on the phone.
         val excluded = com.ghadirb.aimusic.library.ExcludedFoldersStore(appContext).load()
         val scanned = if (excluded.isEmpty()) rawScanned

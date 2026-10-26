@@ -83,6 +83,7 @@ fun LibraryScreen(
     )
     val state by viewModel.uiState.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val scanProgress by viewModel.scanProgress.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
     val scanMessage by viewModel.scanMessage.collectAsState()
     var trackForPlaylistPicker by remember { mutableStateOf<TrackEntity?>(null) }
@@ -405,7 +406,17 @@ fun LibraryScreen(
             }
             if (isScanning) {
                 Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    val sp = scanProgress
+                    if (sp != null && sp.known) {
+                        LinearProgressIndicator(progress = { sp.percent / 100f }, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            "${sp.done} از ${sp.total} (${sp.percent}٪)",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
                     TextButton(onClick = viewModel::cancelScan, modifier = Modifier.align(Alignment.End)) { Text("لغو اسکن") }
                 }
             }

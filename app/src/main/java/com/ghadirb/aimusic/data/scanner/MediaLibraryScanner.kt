@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.util.Log
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
@@ -19,7 +20,11 @@ import kotlinx.coroutines.withContext
  */
 class MediaLibraryScanner(private val context: Context) {
 
-    suspend fun scan(): List<TrackEntity> = withContext(Dispatchers.IO) {
+    /**
+     * [onProgress] gets (rows looked at, all rows) in steps; the scan also stops promptly when the coroutine is
+     * cancelled (the database is only touched later, in one transaction, so a cancelled scan changes nothing).
+     */
+    suspend fun scan(onProgress: ((done: Int, total: Int) -> Unit)? = null): List<TrackEntity> = withContext(Dispatchers.IO) {
         val tracks = mutableListOf<TrackEntity>()
 
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -83,7 +88,12 @@ class MediaLibraryScanner(private val context: Context) {
             val dateAddedCol = c.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
             val genreColIndex = if (includesGenre) c.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
 
+            val totalRows = c.count
+            var rowsDone = 0
             while (c.moveToNext()) {
+                ensureActive()
+                rowsDone++
+                if (onProgress != null && com.ghadirb.aimusic.library.ScanProgress.shouldReport(rowsDone, totalRows)) onProgress(rowsDone, totalRows)
                 // One malformed row (odd metadata, OEM quirks) must never abort the whole scan.
                 try {
                     val rowPath = if (dataCol >= 0) c.getString(dataCol) else null
