@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.video.VideoMoveTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:24" hostname="runnervmr9t6g" time="0.004">
+  <properties/>
+  <testcase name="persianFolderOk" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.001"/>
+  <testcase name="typingMoviesPrefixIsNotDuplicated" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="simpleFolder" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="nestedAndBackslashes" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.001"/>
+  <testcase name="expiry" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="matchesRenamedCopySuffix" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.001"/>
+  <testcase name="emptyTextDecodesToNothing" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="emptyMeansMoviesRoot" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="forbiddenCharsRejected" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="matchesSameNameAndSizeWithNewId" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="differentSizeDoesNotMatch" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="oldIdIsNeverTheMatch" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="garbageLinesAreIgnored" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="newestCopyWinsWhenSeveral" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="encodeDecodeRoundTrip" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.001"/>
+  <testcase name="parentTraversalRejected" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="displayName" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <testcase name="differentNameDoesNotMatch" classname="com.ghadirb.aimusic.video.VideoMoveTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

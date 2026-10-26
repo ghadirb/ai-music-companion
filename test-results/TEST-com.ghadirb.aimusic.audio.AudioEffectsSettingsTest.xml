@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:22" hostname="runnervmr9t6g" time="0.078">
+  <properties/>
+  <testcase name="outOfRangeValuesAreClamped" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.034"/>
+  <testcase name="movingAPastBClearsB" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.001"/>
+  <testcase name="presetUsedWhenBandCountDiffers" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.008"/>
+  <testcase name="replayGainRoundTripAndOldFormat" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.006"/>
+  <testcase name="seekBackOnlyAtOrAfterB" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="presetIdsAreUnique" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="emptyAnchorsAreFlat" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.001"/>
+  <testcase name="savedBandsWinWhenCountMatches" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="roundTrip" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="customWithoutBandsIsFlat" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="emptyBandsRoundTrip" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="movingAKeepsFarEnoughB" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.001"/>
+  <testcase name="garbageDecodesToDefaults" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="gainParsing" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.011"/>
+  <testcase name="bassPresetBoostsLowsMoreThanHighs" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.002"/>
+  <testcase name="gainsAreClampedToDeviceRange" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.001"/>
+  <testcase name="volumeOnlyEverLowers" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="tooShortLoopIsIgnored" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="trackGainWinsOverAlbumGain" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="interpolationIsBetweenAnchorsAndFlatOutside" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="goodLoopIsStored" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="flatPresetIsAllZero" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="loopNeedsBothPointsInOrder" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="worksWithOtherBandCounts" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <testcase name="setBWithoutAIsIgnored" classname="com.ghadirb.aimusic.audio.AudioEffectsSettingsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

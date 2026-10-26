@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.premium.EntitlementTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.275">
+  <properties/>
+  <testcase name="premiumUserUnlocksAllUntilExpiry" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.023"/>
+  <testcase name="rejectsAnAlgNoneStyleTokenAndWrongKey" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.032"/>
+  <testcase name="derConversionRoundTripsOnJcaSignatures" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.198"/>
+  <testcase name="rejectsExpiredWrongSubjectAndTamperedTokens" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.016"/>
+  <testcase name="trialDaysLeftRoundsUpAndNeverGoesNegative" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.001"/>
+  <testcase name="trialEntitlementIsRecognisedOnlyWhenTrialIsTheOnlySku" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.0"/>
+  <testcase name="everyFeatureHasAnExplicitPlanAndCopy" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.001"/>
+  <testcase name="verifiesTokenSignedByTheWorker" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.003"/>
+  <testcase name="unconfiguredVerifierNeverGrantsPremium" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.001"/>
+  <testcase name="freeUserIsBlockedFromPremiumFeaturesButNotFromCore" classname="com.ghadirb.aimusic.premium.EntitlementTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

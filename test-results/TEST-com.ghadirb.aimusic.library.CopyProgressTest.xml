@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.library.CopyProgressTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:22" hostname="runnervmr9t6g" time="0.001">
+  <properties/>
+  <testcase name="unknownTotalIsZeroNotCrash" classname="com.ghadirb.aimusic.library.CopyProgressTest" time="0.0"/>
+  <testcase name="overshootIsCapped" classname="com.ghadirb.aimusic.library.CopyProgressTest" time="0.001"/>
+  <testcase name="bigFilesDoNotOverflow" classname="com.ghadirb.aimusic.library.CopyProgressTest" time="0.0"/>
+  <testcase name="percentOfBasics" classname="com.ghadirb.aimusic.library.CopyProgressTest" time="0.0"/>
+  <testcase name="percentProperty" classname="com.ghadirb.aimusic.library.CopyProgressTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

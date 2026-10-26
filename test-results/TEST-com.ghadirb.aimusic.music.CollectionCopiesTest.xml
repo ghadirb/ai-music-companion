@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.CollectionCopiesTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.007">
+  <properties/>
+  <testcase name="serverPrioritiesDecideWhichCopyIsMain" classname="com.ghadirb.aimusic.music.CollectionCopiesTest" time="0.003"/>
+  <testcase name="differentCollectionsStayApartAndAreNewestFirst" classname="com.ghadirb.aimusic.music.CollectionCopiesTest" time="0.001"/>
+  <testcase name="copiesOfOneCollectionBecomeOneRowWithTheOtherLinksKept" classname="com.ghadirb.aimusic.music.CollectionCopiesTest" time="0.001"/>
+  <testcase name="sameLinkTwiceIsNotItsOwnAlternative" classname="com.ghadirb.aimusic.music.CollectionCopiesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

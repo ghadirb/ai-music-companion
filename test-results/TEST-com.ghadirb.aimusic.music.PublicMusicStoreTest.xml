@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.PublicMusicStoreTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.003">
+  <properties/>
+  <testcase name="extracted collection keeps its own sub-folder" classname="com.ghadirb.aimusic.music.PublicMusicStoreTest" time="0.001"/>
+  <testcase name="unsafe characters in a collection folder name are replaced" classname="com.ghadirb.aimusic.music.PublicMusicStoreTest" time="0.0"/>
+  <testcase name="file directly in the download folder goes to Music Navasa" classname="com.ghadirb.aimusic.music.PublicMusicStoreTest" time="0.0"/>
+  <testcase name="only audio files count as publishable" classname="com.ghadirb.aimusic.music.PublicMusicStoreTest" time="0.001"/>
+  <testcase name="mime types follow the extension" classname="com.ghadirb.aimusic.music.PublicMusicStoreTest" time="0.0"/>
+  <testcase name="legacy scan finds audio in the root and one folder deep only" classname="com.ghadirb.aimusic.music.PublicMusicStoreTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

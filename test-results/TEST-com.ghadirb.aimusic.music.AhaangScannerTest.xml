@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.AhaangScannerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:22" hostname="runnervmr9t6g" time="0.101">
+  <properties/>
+  <testcase name="findsSongsAndArchivesAndBuildsEncodedUrls" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.078"/>
+  <testcase name="recentScansAreNotRepeated" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.005"/>
+  <testcase name="loginPageIsAnErrorNotAnEmptyDay" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.004"/>
+  <testcase name="unreachableSiteStopsEarlyInsteadOfHammering" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.008"/>
+  <testcase name="snapshotSurvivesJsonRoundTripAndCorruption" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.0"/>
+  <testcase name="failedDaysAreRetriedOnlyAfterTheCooldown" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.004"/>
+  <testcase name="dayUrlUsesTwoDigitJalaliYear" classname="com.ghadirb.aimusic.music.AhaangScannerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

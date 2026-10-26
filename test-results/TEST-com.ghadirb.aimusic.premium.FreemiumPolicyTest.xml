@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.premium.FreemiumPolicyTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.01">
+  <properties/>
+  <testcase name="quotaUsesTheLocalDayNotUtc" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.008"/>
+  <testcase name="quotaCountsDownAndNeverGoesNegative" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.0"/>
+  <testcase name="everyMixIsEitherFreeOrNeedsTheMatchingPremiumFeature" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.001"/>
+  <testcase name="singerZipCollectionsStayDisabled" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.0"/>
+  <testcase name="freeUserIsGatedOnLockedMixesAndPremiumUnlocksThem" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.0"/>
+  <testcase name="defaultFreeSetsAreValid" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.0"/>
+  <testcase name="quotaResetsOnTheNextLocalDay" classname="com.ghadirb.aimusic.premium.FreemiumPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

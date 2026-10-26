@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.OnlineRepositoryTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.071">
+  <properties/>
+  <testcase name="artistsAndCollectionsCombineServerAndPhone" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.014"/>
+  <testcase name="healthWindowExpires" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.001"/>
+  <testcase name="readsAllServerPages" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.029"/>
+  <testcase name="serverResolveIsSkippedForPhoneOnlySongs" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.003"/>
+  <testcase name="serverArchiveErrorsAreClassified" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.003"/>
+  <testcase name="deadLinkSkipsOnlyThatFileButDeadSiteSkipsTheSource" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.001"/>
+  <testcase name="phoneArchiveListingUsesRangeRequestsAndSafetyChecks" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.003"/>
+  <testcase name="serverOutageStillShowsWhatThePhoneFound" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.005"/>
+  <testcase name="noViableVersionWhenEveryLinkFailed" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.001"/>
+  <testcase name="mergesServerAndPhoneScanWithAhaangFirstAndEarliestDate" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.005"/>
+  <testcase name="serverPrioritiesOverrideButDefaultsRemain" classname="com.ghadirb.aimusic.music.OnlineRepositoryTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.ArchiveImporterTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.063">
+  <properties/>
+  <testcase name="deadMainLinkFallsBackToAnotherCopyOfTheSameCollection" classname="com.ghadirb.aimusic.music.ArchiveImporterTest" time="0.04"/>
+  <testcase name="purgeRemovesOnlyOldArchivesAndPartFiles" classname="com.ghadirb.aimusic.music.ArchiveImporterTest" time="0.002"/>
+  <testcase name="whenEveryCopyFailsTheLastReasonIsReported" classname="com.ghadirb.aimusic.music.ArchiveImporterTest" time="0.005"/>
+  <testcase name="downloadsOnceAndReusesTheCachedArchive" classname="com.ghadirb.aimusic.music.ArchiveImporterTest" time="0.003"/>
+  <testcase name="anArchiveWithAnEscapingPathIsRefusedAndNothingIsWritten" classname="com.ghadirb.aimusic.music.ArchiveImporterTest" time="0.006"/>
+  <testcase name="extractsOneSongOrTheWholeCollection" classname="com.ghadirb.aimusic.music.ArchiveImporterTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

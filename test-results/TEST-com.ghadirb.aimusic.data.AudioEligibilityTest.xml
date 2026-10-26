@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.data.AudioEligibilityTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:22" hostname="runnervmr9t6g" time="0.005">
+  <properties/>
+  <testcase name="unflaggedSongInDownloadsIsAccepted" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.001"/>
+  <testcase name="missingPathIsAccepted" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.001"/>
+  <testcase name="tooShortIsRejected" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.0"/>
+  <testcase name="voiceNotesAndRecordingsAreRejectedWhenNotMusic" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.002"/>
+  <testcase name="flaggedMusicInOddFolderStillAccepted" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.0"/>
+  <testcase name="ringtoneAlarmNotificationAreRejected" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.0"/>
+  <testcase name="flaggedMusicIsAccepted" classname="com.ghadirb.aimusic.data.AudioEligibilityTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

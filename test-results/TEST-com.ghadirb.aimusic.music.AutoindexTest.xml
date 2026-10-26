@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.music.AutoindexTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:23" hostname="runnervmr9t6g" time="0.007">
+  <properties/>
+  <testcase name="trackKeyIgnoresArtistOrderAndSpelling" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.002"/>
+  <testcase name="nameParsingHandlesQualityMarkers" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.002"/>
+  <testcase name="parsesNginxListing" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.0"/>
+  <testcase name="zipNamesGiveArtistAndCollection" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.001"/>
+  <testcase name="nonListingsAreNotTreatedAsEmptyFolders" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.0"/>
+  <testcase name="hostileLinksAreRejected" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.001"/>
+  <testcase name="extensionsAreRecognised" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.0"/>
+  <testcase name="persianTextIsNormalized" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.001"/>
+  <testcase name="segmentsAreEncodedOnce" classname="com.ghadirb.aimusic.music.AutoindexTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

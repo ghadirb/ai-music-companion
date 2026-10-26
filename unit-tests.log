@@ -1,0 +1,89 @@
+Downloading https://services.gradle.org/distributions/gradle-8.7-bin.zip
+............10%.............20%.............30%.............40%............50%.............60%.............70%.............80%.............90%............100%
+
+Welcome to Gradle 8.7!
+
+Here are the highlights of this release:
+ - Compiling and testing with Java 22
+ - Cacheable Groovy script compilation
+ - New methods in lazy collection properties
+
+For more details see https://docs.gradle.org/8.7/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugResources
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:104:5 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:160:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/MainActivity.kt:212:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:7:30 'Virtualizer' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:59:23 'Virtualizer' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:172:13 Variable 'p' is never used
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:233:30 'constructor Virtualizer(Int, Int)' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:233:30 'Virtualizer' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:241:82 'getter for strengthSupported: Boolean' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:243:88 'getter for strengthSupported: Boolean' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:263:36 'getter for strengthSupported: Boolean' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/audio/AudioEffectsController.kt:263:57 'setStrength(Short): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/recommendation/section/RecommendationSection.kt:57:60 Parameter 'profile' is never used
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/navigation/NavGraph.kt:19:86 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:233:47 'DriveFileMove: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DriveFileMove
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:555:31 'Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/library/LibraryScreen.kt:798:43 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:64:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:67:5 Parameter 'repository' is never used
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/player/PlayerScreen.kt:325:35 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:52:33 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:152:60 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistDetailScreen.kt:156:30 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:47:37 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/screens/playlists/PlaylistsScreen.kt:127:39 'QueueMusic: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.QueueMusic
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoItem.kt:122:51 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoItem.kt:144:51 'DriveFileMove: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DriveFileMove
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoPlayerControls.kt:193:39 'VolumeUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.VolumeUp
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoPlayerScreen.kt:65:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoPlayerScreen.kt:114:55 Unnecessary safe call on a non-null receiver of type Activity?
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoScreen.kt:421:85 'PlaylistAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAdd
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoScreen.kt:422:83 'DriveFileMove: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DriveFileMove
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoScreen.kt:457:39 'Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoScreen.kt:473:51 'ViewList: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ViewList
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/ui/video/VideoScreen.kt:533:75 'ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/video/VideoPlaybackController.kt:43:1 Annotation 'androidx.media3.common.util.UnstableApi' is not an opt-in requirement marker, therefore its usage in @OptIn is ignored
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/main/java/com/ghadirb/aimusic/video/VideoPlaybackController.kt:159:73 Name shadowed: id
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:kspDebugUnitTestKotlin
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///home/runner/work/ai-music-companion/ai-music-companion/app/src/test/java/com/ghadirb/aimusic/music/TestHttpServer.kt:40:13 Lateinit is unnecessary: definitely initialized in constructors
+
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1793013235667.json
+
+BUILD SUCCESSFUL in 3m 39s
+27 actionable tasks: 27 executed

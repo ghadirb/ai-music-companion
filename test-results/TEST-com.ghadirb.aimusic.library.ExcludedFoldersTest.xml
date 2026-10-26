@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ghadirb.aimusic.library.ExcludedFoldersTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-26T11:17:22" hostname="runnervmr9t6g" time="0.014">
+  <properties/>
+  <testcase name="folderItselfIsExcluded" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.007"/>
+  <testcase name="backslashesAndCaseAreNormalised" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.001"/>
+  <testcase name="orientationCycles" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.001"/>
+  <testcase name="fileInsideExcludedFolderIsExcluded" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.0"/>
+  <testcase name="persianFolderNamesMatchAcrossArabicLettersAndInvisibleCharacters" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.0"/>
+  <testcase name="videoRelativeMatch" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.001"/>
+  <testcase name="siblingWithSamePrefixIsNotExcluded" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.0"/>
+  <testcase name="stripVolume" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.0"/>
+  <testcase name="emptyInputsAreSafe" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.0"/>
+  <testcase name="otherFolderNotExcluded" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.001"/>
+  <testcase name="persianFolderNames" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.0"/>
+  <testcase name="suggestedOrientation" classname="com.ghadirb.aimusic.library.ExcludedFoldersTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
