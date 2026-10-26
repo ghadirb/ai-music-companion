@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import coil.compose.AsyncImage
@@ -33,8 +35,17 @@ fun ArtistsScreen(repository: MusicRepository, onArtistClick: (String) -> Unit) 
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         val cover = artistTracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
-                        if (cover != null) AsyncImage(cover, contentDescription = artist, modifier = Modifier.size(64.dp))
-                        else Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(64.dp))
+                        if (cover != null) {
+                            AsyncImage(
+                                model = cover,
+                                contentDescription = artist,
+                                contentScale = ContentScale.Crop,
+                                error = rememberVectorPainter(Icons.Filled.Person),
+                                modifier = Modifier.size(64.dp)
+                            )
+                        } else {
+                            Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(64.dp))
+                        }
                         Spacer(Modifier.width(16.dp))
                         Column {
                             Text(artist, style = MaterialTheme.typography.titleLarge, maxLines = 1)

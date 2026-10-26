@@ -55,11 +55,17 @@ class DatabaseMigrationTest {
         db.query("SELECT COUNT(*) FROM playlist_track_cross_ref").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
     }
 
+    @Test fun migrate5To6AddsNotInterestedColumnDefaultedToFalse() {
+        createV4WithData()
+        val db = helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
+        db.query("SELECT notInterested FROM tracks WHERE id = 1").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+    }
+
     @Test fun openingAnOldDatabaseWithTheRealBuilderPreservesUserData() = runBlocking {
         createV4WithData()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.databaseBuilder(context, AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5).build()
+            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9).build()
         try {
             val tracks = db.trackDao().observeAll().first()
             assertEquals(1, tracks.size)

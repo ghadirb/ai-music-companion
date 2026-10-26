@@ -14,6 +14,10 @@ FREE_IP_DAILY_FACTOR = "5"
 SESSION_LIMIT_PER_IP_DAY = "30"
 REQUEST_LIMIT_PER_MINUTE = "40"
 ENTITLEMENT_TTL_DAYS = "7"
+# One-time free trial of Premium features (server-side, started by the user on their first Premium use).
+TRIAL_DAYS = "7"
+TRIAL_DAILY_EMBEDDING_LIMIT = "40"
+TRIAL_PER_IP_DAY = "20"
 DJ_MODEL = "gpt-4o-mini"
 # SKU table: durationDays = null means lifetime. Add/rename SKUs here without touching code.
 PREMIUM_SKUS = '{"premium_lifetime":{"durationDays":null},"premium_monthly":{"durationDays":31},"premium_yearly":{"durationDays":366}}'
@@ -26,6 +30,18 @@ id = "08ae4a508e3d411d9c353cde59669bcf"
 [[durable_objects.bindings]]
 name = "QUOTA_COUNTER"
 class_name = "QuotaCounter"
+
+# Novasa music catalog. Separate from the Premium KV/Durable Object. Schema: migrations/0001_music.sql
+# (apply with `npx wrangler d1 migrations apply novasa-music --remote`).
+[[d1_databases]]
+binding = "MUSIC_DB"
+database_name = "novasa-music"
+database_id = "89176af8-da3c-47c0-b50f-ffc8037232c6"
+migrations_dir = "migrations"
+
+# Incremental music scan (the minimum gap between real runs is configurable remotely: scanEveryMinutes).
+[triggers]
+crons = ["*/30 * * * *"]
 
 [[migrations]]
 tag = "v1"

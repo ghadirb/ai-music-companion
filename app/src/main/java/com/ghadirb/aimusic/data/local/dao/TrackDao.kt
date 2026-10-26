@@ -32,6 +32,9 @@ interface TrackDao {
     suspend fun insertAll(tracks: List<TrackEntity>): List<Long>
 
     /** Refreshes scanner-provided metadata without changing favorites, ids or analysis. */
+    @Query("SELECT folderPath AS folder, COUNT(*) AS count FROM tracks WHERE folderPath IS NOT NULL AND folderPath != '' GROUP BY folderPath ORDER BY folderPath")
+    suspend fun folderCounts(): List<FolderCount>
+
     @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, durationMs = :durationMs, albumArtUri = :albumArtUri, folderPath = :folderPath, dateAdded = :dateAdded WHERE path = :path")
     suspend fun updateMetadata(
         path: String,
@@ -48,8 +51,19 @@ interface TrackDao {
     @Query("DELETE FROM tracks WHERE path IN (:paths)")
     suspend fun deleteByPaths(paths: List<String>)
 
-    @Query("UPDATE tracks SET isFavorite = :isFavorite WHERE id = :trackId")
+    /** Used after the device file itself was deleted/moved away (see TrackFileOps) — removes it from the Library too. */
+    @Query("DELETE FROM tracks WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
+    /** Liking and "not interested" are mutually exclusive; favoriting a track clears "not interested". */
+    @Query("UPDATE tracks SET isFavorite = :isFavorite, notInterested = CASE WHEN :isFavorite THEN 0 ELSE notInterested END WHERE id = :trackId")
     suspend fun setFavorite(trackId: Long, isFavorite: Boolean)
+
+    // --- v6: explicit negative feedback ---
+
+    /** Liking and "not interested" are mutually exclusive; setting one clears the other. */
+    @Query("UPDATE tracks SET notInterested = :notInterested, isFavorite = CASE WHEN :notInterested THEN 0 ELSE isFavorite END WHERE id = :trackId")
+    suspend fun setNotInterested(trackId: Long, notInterested: Boolean)
 
     @Query("SELECT * FROM tracks WHERE id = :trackId LIMIT 1")
     suspend fun getById(trackId: Long): TrackEntity?
@@ -84,3 +98,6 @@ interface TrackDao {
 
 
 }
+
+/** One music folder and how many library tracks it holds (for the excluded-folders picker). */
+data class FolderCount(val folder: String, val count: Int)

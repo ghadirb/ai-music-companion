@@ -5,14 +5,16 @@ import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.SessionResult
+import androidx.media3.session.SessionError
 import com.ghadirb.aimusic.AiMusicApp
 import com.ghadirb.aimusic.MainActivity
 import com.google.common.collect.ImmutableList
@@ -26,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Foreground Media3 service. Owns the single ExoPlayer + MediaSession so playback survives the
@@ -46,11 +49,49 @@ class PlaybackService : MediaLibraryService() {
     private var recorder: ListeningRecorder? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    /** Consecutive unplayable items; guards against an endless skip loop (e.g. repeat-all with every file missing). */
+    private var consecutiveErrors = 0
+
     private val persistListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) { if (!isPlaying) persist() }
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = persist()
+        override fun onPlayerError(error: PlaybackException) {
+            val failing = player.currentMediaItem
+            if (failing?.mediaId?.startsWith("online:") == true) {
+                // The app's online player first tries another source's copy of the SAME song; skip only if nobody did in time.
+                scope.launch {
+                    delay(ONLINE_FALLBACK_GRACE_MS)
+                    if (player.playerError != null && player.currentMediaItem?.mediaId == failing.mediaId) skipBrokenItem()
+                }
+                return
+            }
+            skipBrokenItem()
+        }
+
+        // A missing/unreadable file must not leave the player stuck: move on to the next track.
+        private fun skipBrokenItem() {
+            consecutiveErrors++
+            if (consecutiveErrors <= MAX_CONSECUTIVE_ERRORS && player.hasNextMediaItem()) {
+                player.seekToNextMediaItem()
+                player.prepare()
+                player.play()
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) consecutiveErrors = 0
+            if (!isPlaying) persist()
+            com.ghadirb.aimusic.widget.MusicWidgetProvider.refresh(this@PlaybackService, com.ghadirb.aimusic.widget.WidgetState.from(player))
+        }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            persist()
+            com.ghadirb.aimusic.widget.MusicWidgetProvider.refresh(this@PlaybackService, com.ghadirb.aimusic.widget.WidgetState.from(player))
+        }
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = persist()
         override fun onRepeatModeChanged(repeatMode: Int) = persist()
+        // Queue edits (add next, reorder, remove) must reach the saved queue even without a track change,
+        // because the periodic save only updates the position.
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) persist()
+        }
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
                 SleepTimerController.onPausedAtEndOfItem()
@@ -76,6 +117,7 @@ class PlaybackService : MediaLibraryService() {
             .build()
         player.addListener(persistListener)
         SleepTimerController.attach(player)
+        com.ghadirb.aimusic.audio.AudioEffectsController.attach(this, player)
 
         val app = application as AiMusicApp
         recorder = ListeningRecorder(player, app.repository, scope).also { it.start() }
@@ -95,7 +137,7 @@ class PlaybackService : MediaLibraryService() {
         scope.launch {
             while (isActive) {
                 delay(PERSIST_INTERVAL_MS)
-                if (player.isPlaying) persist()
+                if (player.isPlaying) stateStore.savePosition(player.currentPosition)
             }
         }
     }
@@ -113,6 +155,7 @@ class PlaybackService : MediaLibraryService() {
         recorder?.stop()
         recorder = null
         SleepTimerController.detach()
+        com.ghadirb.aimusic.audio.AudioEffectsController.detach()
         scope.cancel()
         mediaSession?.release()
         mediaSession = null
@@ -151,15 +194,20 @@ class PlaybackService : MediaLibraryService() {
                 try {
                     val saved = stateStore.load()
                     val repository = (application as AiMusicApp).repository
-                    val tracks = saved?.trackIds.orEmpty().mapNotNull { repository.getTrack(it) }
-                    if (saved == null || tracks.isEmpty()) {
+                    val byId = saved?.trackIds.orEmpty().mapNotNull { repository.getTrack(it) }.associateBy { it.id }
+                    // Skip tracks deleted/moved since the queue was saved; a vanished current track must not inherit its old position.
+                    val plan = if (saved == null) null else withContext(Dispatchers.IO) {
+                        SessionRestore.plan(saved) { id ->
+                            val track = byId[id] ?: return@plan false
+                            !SessionRestore.needsFileCheck(saved, id) || TrackAvailability.isReadable(this@PlaybackService, track.path)
+                        }
+                    }
+                    if (plan == null) {
                         future.setException(UnsupportedOperationException("Nothing to resume"))
                     } else {
-                        val currentId = saved.trackIds.getOrNull(saved.index)
-                        val index = tracks.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
                         future.set(
                             MediaSession.MediaItemsWithStartPosition(
-                                tracks.map { it.toMediaItem() }, index, saved.positionMs
+                                plan.keptIds.mapNotNull { byId[it]?.toMediaItem() }, plan.index, plan.positionMs
                             )
                         )
                     }
@@ -192,10 +240,10 @@ class PlaybackService : MediaLibraryService() {
                     val item = BrowseTree.item(repository, mediaId, isEntitled())
                     future.set(
                         if (item != null) LibraryResult.ofItem(item, null)
-                        else LibraryResult.ofError(SessionResult.RESULT_ERROR_BAD_VALUE)
+                        else LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
                     )
                 } catch (e: Exception) {
-                    future.set(LibraryResult.ofError(SessionResult.RESULT_ERROR_UNKNOWN))
+                    future.set(LibraryResult.ofError(SessionError.ERROR_UNKNOWN))
                 }
             }
             return future
@@ -216,7 +264,7 @@ class PlaybackService : MediaLibraryService() {
                     val children = BrowseTree.children(repository, parentId, isEntitled())
                     future.set(LibraryResult.ofItemList(ImmutableList.copyOf(children.orEmpty()), params))
                 } catch (e: Exception) {
-                    future.set(LibraryResult.ofError(SessionResult.RESULT_ERROR_UNKNOWN))
+                    future.set(LibraryResult.ofError(SessionError.ERROR_UNKNOWN))
                 }
             }
             return future
@@ -270,5 +318,7 @@ class PlaybackService : MediaLibraryService() {
 
     private companion object {
         const val PERSIST_INTERVAL_MS = 15_000L
+        const val MAX_CONSECUTIVE_ERRORS = 5
+        const val ONLINE_FALLBACK_GRACE_MS = 4_000L
     }
 }

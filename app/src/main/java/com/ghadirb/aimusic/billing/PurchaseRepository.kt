@@ -1,5 +1,7 @@
 package com.ghadirb.aimusic.billing
 
+import android.content.Context
+import android.util.Log
 import com.ghadirb.aimusic.BuildConfig
 import com.ghadirb.aimusic.cloud.CloudApi
 import com.ghadirb.aimusic.premium.EntitlementRepository
@@ -24,8 +26,20 @@ sealed interface PurchaseUiState {
  */
 class PurchaseRepository(
     private val api: CloudApi,
-    private val entitlements: EntitlementRepository
+    private val entitlements: EntitlementRepository,
+    context: Context? = null,
+    private val clock: () -> Long = System::currentTimeMillis
 ) {
+    /**
+     * A paid purchase whose server verification has not completed yet. It is kept on disk so a lost network,
+     * a recreated Activity or a killed process never leaves a paying user without Premium: [recover] retries it.
+     * Holds the store purchase token only (no personal data); removed as soon as the server confirms.
+     */
+    private val pendingPrefs = context?.applicationContext?.getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE)
+    private val recovering = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile private var lastPendingTryAt = 0L
+    @Volatile private var lastSilentRestoreAt = 0L
+
     /** Set by the Activity that owns the store connection (billing needs an Activity). */
     @Volatile var gateway: BillingGateway? = null
 
@@ -54,12 +68,16 @@ class PurchaseRepository(
             PurchaseOutcome.Cancelled -> _state.value = PurchaseUiState.Idle
             is PurchaseOutcome.Failed -> _state.value = PurchaseUiState.Error(outcome.message)
             is PurchaseOutcome.Purchased -> {
+                // Persist BEFORE talking to the server: the money is already spent at this point.
+                savePending(outcome.sku, outcome.token, outcome.developerPayload)
                 _state.value = PurchaseUiState.Loading("در حال تأیید امن خرید…")
                 val verify = api.post(
                     "/v1/myket/verify",
                     JSONObject().put("sku", outcome.sku).put("tokenId", outcome.token).put("developerPayload", outcome.developerPayload)
                 )
-                _state.value = handleVerification(verify, "پرداخت انجام شد ولی تأیید آن هنوز کامل نشده. با «بازیابی خرید» دوباره امتحان کنید.")
+                val result = handleVerification(verify, "پرداخت انجام شد ولی تأیید آن هنوز کامل نشده؛ برنامه خودکار دوباره تلاش می‌کند. می‌توانید «بازیابی خرید» را هم بزنید.")
+                if (result is PurchaseUiState.Success || verify.error in TERMINAL_ERRORS) clearPending()
+                _state.value = result
             }
         }
     }
@@ -68,17 +86,121 @@ class PurchaseRepository(
         val billing = gateway
         if (billing == null || !billing.isConfigured) { _state.value = PurchaseUiState.NotConfigured; return }
         _state.value = PurchaseUiState.Loading("در حال جست‌وجوی خریدهای شما در مایکت…")
-        val owned = billing.queryOwned(offeredSkus)
-        if (owned.isEmpty()) { _state.value = PurchaseUiState.Error("خرید قبلی برای این حساب مایکت پیدا نشد."); return }
+        Log.i(TAG, "restore: started")
+        var answer = billing.queryOwned(offeredSkus)
+        if (answer is OwnedResult.Success && answer.purchases.isEmpty()) {
+            // The store answered "nothing owned". Myket may still be starting up, so double-check ONCE with a fresh connection.
+            Log.i(TAG, "restore: empty answer, re-checking once with a fresh connection")
+            kotlinx.coroutines.delay(EMPTY_RECHECK_DELAY_MS)
+            answer = billing.queryOwned(offeredSkus, freshConnection = true)
+        }
+        val owned = when (answer) {
+            is OwnedResult.Success -> answer.purchases
+            is OwnedResult.Unavailable -> {
+                // A connection/SDK/timeout failure is NOT "no purchase found": say what really happened.
+                Log.w(TAG, "restore: store unavailable reason=${answer.reason}")
+                _state.value = if (answer.reason == BillingFailure.NOT_CONFIGURED) PurchaseUiState.NotConfigured
+                else PurchaseUiState.Error(restoreFailureMessage(answer.reason))
+                return
+            }
+        }
+        Log.i(TAG, "restore: store answered, ownedCount=${owned.size}")
+        if (owned.isEmpty()) { _state.value = PurchaseUiState.Error("خرید قبلی برای این حساب مایکت پیدا نشد. اگر مطمئن هستید خرید کرده‌اید، مطمئن شوید با همان حساب مایکت وارد شده‌اید و دوباره تلاش کنید."); return }
         for (purchase in owned) {
             val response = api.post("/v1/myket/restore", JSONObject().put("sku", purchase.sku).put("tokenId", purchase.token))
             val result = handleVerification(response, "بازیابی خرید کامل نشد.")
-            if (result is PurchaseUiState.Success) { _state.value = result; return }
+            if (result is PurchaseUiState.Success) { clearPending(); _state.value = result; return }
             _state.value = result
         }
     }
 
+    /**
+     * Self-healing, called when the app opens/resumes. (1) Re-verifies a paid-but-unconfirmed purchase,
+     * (2) if the user is still not Premium, silently asks Myket what they own and restores it.
+     * Never shows an error (the user did nothing); only a successful activation updates [state].
+     */
+    suspend fun recover() {
+        val current = entitlements.entitlement.value
+        if (current.isPremiumAt(clock()) && !current.isTrial) return
+        if (_state.value is PurchaseUiState.Loading) return
+        if (!recovering.compareAndSet(false, true)) return
+        try {
+            val now = clock()
+            val pending = readPending()
+            if (pending != null && now - lastPendingTryAt > PENDING_RETRY_MS) {
+                lastPendingTryAt = now
+                val verify = api.post(
+                    "/v1/myket/verify",
+                    JSONObject().put("sku", pending.sku).put("tokenId", pending.token).put("developerPayload", pending.payload)
+                )
+                if (verify.isOffline) return
+                val result = handleVerification(verify, "")
+                if (result is PurchaseUiState.Success) { clearPending(); _state.value = result; return }
+                if (verify.error in TERMINAL_ERRORS) clearPending()
+                // Not confirmed (e.g. the single-use nonce was already redeemed): fall through to restore, which needs no nonce.
+            }
+            val billing = gateway ?: return
+            if (!billing.isConfigured || offeredSkus.isEmpty()) return
+            if (now - lastSilentRestoreAt < SILENT_RESTORE_MS) return
+            lastSilentRestoreAt = now
+            val ownedNow = when (val answer = billing.queryOwned(offeredSkus)) {
+                is OwnedResult.Success -> answer.purchases
+                is OwnedResult.Unavailable -> {
+                    Log.w(TAG, "recover: store unavailable reason=${answer.reason}, will retry soon")
+                    lastSilentRestoreAt = now - SILENT_RESTORE_MS + UNAVAILABLE_RETRY_MS
+                    return
+                }
+            }
+            for (purchase in ownedNow) {
+                val response = api.post("/v1/myket/restore", JSONObject().put("sku", purchase.sku).put("tokenId", purchase.token))
+                if (response.isOffline) return
+                val result = handleVerification(response, "")
+                if (result is PurchaseUiState.Success) { clearPending(); _state.value = result; return }
+            }
+        } finally {
+            recovering.set(false)
+        }
+    }
+
+    private data class Pending(val sku: String, val token: String, val payload: String)
+
+    private fun savePending(sku: String, token: String, payload: String) {
+        pendingPrefs?.edit()?.putString(KEY_SKU, sku)?.putString(KEY_TOKEN, token)?.putString(KEY_PAYLOAD, payload)?.apply()
+    }
+
+    private fun readPending(): Pending? {
+        val p = pendingPrefs ?: return null
+        val sku = p.getString(KEY_SKU, null) ?: return null
+        val token = p.getString(KEY_TOKEN, null) ?: return null
+        return Pending(sku, token, p.getString(KEY_PAYLOAD, null).orEmpty())
+    }
+
+    private fun clearPending() { pendingPrefs?.edit()?.clear()?.apply() }
+
+    private companion object {
+        const val PENDING_PREFS = "pending_purchase"
+        const val KEY_SKU = "sku"
+        const val KEY_TOKEN = "token"
+        const val KEY_PAYLOAD = "payload"
+        const val PENDING_RETRY_MS = 15_000L
+        const val EMPTY_RECHECK_DELAY_MS = 2_000L
+        const val UNAVAILABLE_RETRY_MS = 30_000L
+        const val TAG = "PurchaseRestore"
+        const val SILENT_RESTORE_MS = 5 * 60_000L
+        /** Server answers that will never succeed on retry for this purchase. */
+        val TERMINAL_ERRORS = setOf("purchase_already_claimed", "transfer_limit_reached")
+    }
+
+    private fun restoreFailureMessage(reason: BillingFailure): String = when (reason) {
+        BillingFailure.STORE_NOT_INSTALLED -> "برنامه مایکت روی این دستگاه پیدا نشد. مایکت را نصب کنید و دوباره تلاش کنید."
+        BillingFailure.BUSY -> "عملیات دیگری در حال انجام است؛ چند لحظه بعد دوباره تلاش کنید."
+        BillingFailure.STORE_UNAVAILABLE -> "بازیابی خرید انجام نشد؛ نواسا نتوانست به مایکت وصل شود. اگر مایکت بسته است، آن را یک‌بار باز کنید، به نواسا برگردید و دوباره بزنید."
+        else -> "بازیابی خرید انجام نشد؛ لطفاً اتصال به مایکت را بررسی کرده و دوباره تلاش کنید."
+    }
+
     private fun handleVerification(response: CloudApi.Response, fallbackError: String): PurchaseUiState {
+        // Diagnostic only: HTTP status + server error code. Never the purchase token or any account data.
+        Log.i(TAG, "verification: http=${response.code} error=${response.error} premium=${response.body.optBoolean("premium", false)}")
         if (response.isOffline) return PurchaseUiState.Error("اتصال اینترنت برقرار نیست.")
         if (!response.isSuccess) {
             return PurchaseUiState.Error(

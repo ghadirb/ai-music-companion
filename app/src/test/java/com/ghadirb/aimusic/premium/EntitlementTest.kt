@@ -102,4 +102,19 @@ class EntitlementTest {
         }
         assertEquals(PremiumFeature.values().toList(), FeatureGate.premiumFeatures)
     }
+
+    // ---- free trial helpers ----
+    @Test fun trialEntitlementIsRecognisedOnlyWhenTrialIsTheOnlySku() {
+        assertTrue(Entitlement(Plan.PREMIUM, setOf(TRIAL_SKU), 1L, EntitlementSource.VERIFIED_TOKEN).isTrial)
+        assertFalse(Entitlement(Plan.PREMIUM, setOf("premium_lifetime"), null, EntitlementSource.VERIFIED_TOKEN).isTrial)
+        assertFalse(Entitlement.FREE.isTrial)
+    }
+
+    @Test fun trialDaysLeftRoundsUpAndNeverGoesNegative() {
+        val day = 86_400_000L
+        assertEquals(7, TrialMath.daysLeft(7 * day, 0L))
+        assertEquals(1, TrialMath.daysLeft(2 * 3_600_000L, 0L))
+        assertEquals(0, TrialMath.daysLeft(day, day))
+        assertEquals(0, TrialMath.daysLeft(day, 3 * day))
+    }
 }

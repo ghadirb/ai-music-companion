@@ -16,13 +16,23 @@ class PlaybackStateStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun save(state: SavedPlayback) {
+        val s = SessionRestore.limit(state, MAX_SAVED)
         prefs.edit()
-            .putString(KEY_IDS, state.trackIds.take(MAX_SAVED).joinToString(","))
-            .putInt(KEY_INDEX, state.index)
-            .putLong(KEY_POSITION, state.positionMs)
-            .putBoolean(KEY_SHUFFLE, state.shuffle)
-            .putInt(KEY_REPEAT, state.repeatMode)
+            .putString(KEY_IDS, s.trackIds.joinToString(","))
+            .putInt(KEY_INDEX, s.index)
+            .putLong(KEY_POSITION, s.positionMs)
+            .putBoolean(KEY_SHUFFLE, s.shuffle)
+            .putInt(KEY_REPEAT, s.repeatMode)
             .apply()
+    }
+
+    /**
+     * Cheap periodic update while playing: only the position changes, so the (possibly long) queue
+     * string is not rewritten every few seconds. The index is stored relative to the saved window,
+     * so it is only valid while the queue itself has not changed; queue changes call [save].
+     */
+    fun savePosition(positionMs: Long) {
+        prefs.edit().putLong(KEY_POSITION, positionMs.coerceAtLeast(0L)).apply()
     }
 
     fun load(): SavedPlayback? {

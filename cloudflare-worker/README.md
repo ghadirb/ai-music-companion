@@ -36,3 +36,6 @@ npm install
 npm run typecheck
 npm test
 ```
+
+## Free trial
+`POST /v1/trial/start` (session required) starts the one-time trial for the caller's anonymous identity and returns the usual entitlement body (`premium`, `skus: ["trial"]`, `expiresAt`, `entitlementToken`, plus `trial: {eligible, active, startedAt, expiresAt}`). Calling it again never extends it; a corrupt record counts as "already used". Config: `TRIAL_DAYS` (7), `TRIAL_DAILY_EMBEDDING_LIMIT` (40), `TRIAL_PER_IP_DAY` (20). Deploying this endpoint is required before the app's trial button works (`wrangler deploy`).

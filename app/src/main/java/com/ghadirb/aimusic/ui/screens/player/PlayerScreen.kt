@@ -1,9 +1,19 @@
 package com.ghadirb.aimusic.ui.screens.player
 
 import android.app.Application
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,6 +32,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -43,6 +58,7 @@ import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.lyrics.LyricsState
 import com.ghadirb.aimusic.playback.SleepTimerController
 import com.ghadirb.aimusic.playback.SleepTimerState
+import com.ghadirb.aimusic.ui.theme.rememberDynamicAccent
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
@@ -61,10 +77,18 @@ fun PlayerScreen(
     val radio by playerViewModel.radio.collectAsState()
     val queueActions = com.ghadirb.aimusic.ui.components.LocalQueueActions.current
     val sleepState by playerViewModel.sleepTimer.collectAsState()
+    val context = LocalContext.current
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showSleepTimer by rememberSaveable { mutableStateOf(false) }
+    var showAudioEffects by rememberSaveable { mutableStateOf(false) }
+    val audioFx by com.ghadirb.aimusic.audio.AudioEffectsController.state.collectAsState()
     var showQueue by rememberSaveable { mutableStateOf(false) }
+    var showMore by rememberSaveable { mutableStateOf(false) }
     val currentTrack = uiState.currentTrack
+    // The shared extractor is deliberately independent of playback: it uses a
+    // small cached artwork decode on IO and falls back to the theme primary.
+    val dynamicAccent by rememberDynamicAccent(currentTrack?.albumArtUri)
+    val onDynamicAccent = if (dynamicAccent.luminance() > 0.45f) Color(0xFF171717) else Color.White
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playerViewModel.importLyrics(uri)
@@ -81,6 +105,13 @@ fun PlayerScreen(
         }
     }
 
+    // Simple, cheap animation: the cover gently "breathes" out when playing and settles back when paused.
+    val coverScale by animateFloatAsState(
+        targetValue = if (uiState.isPlaying) 1f else 0.88f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 250f),
+        label = "coverScale"
+    )
+
     if (currentTrack == null) {
         EmptyPlayer()
         return
@@ -91,19 +122,56 @@ fun PlayerScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Swipe right -> previous track, swipe left -> next track. A soft threshold
+        // avoids accidental skips from small drags/scrolls; only a clear, deliberate
+        // swipe triggers a track change.
+        var dragAccumX by remember { mutableStateOf(0f) }
         Box(
-            modifier = Modifier.size(280.dp).clip(RoundedCornerShape(30.dp)),
+            modifier = Modifier
+                .size(280.dp)
+                .graphicsLayer { scaleX = coverScale; scaleY = coverScale }
+                .clip(RoundedCornerShape(30.dp))
+                .pointerInput(currentTrack.id) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragAccumX = 0f },
+                        onDragEnd = {
+                            val threshold = 90f
+                            if (dragAccumX <= -threshold) {
+                                playerViewModel.skipNext()
+                            } else if (dragAccumX >= threshold) {
+                                playerViewModel.skipPrevious()
+                            }
+                            dragAccumX = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmount -> dragAccumX += dragAmount }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
-            if (currentTrack.albumArtUri != null) {
-                AsyncImage(
-                    model = currentTrack.albumArtUri,
-                    contentDescription = "جلد آلبوم ${currentTrack.album}",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(96.dp))
+            // Crossfade the cover on track change instead of a hard cut, per the
+            // "smooth transition on track change" requirement. Cheap (opacity-only),
+            // no layout thrash, no heavy blur.
+            AnimatedContent(
+                targetState = currentTrack,
+                transitionSpec = {
+                    (fadeIn(animationSpec = spring(stiffness = 380f))) togetherWith
+                        (fadeOut(animationSpec = spring(stiffness = 380f)))
+                },
+                label = "coverCrossfade"
+            ) { track ->
+                if (track.albumArtUri != null) {
+                    AsyncImage(
+                        model = track.albumArtUri,
+                        contentDescription = "جلد آلبوم ${track.album}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        error = rememberVectorPainter(Icons.Filled.MusicNote)
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(96.dp))
+                    }
+                }
             }
         }
 
@@ -124,6 +192,10 @@ fun PlayerScreen(
             value = uiState.positionMs.toFloat().coerceIn(0f, duration.toFloat()),
             onValueChange = { playerViewModel.seekTo(it.toLong()) },
             valueRange = 0f..duration.toFloat(),
+            colors = SliderDefaults.colors(
+                thumbColor = dynamicAccent,
+                activeTrackColor = dynamicAccent
+            ),
             modifier = Modifier.semantics { contentDescription = "نوار پیشرفت آهنگ" }
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -137,12 +209,28 @@ fun PlayerScreen(
                 Icon(Icons.Filled.SkipPrevious, contentDescription = "آهنگ قبلی", modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.width(16.dp))
-            FilledIconButton(onClick = { playerViewModel.togglePlayPause() }, modifier = Modifier.size(64.dp)) {
-                Icon(
-                    imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (uiState.isPlaying) "توقف" else "پخش",
-                    modifier = Modifier.size(36.dp)
+            FilledIconButton(
+                onClick = { playerViewModel.togglePlayPause() },
+                modifier = Modifier.size(64.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = dynamicAccent,
+                    contentColor = onDynamicAccent
                 )
+            ) {
+                AnimatedContent(
+                    targetState = uiState.isPlaying,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = 500f)) + scaleIn(initialScale = 0.6f, animationSpec = spring(stiffness = 500f))) togetherWith
+                            (fadeOut(animationSpec = spring(stiffness = 500f)) + scaleOut(targetScale = 0.6f, animationSpec = spring(stiffness = 500f)))
+                    },
+                    label = "playPauseIcon"
+                ) { playing ->
+                    Icon(
+                        imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) "توقف" else "پخش",
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
             Spacer(Modifier.width(16.dp))
             IconButton(onClick = { playerViewModel.skipNext() }, modifier = Modifier.size(56.dp)) {
@@ -151,13 +239,31 @@ fun PlayerScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { playerViewModel.toggleFavorite(currentTrack) }) {
-            Icon(
-                imageVector = if (currentTrack.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                contentDescription = null
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(if (currentTrack.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { playerViewModel.toggleFavorite(currentTrack) }) {
+                Icon(
+                    imageVector = if (currentTrack.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = null
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(if (currentTrack.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها")
+            }
+            IconButton(
+                onClick = {
+                    val shareText = listOf(currentTrack.title, currentTrack.artist)
+                        .filter { it.isNotBlank() && it != "Unknown artist" }
+                        .joinToString(" — ")
+                    val shareIntent = Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, shareText)
+                    context.startActivity(Intent.createChooser(shareIntent, "اشتراک‌گذاری آهنگ"))
+                }
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = "اشتراک‌گذاری آهنگ")
+            }
+            IconButton(onClick = { showMore = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "اطلاعات بیشتر")
+            }
         }
 
         radio?.let { session ->
@@ -179,7 +285,7 @@ fun PlayerScreen(
                 Icon(
                     Icons.Filled.Shuffle,
                     contentDescription = if (uiState.shuffleEnabled) "پخش تصادفی روشن" else "پخش تصادفی خاموش",
-                    tint = if (uiState.shuffleEnabled) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    tint = if (uiState.shuffleEnabled) dynamicAccent else LocalContentColor.current
                 )
             }
             IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
@@ -190,7 +296,20 @@ fun PlayerScreen(
                         Player.REPEAT_MODE_ALL -> "تکرار همهٔ آهنگ‌ها"
                         else -> "تکرار خاموش"
                     },
-                    tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) dynamicAccent else LocalContentColor.current
+                )
+            }
+            IconButton(onClick = { playerViewModel.cyclePlaybackSpeed() }) {
+                Text(
+                    "×${if (uiState.playbackSpeed == uiState.playbackSpeed.toInt().toFloat()) uiState.playbackSpeed.toInt().toString() else uiState.playbackSpeed.toString()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (uiState.playbackSpeed != 1f) dynamicAccent else LocalContentColor.current
+                )
+            }
+            IconButton(onClick = { showAudioEffects = true }) {
+                Icon(
+                    Icons.Filled.Equalizer, contentDescription = "صدا و اکولایزر",
+                    tint = if (audioFx.settings.enabled || audioFx.abLoop.active || audioFx.settings.skipSilence) dynamicAccent else LocalContentColor.current
                 )
             }
             IconButton(onClick = { showLyrics = true }) {
@@ -263,6 +382,14 @@ fun PlayerScreen(
             confirmButton = { TextButton(onClick = playerViewModel::dismissDiagnosis) { Text("بستن") } }
         )
     }
+    if (showAudioEffects) {
+        AudioEffectsSheet(
+            speed = uiState.playbackSpeed,
+            positionMs = uiState.positionMs,
+            onSpeed = playerViewModel::setPlaybackSpeed,
+            onDismiss = { showAudioEffects = false }
+        )
+    }
     if (showSleepTimer) {
         SleepTimerDialog(
             state = sleepState,
@@ -283,6 +410,30 @@ fun PlayerScreen(
             onClearAll = { playerViewModel.clearQueue(); showQueue = false },
             onDismiss = { showQueue = false }
         )
+    }
+    if (showMore) {
+        PlayerInfoSheet(track = currentTrack, onDismiss = { showMore = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerInfoSheet(track: TrackEntity, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Text("اطلاعات آهنگ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            ListItem(headlineContent = { Text("نام آهنگ") }, supportingContent = { Text(track.title) })
+            if (track.artist != "Unknown artist") {
+                ListItem(headlineContent = { Text("خواننده") }, supportingContent = { Text(track.artist) })
+            }
+            if (track.album != "Unknown album") {
+                ListItem(headlineContent = { Text("آلبوم") }, supportingContent = { Text(track.album) })
+            }
+            track.genre?.takeIf { it.isNotBlank() }?.let { genre ->
+                ListItem(headlineContent = { Text("سبک") }, supportingContent = { Text(genre) })
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 

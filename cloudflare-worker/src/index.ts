@@ -2,9 +2,11 @@ import { signSession, verifySession, type Claims } from "./auth";
 import { limits, MAX_OWNERSHIP_TRANSFERS, skuTable, TRANSFER_COOLDOWN_MS, type Env } from "./config";
 import { requestIntent } from "./dj";
 import {
-  activeEntitlement, entitlementKey, newEntitlementRecord, ownershipKey, signEntitlementToken,
-  type EntitlementRecord, type OwnershipRecord,
+  activeEntitlement, entitlementKey, newEntitlementRecord, ownershipKey, signEntitlementToken, trialKey, trialStatus,
+  type EntitlementRecord, type OwnershipRecord, type TrialRecord,
 } from "./entitlement";
+import { handleMusic, handleMusicAdmin, storeFor } from "./music/api";
+import { runScan } from "./music/service";
 import { verifyWithMyket } from "./myket";
 import { counterFor, type Counter } from "./quota";
 import { base64UrlDecode, base64UrlEncode, hmacBase64Url, json, readJson, sha256Hex, timingSafeEqual } from "./util";
@@ -31,6 +33,17 @@ export default {
       now: () => Date.now(),
     });
   },
+
+  /** Cron Trigger: incremental scan of the music sources. Failures are logged and never throw (the next tick retries). */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const store = storeFor(env);
+    if (!store) return;
+    ctx.waitUntil(
+      runScan(store, { fetchImpl: (input, init) => fetch(input, init), now: () => Date.now() })
+        .then((summary) => log('cron', 'music_scan', { ...summary }))
+        .catch((error) => log('cron', 'music_scan_failed', { name: error instanceof Error ? error.name : 'unknown' })),
+    );
+  },
 };
 
 /** Exported for tests: dependency-injected request handler. */
@@ -46,6 +59,8 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     }
 
     if (path === "/v1/session/anonymous") return await issueSession(request, env, deps, requestId);
+    // Admin routes carry their own secret (never a user session) and are throttled per network address.
+    if (path.startsWith("/v1/music/admin/")) return await handleMusicAdmin(path, request, env, deps);
 
     const claims = await verifySession(request, env.JWT_SIGNING_SECRET, deps.now());
     if (!claims) return json({ error: "unauthorized" }, 401);
@@ -61,7 +76,10 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       case "/v1/myket/verify": return await verifyPurchase(request, env, deps, claims, requestId);
       case "/v1/myket/restore": return await restorePurchase(request, env, deps, claims, requestId);
       case "/v1/entitlements/me": return await getEntitlement(env, deps, claims);
-      default: return json({ error: "not_found" }, 404);
+      case "/v1/trial/start": return await startTrial(request, env, deps, claims, requestId);
+      default:
+        if (path.startsWith("/v1/music/")) return await handleMusic(path, request, env, deps, claims);
+        return json({ error: "not_found" }, 404);
     }
   } catch (error) {
     log(requestId, "internal_error", { path, name: error instanceof Error ? error.name : "unknown" });
@@ -99,7 +117,7 @@ async function reserveAi(request: Request, env: Env, deps: Deps, claims: Claims)
   const now = deps.now();
   const entitlement = await activeEntitlement(env, claims.sub, now);
   const cfg = limits(env);
-  const limit = entitlement.premium ? cfg.premiumDaily : cfg.freeDaily;
+  const limit = dailyLimit(entitlement, cfg);
   const day = dayStamp(now);
   const subKey = `ai:${day}:${claims.sub}`;
   const ttl = DAY_SECONDS + 3600;
@@ -183,6 +201,11 @@ async function createDjIntent(request: Request, env: Env, deps: Deps, claims: Cl
   return json({ intent }, 200, aiHeaders(reservation));
 }
 
+function dailyLimit(e: { premium: boolean; trial?: boolean }, cfg: ReturnType<typeof limits>): number {
+  if (e.trial) return cfg.trialDaily;
+  return e.premium ? cfg.premiumDaily : cfg.freeDaily;
+}
+
 function aiHeaders(r: { limit: number; remaining: number; premium: boolean }): Record<string, string> {
   return {
     "x-ai-daily-limit": String(r.limit),
@@ -197,17 +220,44 @@ async function getEntitlement(env: Env, deps: Deps, claims: Claims): Promise<Res
   const now = deps.now();
   const active = await activeEntitlement(env, claims.sub, now);
   const cfg = limits(env);
-  const limit = active.premium ? cfg.premiumDaily : cfg.freeDaily;
+  const limit = dailyLimit(active, cfg);
   const used = await deps.counter!.get(`ai:${dayStamp(now)}:${claims.sub}`);
   return json({
     premium: active.premium,
     skus: active.skus,
     expiresAt: active.expiresAt,
+    trial: await trialStatus(env, claims.sub, now),
     aiDailyLimit: limit,
     aiDailyRemaining: Math.max(0, limit - used),
     resetsAt: nextUtcMidnight(now),
     entitlementToken: await signEntitlementToken(env, claims.sub, active, now),
   });
+}
+
+// ---------- free trial ----------
+
+/**
+ * Starts the ONE-TIME free trial of Premium features for this identity (idempotent: calling again never
+ * extends it). The app calls this only when the user chooses it after tapping a Premium feature.
+ * The record lives on the server, so clearing app data or changing the phone clock cannot extend it.
+ */
+async function startTrial(request: Request, env: Env, deps: Deps, claims: Claims, requestId: string): Promise<Response> {
+  if (!env.PURCHASE_ENTITLEMENTS) return json({ error: "trial_not_available" }, 503);
+  const now = deps.now();
+  const status = await trialStatus(env, claims.sub, now);
+  if (status.eligible) {
+    // Cap trial starts per network address (anonymous IDs are free to mint). The cap is generous on purpose.
+    const ipKey = `trialip:${dayStamp(now)}:${await hashedIp(request, env)}`;
+    const ip = await deps.counter!.incrementIfBelow(ipKey, limits(env).trialPerIpDay, DAY_SECONDS + 3600);
+    if (!ip.allowed) {
+      log(requestId, "trial_ip_limited", {});
+      return json({ error: "trial_limit_reached" }, 429, { "retry-after": "3600" });
+    }
+    const record: TrialRecord = { startedAt: now, expiresAt: now + limits(env).trialDays * 86_400_000 };
+    await env.PURCHASE_ENTITLEMENTS.put(trialKey(claims.sub), JSON.stringify(record));
+    log(requestId, "trial_started", {});
+  }
+  return await entitlementResponse(env, deps, claims);
 }
 
 // ---------- Myket purchases ----------
@@ -332,6 +382,7 @@ async function entitlementResponse(env: Env, deps: Deps, claims: Claims): Promis
   const active = await activeEntitlement(env, claims.sub, now);
   return json({
     premium: active.premium, skus: active.skus, expiresAt: active.expiresAt,
+    trial: await trialStatus(env, claims.sub, now),
     entitlementToken: await signEntitlementToken(env, claims.sub, active, now),
   });
 }

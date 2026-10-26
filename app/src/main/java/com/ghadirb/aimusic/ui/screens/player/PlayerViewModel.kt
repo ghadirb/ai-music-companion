@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
@@ -17,6 +18,8 @@ import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.embedding.OnlineSimilarityRanker
 import com.ghadirb.aimusic.playback.PlaybackStateStore
 import com.ghadirb.aimusic.playback.PlayerController
+import com.ghadirb.aimusic.playback.SessionRestore
+import com.ghadirb.aimusic.playback.TrackAvailability
 import com.ghadirb.aimusic.playback.SleepTimerController
 import com.ghadirb.aimusic.playback.SleepTimerState
 import com.ghadirb.aimusic.radio.RadioConfig
@@ -24,7 +27,10 @@ import com.ghadirb.aimusic.radio.RadioEngine
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
 import com.ghadirb.aimusic.recommendation.TuningStore
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -40,6 +46,7 @@ data class PlayerUiState(
     val durationMs: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
+    val playbackSpeed: Float = 1f,
     val queueIndex: Int = 0,
     val isConnected: Boolean = false
 )
@@ -62,6 +69,10 @@ class PlayerViewModel(
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /** One-shot, user-facing playback problems (shown as a snackbar by MainActivity). */
+    private val _playbackErrors = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val playbackErrors: SharedFlow<String> = _playbackErrors.asSharedFlow()
 
     private val _queue = MutableStateFlow<List<TrackEntity>>(emptyList())
     val queue: StateFlow<List<TrackEntity>> = _queue.asStateFlow()
@@ -97,12 +108,30 @@ class PlayerViewModel(
             _uiState.update { it.copy(isPlaying = isPlaying) }
         }
 
+        override fun onPlayerError(error: PlaybackException) {
+            if (controller.currentMediaId()?.startsWith("online:") == true) return // handled by the online player's fallback
+            val fileProblem = when (error.errorCode) {
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+                PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> true
+                else -> false
+            }
+            _playbackErrors.tryEmit(
+                if (fileProblem) "فایل این آهنگ پیدا نشد؛ شاید حذف یا جابه‌جا شده باشد. از بخش کتابخانه دوباره اسکن کنید."
+                else "پخش این آهنگ با خطا مواجه شد."
+            )
+        }
+
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
             _uiState.update { it.copy(shuffleEnabled = shuffleModeEnabled) }
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
             _uiState.update { it.copy(repeatMode = repeatMode) }
+        }
+
+        override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+            _uiState.update { it.copy(playbackSpeed = playbackParameters.speed) }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -122,7 +151,8 @@ class PlayerViewModel(
                     isConnected = true,
                     isPlaying = mediaController.isPlaying,
                     shuffleEnabled = mediaController.shuffleModeEnabled,
-                    repeatMode = mediaController.repeatMode
+                    repeatMode = mediaController.repeatMode,
+                    playbackSpeed = mediaController.playbackParameters.speed
                 )
             }
             if (mediaController.mediaItemCount > 0) {
@@ -154,6 +184,21 @@ class PlayerViewModel(
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
     fun setShuffle(enabled: Boolean) = controller.setShuffle(enabled)
     fun cycleRepeatMode() = controller.cycleRepeatMode()
+    /** Cycles 1x -> 1.25x -> 1.5x -> 2x -> 0.75x -> 1x, matching common player conventions. */
+    fun cyclePlaybackSpeed() {
+        val speeds = listOf(1f, 1.25f, 1.5f, 2f, 0.75f)
+        val current = _uiState.value.playbackSpeed
+        val next = speeds.getOrElse(speeds.indexOf(current) + 1) { speeds.first() }
+        controller.setPlaybackSpeed(next)
+        _uiState.update { it.copy(playbackSpeed = next) }
+    }
+
+    /** Exact speed (the audio sheet slider); the cycle button keeps working. */
+    fun setPlaybackSpeed(speed: Float) {
+        val v = speed.coerceIn(0.5f, 2f)
+        controller.setPlaybackSpeed(v)
+        _uiState.update { it.copy(playbackSpeed = v) }
+    }
 
     // ---- Queue ----
 
@@ -359,13 +404,21 @@ class PlayerViewModel(
     private fun restoreLastSession() {
         viewModelScope.launch {
             val saved = stateStore.load() ?: return@launch
-            val tracks = saved.trackIds.mapNotNull { resolve(it) }
-            if (tracks.isEmpty() || controller.hasItems()) return@launch
-            val savedCurrentId = saved.trackIds.getOrNull(saved.index)
-            val index = tracks.indexOfFirst { it.id == savedCurrentId }.coerceAtLeast(0)
-            controller.restoreQueue(tracks, index, saved.positionMs, saved.shuffle, saved.repeatMode)
+            if (controller.hasItems()) return@launch
+            // Drop tracks that were deleted/moved since the queue was saved (checked off the main thread).
+            // Resolve on the caller's dispatcher (trackCache is not thread-safe); only file checks go to IO.
+            val byId = saved.trackIds.mapNotNull { resolve(it) }.associateBy { it.id }
+            val restore = withContext(Dispatchers.IO) {
+                SessionRestore.plan(saved) { id ->
+                    val track = byId[id] ?: return@plan false
+                    !SessionRestore.needsFileCheck(saved, id) || TrackAvailability.isReadable(getApplication<Application>(), track.path)
+                }
+            } ?: return@launch
+            val tracks = restore.keptIds.mapNotNull { byId[it] }
+            val index = restore.index.coerceIn(0, tracks.lastIndex)
+            controller.restoreQueue(tracks, index, restore.positionMs, saved.shuffle, saved.repeatMode)
             _uiState.update {
-                it.copy(currentTrack = tracks[index], positionMs = saved.positionMs, queueIndex = index)
+                it.copy(currentTrack = tracks[index], positionMs = restore.positionMs, queueIndex = index)
             }
         }
     }

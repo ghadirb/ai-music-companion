@@ -21,6 +21,9 @@ val cloudAiBaseUrl = providers.gradleProperty("CLOUD_AI_BASE_URL")
     .orElse("https://ai-music-companion-embedding.ghadir-baraty.workers.dev")
     .get().trimEnd('/').replace("\\", "\\\\").replace("\"", "\\\"")
 
+val releaseAbis = providers.gradleProperty("ABI_FILTERS").orElse("arm64-v8a,armeabi-v7a").get()
+    .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
 android {
     namespace = "com.ghadirb.aimusic"
     compileSdk = 35
@@ -30,17 +33,23 @@ android {
         minSdk = 26
         targetSdk = 35
         // CI passes -PVERSION_CODE=<run number>; -PVERSION_NAME sets the marketing version.
+        // Bumped for the v1.1 smart-features / redesign release (previous Myket release was 1.0.0).
         versionCode = providers.gradleProperty("VERSION_CODE").orElse("1").get().toInt()
-        versionName = providers.gradleProperty("VERSION_NAME").orElse("1.0.0").get()
+        versionName = providers.gradleProperty("VERSION_NAME").orElse("1.2.0").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val marketApplicationId = "ir.mservices.market"
         val marketBindAddress = "ir.mservices.market.InAppBillingService.BIND"
+        // Required by Myket Billing Client 1.19. Besides newer Android support, this
+        // SDK version uses an explicit fallback broadcast to Myket's receiver, which
+        // prevents the setup callback from being lost on recent Android releases.
+        val marketSdkVersion = "6"
         manifestPlaceholders.apply {
             this["marketApplicationId"] = marketApplicationId
             this["marketBindAddress"] = marketBindAddress
             this["marketPermission"] = "$marketApplicationId.BILLING"
+            this["sdkVersion"] = marketSdkVersion
         }
         buildConfigField("String", "IAB_PUBLIC_KEY", "\"$escapedMyketPublicKey\"")
         buildConfigField("String", "MYKET_PREMIUM_SKU", "\"$escapedMyketPremiumSku\"")
@@ -69,6 +78,9 @@ android {
             buildConfigField("boolean", "VERBOSE_LOGS", "true")
         }
         release {
+            // libVLC ships native code for every ABI (~100 MB universal). Real phones are arm only.
+            // CI builds an extra x86_64 variant (-PABI_FILTERS=...,x86_64) just for the emulator smoke test.
+            ndk { abiFilters += releaseAbis }
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("boolean", "VERBOSE_LOGS", "false")
@@ -121,6 +133,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
+    // SAF folder picking + writing, for copying/moving selected tracks to another folder.
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -134,6 +148,11 @@ dependencies {
     implementation("androidx.media3:media3-session:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+
+    // Fallback video engine (LGPL-2.1): AVI/WMV/RMVB/VOB, DTS/AC3, codecs the phone lacks.
+    // 3.6.5 = newest 3.x tried that fits compileSdk 35 (3.7.6 needs compileSdk 36 + AGP >= 8.9: see docs/video-engine.md).
+    // 4.0.0-eap* are previews and deliberately NOT used. This upgrade does NOT add H.266/VVC.
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
@@ -149,11 +168,14 @@ dependencies {
     // Image loading (album art)
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Dominant-color extraction from album artwork, for the Dynamic Artwork Theme
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // Permissions helper (Accompanist)
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
     // Myket in-app billing. The merchant key is supplied locally as a Gradle property.
-    implementation("com.github.myketstore:myket-billing-client:1.6")
+    implementation("com.github.myketstore:myket-billing-client:1.19")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

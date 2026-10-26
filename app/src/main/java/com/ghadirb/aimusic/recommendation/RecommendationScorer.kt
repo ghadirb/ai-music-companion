@@ -10,7 +10,9 @@ import kotlin.math.pow
 
 enum class ReasonType {
     FAVORITE, FAVORITE_ARTIST, GENRE_MATCH, SIMILAR_TO_RECENT, RECENTLY_LOVED,
-    NOT_PLAYED_LONG, TIME_OF_DAY_MATCH, EXPLORE, NEW_ADDITION
+    NOT_PLAYED_LONG, TIME_OF_DAY_MATCH, EXPLORE, NEW_ADDITION,
+    // --- v2 engine (see recommendation/explanation/RecommendationExplainer.kt) ---
+    SIMILAR_TRACK, SIMILAR_ARTIST, SIMILAR_MOOD, HIGH_COMPLETION, SESSION_MATCH, RECENTLY_FAVORITED, DISCOVERY, COLD_START
 }
 
 /** A short, human-readable reason for a suggestion (rendered by [ReasonText]). */
@@ -170,7 +172,9 @@ object RecommendationScorer {
         val energyPref = stats.preferredEnergyByBucket[bucket] ?: stats.preferredEnergy
         val usingBucketEnergy = stats.preferredEnergyByBucket.containsKey(bucket)
 
-        return tracks.map { track -> scoreOne(track, stats, config, nowMs, energyPref, usingBucketEnergy) }
+        // "Not interested" tracks are excluded from every suggestion surface (Home picks, smart
+        // mixes, smart playlists) but stay untouched in the Library itself.
+        return tracks.filterNot { it.notInterested }.map { track -> scoreOne(track, stats, config, nowMs, energyPref, usingBucketEnergy) }
             .sortedWith(compareByDescending<Recommendation> { it.score }.thenByDescending { it.track.dateAdded }.thenBy { it.track.title })
     }
 

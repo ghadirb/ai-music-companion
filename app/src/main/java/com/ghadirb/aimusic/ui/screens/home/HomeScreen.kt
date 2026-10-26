@@ -1,5 +1,6 @@
 package com.ghadirb.aimusic.ui.screens.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -7,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.ghadirb.aimusic.premium.Entitlement
+import com.ghadirb.aimusic.premium.FreemiumPolicy
 import com.ghadirb.aimusic.premium.PremiumFeature
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.ghadirb.aimusic.recommendation.TuningStore
 import com.ghadirb.aimusic.ui.premium.LocalPremiumAccess
 import androidx.compose.runtime.collectAsState
@@ -64,8 +69,11 @@ fun HomeScreen(
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
     onOpenSmartPlaylist: () -> Unit = {},
     onOpenStats: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
     onOpenPremium: () -> Unit = {},
-    onOpenTaste: () -> Unit = {}
+    onOpenTaste: () -> Unit = {},
+    onOpenPlaylist: (Long, String) -> Unit = { _, _ -> },
+    onOpenPlaylists: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val access = LocalPremiumAccess.current
@@ -85,11 +93,25 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val picks by viewModel.picks.collectAsState()
+    val sections by viewModel.sections.collectAsState()
     val mixes by viewModel.mixes.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
+    val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
+    val recentlyAdded by viewModel.recentlyAdded.collectAsState()
+    val userPlaylists by repository.observePlaylists().collectAsState(initial = emptyList())
     val hasLibrary by viewModel.hasLibrary.collectAsState()
     val isReanalyzing by viewModel.isReanalyzing.collectAsState()
     val progress by viewModel.analysisProgress.collectAsState()
     val message by viewModel.message.collectAsState()
+    // Subscribing re-composes Home the moment the plan changes (trial started, purchase restored, expiry).
+    val plan by (access?.entitlement ?: FREE_FLOW).collectAsState()
+    val nowMs = System.currentTimeMillis()
+    /** The premium feature this mix still needs for THIS user, or null when it is fully available. */
+    fun lockFor(type: MixType): PremiumFeature? {
+        val gate = FreemiumPolicy.gateFor(type) ?: return null
+        return if (plan.isPremiumAt(nowMs) || access?.isAllowed(gate) == true) null else gate
+    }
+    val previewCount = FreemiumPolicy.config.lockedPreviewCount
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text(stringResource(R.string.home_greeting), style = MaterialTheme.typography.headlineMedium)
@@ -106,7 +128,22 @@ fun HomeScreen(
                 return@Column
             }
             false -> {
-                Text(stringResource(R.string.empty_library), style = MaterialTheme.typography.bodyMedium)
+                // Spec §18: a brand-new user shouldn't see a blank/broken-looking Home —
+                // a real CTA (library rescan), not a decorative dead button.
+                com.ghadirb.aimusic.ui.components.EmptyState(
+                    icon = androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                    title = "موسیقی‌ات را پیدا کن و نواسا را شروع کن",
+                    subtitle = stringResource(R.string.empty_library),
+                    // EmptyState defaults to fillMaxSize(), which breaks inside this
+                    // screen's unbounded-height scrolling Column — bound it here instead.
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Button(onClick = viewModel::scanLibraryNow, enabled = !isReanalyzing) {
+                        Text(if (isReanalyzing) "در حال جستجوی موسیقی…" else "انتخاب موسیقی")
+                    }
+                }
                 return@Column
             }
             true -> Unit
@@ -114,6 +151,7 @@ fun HomeScreen(
 
         Row(Modifier.padding(bottom = 16.dp).horizontalScroll(rememberScrollState())) {
             AssistChip(onClick = onOpenSmartPlaylist, label = { Text("پلی‌لیست هوشمند") }, modifier = Modifier.padding(end = 8.dp))
+            AssistChip(onClick = onOpenHistory, label = { Text("تاریخچه") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenStats, label = { Text("آمار") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenTaste, label = { Text("تکامل سلیقه") }, modifier = Modifier.padding(end = 8.dp))
             AssistChip(onClick = onOpenPremium, label = { Text("پرمیوم") })
@@ -176,11 +214,68 @@ fun HomeScreen(
             }
         }
 
-        SectionHeader(emoji = "🎧", title = stringResource(R.string.card_today_pick))
-        if (picks.isEmpty()) {
-            Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+        // These rails are derived only from the user's local library/history.
+        // They are intentionally hidden until they have real content.
+        if (recentlyPlayed.isNotEmpty()) {
+            SectionHeader(emoji = "🕘", title = "اخیراً پخش‌شده")
+            TrackRail(recentlyPlayed) { onTrackClick(it, recentlyPlayed) }
+            Spacer(Modifier.height(24.dp))
+        }
+
+        if (favorites.isNotEmpty()) {
+            SectionHeader(emoji = "♥", title = "علاقه‌مندی‌ها")
+            TrackRail(favorites) { onTrackClick(it, favorites) }
+            Spacer(Modifier.height(24.dp))
+        }
+
+        if (userPlaylists.isNotEmpty()) {
+            SectionHeader(
+                emoji = "☷",
+                title = "پلی‌لیست‌های شما",
+                actions = { TextButton(onClick = onOpenPlaylists) { Text("همه") } }
+            )
+            LazyRow {
+                items(userPlaylists, key = { it.id }) { playlist ->
+                    Card(
+                        modifier = Modifier.width(156.dp).padding(end = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        onClick = { onOpenPlaylist(playlist.id, playlist.name) }
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.height(20.dp))
+                            Text(playlist.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+
+        // v2 engine: every section has its own strategy (for you / because you like / tonight / driving / discover / similar).
+        if (sections.isNotEmpty()) {
+            sections.forEachIndexed { index, section ->
+                if (index > 0) Spacer(Modifier.height(24.dp))
+                SectionHeader(emoji = sectionEmoji(section.type), title = section.title)
+                Text(
+                    section.reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                RecommendationRail(section.items) { onTrackClick(it, section.items.map { r -> r.track }) }
+            }
         } else {
-            RecommendationRail(picks) { onTrackClick(it, picks.map { r -> r.track }) }
+            SectionHeader(emoji = "🎧", title = stringResource(R.string.card_today_pick))
+            if (picks.isEmpty()) {
+                Text(stringResource(R.string.mood_cards_analyzing), style = MaterialTheme.typography.bodySmall)
+            } else {
+                RecommendationRail(picks) { onTrackClick(it, picks.map { r -> r.track }) }
+            }
         }
 
         // ---- occasions: "what do I want to listen to now?" ----
@@ -193,46 +288,53 @@ fun HomeScreen(
         } else {
             val suggested = remember { MixType.suggestedFor(TimeBuckets.bucketOf(System.currentTimeMillis())) }
             var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+            // Default to a mix the user can actually play; locked ones are one tap away as a preview.
             val selected = occasionMixes.firstOrNull { it.type.name == chosen }
-                ?: occasionMixes.firstOrNull { it.type == suggested }
+                ?: occasionMixes.firstOrNull { it.type == suggested && lockFor(it.type) == null }
+                ?: occasionMixes.firstOrNull { lockFor(it.type) == null }
                 ?: occasionMixes.first()
             LazyRow(Modifier.padding(bottom = 8.dp)) {
                 items(MixType.values().filter { it.occasion }, key = { it.name }) { type ->
                     val count = occasionMixes.firstOrNull { it.type == type }?.tracks?.size ?: 0
+                    val lock = if (lockFor(type) != null) "🔒 " else ""
                     FilterChip(
                         selected = selected.type == type,
                         enabled = count > 0,
                         onClick = { chosen = type.name },
-                        label = { Text("${type.emoji} ${type.titleFa} ($count)") },
+                        label = { Text("$lock${type.emoji} ${type.titleFa} ($count)") },
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
             }
-            SectionHeader(
-                emoji = selected.type.emoji,
-                title = selected.type.titleFa,
-                actions = {
-                    TextButton(onClick = { selected.tracks.firstOrNull()?.let { onTrackClick(it.track, selected.trackList) } }) { Text("پخش همه") }
-                    TextButton(onClick = { queueActions?.let { it.startRadio(selected.trackList, selected.type.titleFa) } }) { Text("📻 رادیو") }
-                    TextButton(onClick = { viewModel.saveMixAsPlaylist(selected) }) { Text("ذخیره") }
-                }
+            MixBlock(
+                mix = selected,
+                lockedFeature = lockFor(selected.type),
+                previewCount = previewCount,
+                onUpgrade = { feature -> access?.require(feature) {} },
+                onPlay = onTrackClick,
+                onRadio = { mix -> queueActions?.let { it.startRadio(mix.trackList, mix.type.titleFa) } },
+                onSave = viewModel::saveMixAsPlaylist
             )
-            RecommendationRail(selected.tracks) { onTrackClick(it, selected.trackList) }
         }
 
         // ---- personal mixes ----
         personalMixes.forEach { mix ->
             Spacer(Modifier.height(24.dp))
-            SectionHeader(
-                emoji = mix.type.emoji,
-                title = mix.type.titleFa,
-                actions = {
-                    TextButton(onClick = { mix.tracks.firstOrNull()?.let { onTrackClick(it.track, mix.trackList) } }) { Text("پخش همه") }
-                    TextButton(onClick = { queueActions?.let { it.startRadio(mix.trackList, mix.type.titleFa) } }) { Text("📻 رادیو") }
-                    TextButton(onClick = { viewModel.saveMixAsPlaylist(mix) }) { Text("ذخیره") }
-                }
+            MixBlock(
+                mix = mix,
+                lockedFeature = lockFor(mix.type),
+                previewCount = previewCount,
+                onUpgrade = { feature -> access?.require(feature) {} },
+                onPlay = onTrackClick,
+                onRadio = { m -> queueActions?.let { it.startRadio(m.trackList, m.type.titleFa) } },
+                onSave = viewModel::saveMixAsPlaylist
             )
-            RecommendationRail(mix.tracks) { onTrackClick(it, mix.trackList) }
+        }
+
+        if (recentlyAdded.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionHeader(emoji = "✦", title = "تازه اضافه‌شده")
+            TrackRail(recentlyAdded) { onTrackClick(it, recentlyAdded) }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -242,6 +344,53 @@ fun HomeScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         ) {
             Text(if (isReanalyzing) "در صف تحلیل…" else "تحلیل دوبارهٔ پیشنهادهای هوشمند")
+        }
+    }
+}
+
+private val FREE_FLOW = MutableStateFlow(Entitlement.FREE)
+
+/**
+ * One mix: header with play / radio / save, and its tracks. When the mix is locked for the user it shows
+ * a short preview (first [previewCount] tracks), and every action opens the upgrade dialog instead —
+ * the content is visible, never hidden, so the user knows what Premium adds.
+ */
+@Composable
+private fun MixBlock(
+    mix: SmartMix,
+    lockedFeature: PremiumFeature?,
+    previewCount: Int,
+    onUpgrade: (PremiumFeature) -> Unit,
+    onPlay: (TrackEntity, List<TrackEntity>) -> Unit,
+    onRadio: (SmartMix) -> Unit,
+    onSave: (SmartMix) -> Unit
+) {
+    val locked = lockedFeature != null
+    SectionHeader(
+        emoji = mix.type.emoji,
+        title = if (locked) "🔒 ${mix.type.titleFa}" else mix.type.titleFa,
+        actions = {
+            if (!locked) {
+                TextButton(onClick = { mix.tracks.firstOrNull()?.let { onPlay(it.track, mix.trackList) } }) { Text("پخش همه") }
+                TextButton(onClick = { onRadio(mix) }) { Text("📻 رادیو") }
+                TextButton(onClick = { onSave(mix) }) { Text("ذخیره") }
+            } else {
+                TextButton(onClick = { onUpgrade(lockedFeature!!) }) { Text("پرمیوم") }
+            }
+        }
+    )
+    if (!locked) {
+        RecommendationRail(mix.tracks) { onPlay(it, mix.trackList) }
+    } else {
+        RecommendationRail(mix.tracks.take(previewCount)) { onUpgrade(lockedFeature!!) }
+        Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Column(Modifier.padding(14.dp)) {
+                Text(
+                    "این میکس ویژهٔ پرمیوم است؛ ${previewCount.coerceAtMost(mix.tracks.size)} آهنگ اول را به‌عنوان پیش‌نمایش می‌بینید (از ${mix.tracks.size} آهنگ).",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(onClick = { onUpgrade(lockedFeature!!) }) { Text("فعال‌سازی پرمیوم") }
+            }
         }
     }
 }
@@ -257,27 +406,66 @@ private fun SectionHeader(emoji: String, title: String, actions: @Composable Row
     }
 }
 
+private fun sectionEmoji(type: com.ghadirb.aimusic.recommendation.section.SectionType): String = when (type) {
+    com.ghadirb.aimusic.recommendation.section.SectionType.FOR_YOU -> "🎧"
+    com.ghadirb.aimusic.recommendation.section.SectionType.BECAUSE_YOU_LIKE -> "💜"
+    com.ghadirb.aimusic.recommendation.section.SectionType.TONIGHT -> "🌙"
+    com.ghadirb.aimusic.recommendation.section.SectionType.DRIVING -> "🚗"
+    com.ghadirb.aimusic.recommendation.section.SectionType.DISCOVER -> "✨"
+    com.ghadirb.aimusic.recommendation.section.SectionType.SIMILAR_TO_RECENT -> "🔁"
+}
+
 @Composable
 private fun RecommendationRail(items: List<Recommendation>, onTrackClick: (TrackEntity) -> Unit) {
     if (items.isEmpty()) return
     LazyRow {
         items(items, key = { it.track.id }) { rec ->
-            Card(
-                modifier = Modifier.padding(end = 12.dp).width(168.dp).height(118.dp),
-                shape = RoundedCornerShape(16.dp),
-                onClick = { onTrackClick(rec.track) }
-            ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text(rec.track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                        if (rec.track.artist != "Unknown artist") {
-                            Text(rec.track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    ReasonText.best(rec)?.let {
-                        Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
+            MusicCard(rec.track, ReasonText.best(rec), onClick = { onTrackClick(rec.track) })
+        }
+    }
+}
+
+@Composable
+private fun TrackRail(tracks: List<TrackEntity>, onTrackClick: (TrackEntity) -> Unit) {
+    LazyRow {
+        items(tracks, key = { it.id }) { track ->
+            MusicCard(track, reason = null, onClick = { onTrackClick(track) })
+        }
+    }
+}
+
+@Composable
+private fun MusicCard(track: TrackEntity, reason: String?, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.padding(end = 12.dp).width(168.dp),
+        shape = RoundedCornerShape(16.dp),
+        onClick = onClick
+    ) {
+        Box(Modifier.fillMaxWidth().height(96.dp)) {
+            if (track.albumArtUri != null) {
+                coil.compose.AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            }
+        }
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+            if (track.artist != "Unknown artist") {
+                Text(track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+            }
+            reason?.let {
+                Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

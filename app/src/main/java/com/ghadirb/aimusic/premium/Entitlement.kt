@@ -19,7 +19,27 @@ data class Entitlement(
 ) {
     fun isPremiumAt(nowMs: Long): Boolean = plan == Plan.PREMIUM && (expiresAtMs == null || nowMs < expiresAtMs)
 
+    /** Premium that comes only from the one-time free trial (no purchase). */
+    val isTrial: Boolean get() = plan == Plan.PREMIUM && skus == setOf(TRIAL_SKU)
+
     companion object { val FREE = Entitlement() }
+}
+
+/** Pseudo-SKU the gateway puts in tokens while the free trial runs. */
+const val TRIAL_SKU = "trial"
+
+/** Length shown in the UI; the gateway's `TRIAL_DAYS` setting decides the real length (keep them equal). */
+const val TRIAL_DAYS_LABEL = 7
+
+/** Server-reported state of the one-time free trial. */
+data class TrialInfo(val eligible: Boolean = true, val active: Boolean = false, val expiresAtMs: Long? = null)
+
+object TrialMath {
+    private const val DAY_MS = 86_400_000L
+
+    /** Whole days left, rounded up (a trial with 2 hours left shows "1 day"); 0 when over. */
+    fun daysLeft(expiresAtMs: Long, nowMs: Long): Int =
+        if (nowMs >= expiresAtMs) 0 else ((expiresAtMs - nowMs + DAY_MS - 1) / DAY_MS).toInt()
 }
 
 /** Server-reported daily AI quota (informational; the server enforces it). */
@@ -34,6 +54,9 @@ enum class PremiumFeature(val titleFa: String, val descriptionFa: String) {
     ADVANCED_REDISCOVER("کشف مجدد پیشرفته", "آهنگ‌هایی که مدت‌هاست نشنیده‌اید را با فاصلهٔ زمانی دلخواه پیدا کنید."),
     ADVANCED_INSIGHTS("بینش‌های شنیداری", "تحلیل سلیقه: BPM، محدودهٔ انرژی، ساعت‌های اوج شنیدن و رفتار رد کردن."),
     ADVANCED_STATISTICS("آمار پیشرفته", "ژانرها، حال‌وهوا، روزهای هفته و روند شنیدن شما."),
+    UNLIMITED_ONLINE_DOWNLOADS("دانلود نامحدود آهنگ‌های جدید", "کاربر رایگان هر روز چند آهنگ از تب «آهنگ‌های جدید» را به کتابخانه اضافه می‌کند؛ با پرمیوم این سقف روزانه برداشته می‌شود. پخش آنلاین همیشه رایگان است."),
+    ALL_OCCASION_MIXES("همهٔ میکس‌های «برای هر موقعیت»", "علاوه بر چند موقعیت رایگان، همهٔ موقعیت‌ها (شاد، تمرکز، شب، غمگین، شروع روز، پرانرژی) را کامل پخش و ذخیره کنید."),
+    PERSONAL_MIXES("میکس‌های شخصی‌سازی‌شده", "میکس‌های فراموش‌شده‌ها، گنج‌های پنهان، میکس فارسی و تصادفی از سلیقهٔ شما را کامل پخش، رادیو و ذخیره کنید."),
     ONLINE_LYRICS("متن آنلاین (بعداً)", "متن آهنگ از سرویس دارای مجوز؛ به‌محض افزوده‌شدن فعال می‌شود.")
 }
 
@@ -51,6 +74,9 @@ object FeatureGate {
         PremiumFeature.ADVANCED_REDISCOVER to Plan.PREMIUM,
         PremiumFeature.ADVANCED_INSIGHTS to Plan.PREMIUM,
         PremiumFeature.ADVANCED_STATISTICS to Plan.PREMIUM,
+        PremiumFeature.UNLIMITED_ONLINE_DOWNLOADS to Plan.PREMIUM,
+        PremiumFeature.ALL_OCCASION_MIXES to Plan.PREMIUM,
+        PremiumFeature.PERSONAL_MIXES to Plan.PREMIUM,
         PremiumFeature.ONLINE_LYRICS to Plan.PREMIUM
     )
 

@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">نواسا</string>
+    <!-- Home-screen widget (v1.1 item 5) -->
+    <string name="widget_subtitle_idle">چیزی در حال پخش نیست</string>
+    <string name="widget_action_play_pause">پخش یا توقف</string>
+    <string name="widget_action_next">آهنگ بعدی</string>
+    <string name="widget_action_previous">آهنگ قبلی</string>
     <string name="nav_home">خانه</string>
     <string name="nav_library">کتابخانه</string>
     <string name="nav_artists">خواننده‌ها</string>
@@ -18,6 +23,7 @@
     <string name="empty_library">هنوز آهنگی پیدا نشده. کتابخانه را اسکن کنید.</string>
     <string name="scan_library">اسکن کتابخانه</string>
     <string name="mood_cards_analyzing">در حال تحلیل آهنگ‌ها برای این پیشنهاد… کمی بعد دوباره سر بزنید.</string>
+    <string name="nav_video">ویدئو</string>
     <string name="nav_folders">پوشه‌ها</string>
     <string name="permission_title">دسترسی به موسیقی</string>
     <string name="permission_detail">برای ساخت کتابخانه، فقط به فایل‌های صوتی دستگاه دسترسی می‌خواهیم. فایل‌ها، متن آهنگ و سابقهٔ شنیدن بدون انتخاب شما ارسال نمی‌شوند.</string>

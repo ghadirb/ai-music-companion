@@ -5,7 +5,32 @@ import { base64UrlEncode, base64UrlEncodeBytes } from "./util";
 export interface EntitlementRecord { sku: string; tokenId: string; grantedAt: number; expiresAt: number | null }
 export interface OwnershipRecord { sub: string; transfers: number; claimedAt: number; lastTransferAt: number | null }
 
-export interface ActiveEntitlement { premium: boolean; skus: string[]; expiresAt: number | null }
+export interface ActiveEntitlement { premium: boolean; skus: string[]; expiresAt: number | null; /** True when premium comes ONLY from the free trial. */ trial?: boolean }
+
+/** Pseudo-SKU carried in entitlement tokens while the free trial is active. */
+export const TRIAL_SKU = "trial";
+export interface TrialRecord { startedAt: number; expiresAt: number }
+export interface TrialStatus { eligible: boolean; active: boolean; startedAt: number | null; expiresAt: number | null }
+export const trialKey = (sub: string) => `trial:${sub}`;
+
+export async function readTrial(env: Env, sub: string): Promise<TrialRecord | null> {
+  if (!env.PURCHASE_ENTITLEMENTS) return null;
+  const raw = await env.PURCHASE_ENTITLEMENTS.get(trialKey(sub));
+  if (!raw) return null;
+  try {
+    const r = JSON.parse(raw) as Partial<TrialRecord>;
+    if (typeof r.startedAt === "number" && typeof r.expiresAt === "number") return { startedAt: r.startedAt, expiresAt: r.expiresAt };
+  } catch { /* corrupt => treat as used, never re-grant */ }
+  return { startedAt: 0, expiresAt: 0 };
+}
+
+/** The trial is one-time: eligible only if this identity never started it. */
+export async function trialStatus(env: Env, sub: string, nowMs: number): Promise<TrialStatus> {
+  if (!env.PURCHASE_ENTITLEMENTS) return { eligible: false, active: false, startedAt: null, expiresAt: null };
+  const record = await readTrial(env, sub);
+  if (!record) return { eligible: true, active: false, startedAt: null, expiresAt: null };
+  return { eligible: false, active: nowMs < record.expiresAt, startedAt: record.startedAt, expiresAt: record.expiresAt };
+}
 
 export const entitlementKey = (sub: string, sku: string) => `entitlement:${sub}:${sku}`;
 export const ownershipKey = (tokenId: string) => `myket-token:${tokenId}`;
@@ -25,7 +50,11 @@ export async function activeEntitlement(env: Env, sub: string, nowMs: number): P
       if (record.expiresAt != null) earliestExpiry = earliestExpiry === null ? record.expiresAt : Math.max(earliestExpiry, record.expiresAt);
     } catch { /* corrupt record => no entitlement */ }
   }
-  return { premium: skus.length > 0, skus, expiresAt: skus.length && earliestExpiry !== null ? earliestExpiry : null };
+  if (skus.length) return { premium: true, skus, expiresAt: earliestExpiry };
+  // No purchase: the one-time free trial (if running) grants premium until its end.
+  const trial = await readTrial(env, sub);
+  if (trial && nowMs < trial.expiresAt) return { premium: true, skus: [TRIAL_SKU], expiresAt: trial.expiresAt, trial: true };
+  return { premium: false, skus: [], expiresAt: null };
 }
 
 export function newEntitlementRecord(env: Env, sku: string, tokenId: string, nowMs: number, grantedAt = nowMs): EntitlementRecord {

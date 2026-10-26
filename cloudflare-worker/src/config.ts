@@ -5,6 +5,8 @@ export interface Env {
   MYKET_ACCESS_TOKEN?: string;
   /** Private ES256 key (JWK JSON) used to sign entitlement tokens the app verifies offline. */
   ENTITLEMENT_SIGNING_JWK?: string;
+  /** Admin token for the Novasa music endpoints (scan trigger + remote config). Separate from every Premium/AI secret. */
+  MUSIC_ADMIN_TOKEN?: string;
 
   // ---- plain configuration (wrangler.toml [vars]) ----
   MYKET_PACKAGE_NAME?: string;
@@ -15,6 +17,12 @@ export interface Env {
   SESSION_LIMIT_PER_IP_DAY?: string;
   REQUEST_LIMIT_PER_MINUTE?: string;
   ENTITLEMENT_TTL_DAYS?: string;
+  /** Length of the one-time free trial of Premium features (days). */
+  TRIAL_DAYS?: string;
+  /** Daily AI quota while on the trial (between free and premium). */
+  TRIAL_DAILY_EMBEDDING_LIMIT?: string;
+  /** Max trials that may be started from one network address per day (high: mobile carriers share IPs). */
+  TRIAL_PER_IP_DAY?: string;
   /** JSON map: sku -> { "durationDays": number | null }. Defaults below. */
   PREMIUM_SKUS?: string;
   DJ_MODEL?: string;
@@ -22,6 +30,8 @@ export interface Env {
   // ---- bindings ----
   PURCHASE_ENTITLEMENTS?: KVNamespace;
   QUOTA_COUNTER?: DurableObjectNamespace;
+  /** D1 database for the Novasa music catalog (migrations/0001_music.sql). Independent of the entitlement KV. */
+  MUSIC_DB?: D1Database;
 }
 
 export interface SkuConfig { durationDays: number | null }
@@ -60,6 +70,9 @@ export interface Limits {
   sessionPerIpDay: number;
   requestsPerMinute: number;
   entitlementTtlDays: number;
+  trialDays: number;
+  trialDaily: number;
+  trialPerIpDay: number;
 }
 
 /** All numbers are configuration, not code: change wrangler.toml [vars], no redeploy of logic needed. */
@@ -71,6 +84,9 @@ export function limits(env: Env): Limits {
     sessionPerIpDay: positive(env.SESSION_LIMIT_PER_IP_DAY, 30, 10_000),
     requestsPerMinute: positive(env.REQUEST_LIMIT_PER_MINUTE, 40, 10_000),
     entitlementTtlDays: positive(env.ENTITLEMENT_TTL_DAYS, 7, 60),
+    trialDays: positive(env.TRIAL_DAYS, 7, 90),
+    trialDaily: positive(env.TRIAL_DAILY_EMBEDDING_LIMIT, 40, 10_000),
+    trialPerIpDay: positive(env.TRIAL_PER_IP_DAY, 20, 10_000),
   };
 }
 

@@ -5,6 +5,8 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -61,10 +64,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ALBUM_DETAIL
 import com.ghadirb.aimusic.ui.navigation.ROUTE_ARTIST_DETAIL
+import com.ghadirb.aimusic.ui.navigation.ROUTE_ONLINE
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYER
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PREMIUM
 import com.ghadirb.aimusic.ui.navigation.ROUTE_SMART_PLAYLIST
 import com.ghadirb.aimusic.ui.navigation.ROUTE_STATS
+import com.ghadirb.aimusic.ui.navigation.ROUTE_HISTORY
+import com.ghadirb.aimusic.ui.screens.history.HistoryScreen
 import com.ghadirb.aimusic.ui.navigation.ROUTE_TASTE
 import com.ghadirb.aimusic.ui.screens.stats.TasteEvolutionScreen
 import com.ghadirb.aimusic.ui.navigation.ROUTE_PLAYLIST_DETAIL
@@ -85,6 +91,9 @@ import com.ghadirb.aimusic.ui.screens.player.rememberPlayerViewModel
 import com.ghadirb.aimusic.ui.screens.playlists.PlaylistDetailScreen
 import com.ghadirb.aimusic.ui.screens.playlists.PlaylistsScreen
 import com.ghadirb.aimusic.ui.screens.settings.SettingsScreen
+import com.ghadirb.aimusic.ui.video.VideoScreen
+import com.ghadirb.aimusic.ui.screens.online.OnlineMusicScreen
+import com.ghadirb.aimusic.ui.screens.online.OnlineMusicViewModel
 import com.ghadirb.aimusic.ui.theme.AiMusicCompanionTheme
 import java.net.URLDecoder
 
@@ -93,6 +102,18 @@ class MainActivity : ComponentActivity() {
     private lateinit var billingGateway: MyketBillingGateway
 
     @OptIn(UnstableApi::class)
+    override fun onStart() {
+        super.onStart()
+        (application as AiMusicApp).rescanLibraryIfStale()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Self-heal a paid-but-unconfirmed purchase (lost network, recreated Activity, killed process, reinstall).
+        // Throttled and silent inside PurchaseRepository; a no-op for users who are already Premium.
+        lifecycleScope.launch { (application as AiMusicApp).purchases.recover() }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as AiMusicApp
@@ -208,11 +229,23 @@ private fun MainScaffold(
     )
     var upgradeFeature by remember { mutableStateOf<PremiumFeature?>(null) }
     val purchaseState by premiumViewModel.purchaseState.collectAsState()
+    val trialInfo by premiumViewModel.trial.collectAsState()
+    val trialState by premiumViewModel.trialState.collectAsState()
     val premiumAccess = remember(premiumViewModel) {
         PremiumAccess(premiumViewModel.entitlement, premiumViewModel::isAllowed) { feature -> upgradeFeature = feature }
     }
     // Refresh the plan in the background only if a (cached, offline-verified) premium token is close to expiry.
     LaunchedEffect(Unit) { if (app.entitlements.needsRefresh()) premiumViewModel.refresh() }
+    // Trial started from the upgrade dialog: close it and tell the user to retry what they tapped.
+    LaunchedEffect(trialState) {
+        if (trialState is PurchaseUiState.Success) {
+            if (upgradeFeature != null) {
+                upgradeFeature = null
+                android.widget.Toast.makeText(context, "دورهٔ آزمایشی فعال شد؛ دوباره امتحان کنید.", android.widget.Toast.LENGTH_LONG).show()
+            }
+            premiumViewModel.resetTrialState()
+        }
+    }
     LaunchedEffect(purchaseState) {
         if (purchaseState is PurchaseUiState.Success && upgradeFeature != null) upgradeFeature = null
     }
@@ -253,7 +286,9 @@ private fun MainScaffold(
         currentRoute == null -> stringResource(R.string.app_name)
         currentRoute == ROUTE_PLAYER -> "در حال پخش"
         currentRoute == ROUTE_PREMIUM -> "پرمیوم"
+        currentRoute == ROUTE_ONLINE -> stringResource(R.string.nav_online)
         currentRoute == ROUTE_STATS -> "آمار"
+        currentRoute == ROUTE_HISTORY -> "تاریخچهٔ پخش"
         currentRoute == ROUTE_TASTE -> "تکامل سلیقه"
         currentRoute == ROUTE_SMART_PLAYLIST -> "پلی‌لیست هوشمند"
         currentRoute == ROUTE_PLAYLIST_DETAIL ->
@@ -271,7 +306,14 @@ private fun MainScaffold(
     val showBackButton = currentRoute != null &&
         Screen.bottomBarScreens.none { it.route == currentRoute }
 
+    // Playback problems (e.g. the audio file was deleted/moved) surface as a snackbar on any screen.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(playerViewModel) {
+        playerViewModel.playbackErrors.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(screenTitle) },
@@ -324,9 +366,12 @@ private fun MainScaffold(
                     onTrackClick = ::openPlayer,
                     onOpenSmartPlaylist = { navController.navigate(ROUTE_SMART_PLAYLIST) { launchSingleTop = true } },
                     onOpenStats = { navController.navigate(ROUTE_STATS) { launchSingleTop = true } },
+                    onOpenHistory = { navController.navigate(ROUTE_HISTORY) { launchSingleTop = true } },
                     onOpenPremium = { navController.navigate(ROUTE_PREMIUM) { launchSingleTop = true } },
                     // Gated centrally through PremiumAccess (no scattered checks in the UI).
-                    onOpenTaste = { premiumAccess.require(PremiumFeature.TASTE_EVOLUTION) { navController.navigate(ROUTE_TASTE) { launchSingleTop = true } } }
+                    onOpenTaste = { premiumAccess.require(PremiumFeature.TASTE_EVOLUTION) { navController.navigate(ROUTE_TASTE) { launchSingleTop = true } } },
+                    onOpenPlaylist = { id, name -> navController.navigate(playlistDetailRoute(id, name)) },
+                    onOpenPlaylists = { navController.navigate(Screen.Playlists.route) { launchSingleTop = true } }
                 )
             }
             composable(Screen.Library.route) {
@@ -338,6 +383,13 @@ private fun MainScaffold(
                     onAlbumClick = { navController.navigate(albumDetailRoute(it)) },
                     onPlaylistClick = { id, name -> navController.navigate(playlistDetailRoute(id, name)) }
                 )
+            }
+            composable(ROUTE_ONLINE) {
+                val onlineViewModel: OnlineMusicViewModel = viewModel()
+                OnlineMusicScreen(onlineViewModel)
+            }
+            composable(Screen.Video.route) {
+                VideoScreen(repository = app.videoRepository)
             }
             composable(Screen.Artists.route) {
                 ArtistsScreen(repository = repository) { artist ->
@@ -377,6 +429,13 @@ private fun MainScaffold(
             }
             composable(ROUTE_PREMIUM) { PremiumScreen(premiumViewModel) }
             composable(ROUTE_STATS) { StatisticsScreen(repository) }
+            composable(ROUTE_HISTORY) {
+                HistoryScreen(
+                    repository = repository,
+                    currentTrack = playerUiState.currentTrack,
+                    onTrackClick = ::openPlayer
+                )
+            }
             composable(ROUTE_TASTE) { TasteEvolutionScreen(repository) }
             composable(ROUTE_SMART_PLAYLIST) {
                 SmartPlaylistScreen(
@@ -437,7 +496,10 @@ private fun MainScaffold(
             skus = premiumViewModel.offeredSkus,
             onBuy = premiumViewModel::buy,
             onRestore = premiumViewModel::restore,
-            onDismiss = { upgradeFeature = null; premiumViewModel.resetPurchaseState() }
+            onDismiss = { upgradeFeature = null; premiumViewModel.resetPurchaseState(); premiumViewModel.resetTrialState() },
+            trial = trialInfo,
+            trialState = trialState,
+            onStartTrial = premiumViewModel::startTrial
         )
     }
 }

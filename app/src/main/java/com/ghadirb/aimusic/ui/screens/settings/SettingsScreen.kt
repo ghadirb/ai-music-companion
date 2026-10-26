@@ -225,6 +225,71 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        val rescueScope = rememberCoroutineScope()
+        var rescueBusy by remember { mutableStateOf(false) }
+        var rescueResult by remember { mutableStateOf<String?>(null) }
+        ListItem(
+            headlineContent = { Text("یافتن فایل‌های ناشناخته در حافظه") },
+            supportingContent = {
+                Column {
+                    Text("اگر آهنگ یا ویدیویی روی گوشی هست و در فایل‌ها پخش می‌شود ولی در برنامه دیده نمی‌شود (مثلاً بعد از یک حذف نیمه‌کاره)، اینجا دوباره به سیستم معرفی می‌شود.")
+                    rescueResult?.let { Text(it) }
+                    TextButton(enabled = !rescueBusy, onClick = {
+                        rescueBusy = true
+                        rescueResult = null
+                        rescueScope.launch {
+                            val app = context.applicationContext as com.ghadirb.aimusic.AiMusicApp
+                            val found = runCatching {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.rescueUnindexedMedia() }
+                            }.getOrDefault(-1)
+                            rescueResult = when {
+                                found < 0 -> "دسترسی به حافظه ممکن نشد. اجازهٔ دسترسی به موسیقی و ویدیو را بررسی کنید."
+                                found == 0 -> "فایل ناشناخته‌ای پیدا نشد."
+                                else -> "$found فایل پیدا و دوباره معرفی شد. تب‌های موسیقی و ویدیو را باز کنید."
+                            }
+                            rescueBusy = false
+                        }
+                    }) { Text(if (rescueBusy) "در حال جستجو…" else "جستجو و معرفی دوباره") }
+                }
+            }
+        )
+        HorizontalDivider()
+
+        val excludedStore = remember { com.ghadirb.aimusic.library.ExcludedFoldersStore(context) }
+        var excludedCount by remember { mutableStateOf(excludedStore.load().size) }
+        var excludedFolderList by remember { mutableStateOf<List<Pair<String, Int>>?>(null) }
+        val excludeScope = rememberCoroutineScope()
+        ListItem(
+            headlineContent = { Text("پوشه‌های نادیده‌گرفته‌شده") },
+            supportingContent = {
+                Column {
+                    Text("پوشه‌هایی که نمی‌خواهید موسیقی و ویدیوی آن‌ها در برنامه دیده شود (مثلاً صدای واتساپ).")
+                    Text(if (excludedCount == 0) "هیچ پوشه‌ای نادیده گرفته نشده است." else "$excludedCount پوشه نادیده گرفته می‌شود.", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = {
+                        excludeScope.launch { excludedFolderList = repository.folderCounts().map { it.folder to it.count } }
+                    }) { Text("انتخاب پوشه‌ها") }
+                }
+            }
+        )
+        excludedFolderList?.let { list ->
+            com.ghadirb.aimusic.ui.screens.settings.ExcludedFoldersDialog(
+                folders = list,
+                excluded = excludedStore.load(),
+                onDismiss = { excludedFolderList = null },
+                onSave = { chosen ->
+                    excludedStore.save(chosen)
+                    excludedCount = excludedStore.load().size
+                    excludedFolderList = null
+                    excludeScope.launch {
+                        val app = context.applicationContext as com.ghadirb.aimusic.AiMusicApp
+                        runCatching { repository.rescanLibrary() }
+                        runCatching { app.videoRepository.sync() }
+                    }
+                }
+            )
+        }
+        HorizontalDivider()
+
         val libraryWatchStore = remember { com.ghadirb.aimusic.library.LibraryWatchStore(context) }
         var libraryWatchEnabled by remember { mutableStateOf(libraryWatchStore.enabled) }
         var libraryWatchSummary by remember { mutableStateOf(libraryWatchStore.pendingSummary) }
@@ -274,6 +339,14 @@ fun SettingsScreen(
                         TextButton(onClick = { openUrl(context, TERMS_URL) }) { Text("شرایط استفاده") }
                     }
                 }
+            }
+        )
+        HorizontalDivider()
+
+        ListItem(
+            headlineContent = { Text("مجوزهای نرم‌افزارهای متن‌باز") },
+            supportingContent = {
+                Text("پخش ویدئو با موتور جایگزین از VLC (libVLC، مجوز LGPL-2.1، سازنده: VideoLAN) و کتابخانه‌های FFmpeg درون آن استفاده می‌کند. پخش‌کنندهٔ اصلی بر پایهٔ AndroidX Media3 (Apache-2.0) است. کد منبع و متن کامل مجوزها: videolan.org و github.com/androidx/media")
             }
         )
         HorizontalDivider()

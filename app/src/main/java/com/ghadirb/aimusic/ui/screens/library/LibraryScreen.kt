@@ -1,6 +1,13 @@
 package com.ghadirb.aimusic.ui.screens.library
 
+import android.app.Activity
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,9 +18,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -36,12 +48,16 @@ import com.ghadirb.aimusic.analysis.AudioAnalysisWorker
 import com.ghadirb.aimusic.library.EnergyBand
 import com.ghadirb.aimusic.library.LibraryFilter
 import com.ghadirb.aimusic.library.LibrarySort
+import com.ghadirb.aimusic.library.TrackFileOps
 import com.ghadirb.aimusic.ui.components.LocalQueueActions
 import com.ghadirb.aimusic.R
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,16 +83,172 @@ fun LibraryScreen(
     )
     val state by viewModel.uiState.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val scanProgress by viewModel.scanProgress.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
+    val scanMessage by viewModel.scanMessage.collectAsState()
     var trackForPlaylistPicker by remember { mutableStateOf<TrackEntity?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
+    val searchHistoryPreferences = remember(context) {
+        context.getSharedPreferences("ui_preferences", android.content.Context.MODE_PRIVATE)
+    }
+    var recentSearches by remember { mutableStateOf(readSearchHistory(searchHistoryPreferences)) }
+
+    // Save only deliberate, settled queries. This is real local search history,
+    // not a fabricated discovery feed, and remains useful offline.
+    LaunchedEffect(searchQuery) {
+        val query = searchQuery.trim()
+        if (query.length < 2) return@LaunchedEffect
+        delay(650)
+        val updated = (listOf(query) + recentSearches.filterNot { it.equals(query, ignoreCase = true) }).take(6)
+        recentSearches = updated
+        writeSearchHistory(searchHistoryPreferences, updated)
+    }
+
+    // --- Multi-select: delete from device, or copy/move selected tracks to another folder ---
+    val scope = rememberCoroutineScope()
+    val selectedIds by viewModel.selectedIds.collectAsState()
+    val isSelectionMode by viewModel.isSelectionMode.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    // Ready.tracks is filtered/sorted by the active filter; search.tracks covers the search view.
+    // Together they cover every track a selection or a row action could currently refer to.
+    val tracksById = remember(state) {
+        val ready = state as? LibraryUiState.Ready
+        (ready?.tracks.orEmpty() + ready?.search?.tracks.orEmpty()).associateBy { it.id }
+    }
+    var pendingCopyIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var pendingMove by remember { mutableStateOf(false) }
+    var copyOrMoveTarget by remember { mutableStateOf<Set<Long>?>(null) }
+    var trackPendingDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
+
+    LaunchedEffect(scanMessage) {
+        scanMessage?.let { snackbarHostState.showSnackbar(it); viewModel.consumeScanMessage() }
+    }
+    // Real deletion from the phone (see rememberDeleteFlow): only files that are truly gone leave the Library.
+    val idByUri = remember { mutableMapOf<Uri, Long>() }
+    val deleteFlow = com.ghadirb.aimusic.ui.common.rememberDeleteFlow(
+        onDeleted = { uris ->
+            val ids = uris.mapNotNull { idByUri[it] }
+            if (ids.isNotEmpty()) {
+                viewModel.removeFromLibrary(ids)
+                scope.launch { snackbarHostState.showSnackbar("${ids.size} آهنگ از دستگاه حذف شد") }
+            }
+        },
+        onMessage = { text -> scope.launch { snackbarHostState.showSnackbar(text) } }
+    )
+
+    fun requestDeleteTracks(targets: List<TrackEntity>) {
+        if (targets.isEmpty()) return
+        idByUri.clear()
+        targets.forEach { t -> runCatching { Uri.parse(t.path) }.getOrNull()?.let { idByUri[it] = t.id } }
+        deleteFlow(idByUri.keys.toList())
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        val ids = pendingCopyIds
+        val move = pendingMove
+        pendingCopyIds = emptySet()
+        if (treeUri == null || ids.isEmpty()) return@rememberLauncherForActivityResult
+        val targets = ids.mapNotNull { tracksById[it] }
+        scope.launch {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    treeUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            val pairs = targets.mapNotNull { t -> runCatching { Uri.parse(t.path) }.getOrNull()?.let { it to t.title } }
+            val result = TrackFileOps.copyToFolder(context, treeUri, pairs)
+            val verb = if (move) "انتقال" else "کپی"
+            snackbarHostState.showSnackbar(
+                if (result.failed.isEmpty()) "${result.succeeded.size} آهنگ $verb شد"
+                else "${result.succeeded.size} آهنگ $verb شد، ${result.failed.size} مورد ناموفق بود"
+            )
+            if (move && result.succeeded.isNotEmpty()) {
+                val movedTracks = targets.filter { t -> runCatching { Uri.parse(t.path) }.getOrNull() in result.succeeded }
+                requestDeleteTracks(movedTracks)
+            } else {
+                viewModel.clearSelection()
+            }
+        }
+    }
+
+    trackPendingDeleteConfirm?.let { track ->
+        AlertDialog(
+            onDismissRequest = { trackPendingDeleteConfirm = null },
+            title = { Text("حذف آهنگ") },
+            text = { Text("«${track.title}» از دستگاه حذف شود؟ این کار قابل بازگشت نیست.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    trackPendingDeleteConfirm = null
+                    requestDeleteTracks(listOf(track))
+                }) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { trackPendingDeleteConfirm = null }) { Text("انصراف") } }
+        )
+    }
+
+    copyOrMoveTarget?.let { ids ->
+        AlertDialog(
+            onDismissRequest = { copyOrMoveTarget = null },
+            title = { Text("کپی یا انتقال") },
+            text = { Text("${ids.size} آهنگ انتخاب شده در پوشهٔ مقصد چه کاری انجام شود؟") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingCopyIds = ids; pendingMove = false; copyOrMoveTarget = null
+                    folderPickerLauncher.launch(null)
+                }) { Text("فقط کپی") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        pendingCopyIds = ids; pendingMove = true; copyOrMoveTarget = null
+                        folderPickerLauncher.launch(null)
+                    }) { Text("انتقال (حذف پس از کپی)") }
+                    TextButton(onClick = { copyOrMoveTarget = null }) { Text("انصراف") }
+                }
+            }
+        )
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            if (isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${selectedIds.size} انتخاب شده") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.clearSelection() }) {
+                            Icon(Icons.Filled.Close, contentDescription = "لغو انتخاب")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { copyOrMoveTarget = selectedIds },
+                            enabled = selectedIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.DriveFileMove, contentDescription = "کپی یا انتقال به پوشهٔ دیگر")
+                        }
+                        IconButton(
+                            onClick = { requestDeleteTracks(selectedIds.mapNotNull { tracksById[it] }) },
+                            enabled = selectedIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.Delete, contentDescription = "حذف از دستگاه")
+                        }
+                    }
+                )
+            }
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.scanLibrary() }) {
-                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.scan_library))
+            if (!isSelectionMode) {
+                ExtendedFloatingActionButton(
+                    onClick = { viewModel.scanLibrary() },
+                    icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
+                    text = { Text(if (isScanning) "در حال جستجو…" else "جستجوی آهنگ جدید") }
+                )
             }
         }
     ) { padding ->
@@ -147,7 +319,21 @@ fun LibraryScreen(
                     }
                     val search = current.search
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        if (search != null) {
+                        if (searchExpanded && search == null) {
+                            item {
+                                SearchStartContent(
+                                    recentSearches = recentSearches,
+                                    onSearch = { query ->
+                                        searchQuery = query
+                                        viewModel.setQuery(query)
+                                    },
+                                    onClearHistory = {
+                                        recentSearches = emptyList()
+                                        writeSearchHistory(searchHistoryPreferences, emptyList())
+                                    }
+                                )
+                            }
+                        } else if (search != null) {
                             if (search.isEmpty) {
                                 item { EmptyResult() }
                             } else {
@@ -182,7 +368,14 @@ fun LibraryScreen(
                                             isCurrentTrack = track.id == currentTrackId,
                                             onClick = { onTrackClick(track, search.tracks) },
                                             onFavoriteClick = { viewModel.toggleFavorite(track) },
-                                            onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                                            onAddToPlaylistClick = { trackForPlaylistPicker = track },
+                                            onNotInterestedClick = { viewModel.toggleNotInterested(track) },
+                                            onDeleteClick = { trackPendingDeleteConfirm = track },
+                                            onCopyMoveClick = { copyOrMoveTarget = setOf(track.id) },
+                                            selectionMode = isSelectionMode,
+                                            selected = track.id in selectedIds,
+                                            onToggleSelect = { viewModel.toggleSelection(track.id) },
+                                            onLongPress = { viewModel.startSelection(track.id) }
                                         )
                                     }
                                 }
@@ -197,7 +390,14 @@ fun LibraryScreen(
                                     isCurrentTrack = track.id == currentTrackId,
                                     onClick = { onTrackClick(track, current.tracks) },
                                     onFavoriteClick = { viewModel.toggleFavorite(track) },
-                                    onAddToPlaylistClick = { trackForPlaylistPicker = track }
+                                    onAddToPlaylistClick = { trackForPlaylistPicker = track },
+                                    onNotInterestedClick = { viewModel.toggleNotInterested(track) },
+                                    onDeleteClick = { trackPendingDeleteConfirm = track },
+                                    onCopyMoveClick = { copyOrMoveTarget = setOf(track.id) },
+                                    selectionMode = isSelectionMode,
+                                    selected = track.id in selectedIds,
+                                    onToggleSelect = { viewModel.toggleSelection(track.id) },
+                                    onLongPress = { viewModel.startSelection(track.id) }
                                 )
                             }
                         }
@@ -205,7 +405,20 @@ fun LibraryScreen(
                 }
             }
             if (isScanning) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
+                    val sp = scanProgress
+                    if (sp != null && sp.known) {
+                        LinearProgressIndicator(progress = { sp.percent / 100f }, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            "${sp.done} از ${sp.total} (${sp.percent}٪)",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    TextButton(onClick = viewModel::cancelScan, modifier = Modifier.align(Alignment.End)) { Text("لغو اسکن") }
+                }
             }
         }
     }
@@ -221,7 +434,74 @@ fun LibraryScreen(
 
 @Composable
 private fun EmptyResult() {
-    Text("نتیجه‌ای پیدا نشد.", modifier = Modifier.padding(24.dp))
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        Text("نتیجه‌ای پیدا نشد.", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "نام آهنگ، خواننده، آلبوم یا پلی‌لیست را با املای دیگری امتحان کنید.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun SearchStartContent(
+    recentSearches: List<String>,
+    onSearch: (String) -> Unit,
+    onClearHistory: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        if (recentSearches.isEmpty()) {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Text("دنبال چه چیزی می‌گردید؟", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "آهنگ، خواننده، آلبوم یا پلی‌لیست را جست‌وجو کنید.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("جست‌وجوهای اخیر", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClearHistory) { Text("پاک‌کردن") }
+            }
+            LazyRow(contentPadding = PaddingValues(top = 8.dp)) {
+                items(recentSearches, key = { it }) { query ->
+                    AssistChip(
+                        onClick = { onSearch(query) },
+                        label = { Text(query, maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private const val SEARCH_HISTORY_KEY = "library_search_history"
+private const val SEARCH_HISTORY_SEPARATOR = "\u001F"
+
+private fun readSearchHistory(preferences: android.content.SharedPreferences): List<String> =
+    preferences.getString(SEARCH_HISTORY_KEY, null)
+        ?.split(SEARCH_HISTORY_SEPARATOR)
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.take(6)
+        .orEmpty()
+
+private fun writeSearchHistory(preferences: android.content.SharedPreferences, queries: List<String>) {
+    preferences.edit()
+        .putString(SEARCH_HISTORY_KEY, queries.joinToString(SEARCH_HISTORY_SEPARATOR) { it.replace(SEARCH_HISTORY_SEPARATOR, "") })
+        .apply()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -338,13 +618,27 @@ private fun FilterRow(state: LibraryUiState.Ready, onChange: (LibraryFilter) -> 
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
     track: TrackEntity,
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     onAddToPlaylistClick: (() -> Unit)? = null,
-    isCurrentTrack: Boolean = false
+    onNotInterestedClick: (() -> Unit)? = null,
+    isCurrentTrack: Boolean = false,
+    /** Extra trailing action rendered before the favourite/menu icons (e.g. "remove from playlist"). */
+    trailingExtra: (@Composable () -> Unit)? = null,
+    /** Deletes this single track from the device (shown in the row's own menu). */
+    onDeleteClick: (() -> Unit)? = null,
+    /** Copies/moves just this single track to another folder (shown in the row's own menu). */
+    onCopyMoveClick: (() -> Unit)? = null,
+    /** True while the Library is in multi-select mode: shows a checkbox and disables normal tap-to-play. */
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onToggleSelect: (() -> Unit)? = null,
+    /** Long-press anywhere on the row enters selection mode with this track picked. */
+    onLongPress: (() -> Unit)? = null
 ) {
     ListItem(
         headlineContent = {
@@ -357,13 +651,27 @@ fun TrackRow(
             if (track.artist != "Unknown artist") Text(track.artist, maxLines = 1)
         },
         leadingContent = {
-            if (track.albumArtUri != null) {
-                AsyncImage(track.albumArtUri, contentDescription = track.album, modifier = Modifier.size(56.dp))
+            if (selectionMode) {
+                Icon(
+                    imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                    contentDescription = if (selected) "انتخاب شده" else "انتخاب نشده",
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp)
+                )
+            } else if (track.albumArtUri != null) {
+                AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = track.album,
+                    contentScale = ContentScale.Crop,
+                    error = rememberVectorPainter(Icons.Filled.MusicNote),
+                    modifier = Modifier.size(56.dp)
+                )
             } else {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Icon(Icons.Filled.MusicNote, contentDescription = null)
             }
         },
         trailingContent = {
+            if (selectionMode) return@ListItem
             val queueActions = LocalQueueActions.current
             var menuOpen by remember { mutableStateOf(false) }
             Row {
@@ -373,7 +681,7 @@ fun TrackRow(
                         contentDescription = if (track.isFavorite) "حذف از علاقه‌مندی‌ها" else "افزودن به علاقه‌مندی‌ها"
                     )
                 }
-                if (onAddToPlaylistClick != null || queueActions != null) {
+                if (onAddToPlaylistClick != null || queueActions != null || onNotInterestedClick != null || onDeleteClick != null) {
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "گزینه‌های بیشتر")
@@ -399,12 +707,38 @@ fun TrackRow(
                                     onClick = { onAddToPlaylistClick(); menuOpen = false }
                                 )
                             }
+                            if (onCopyMoveClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text("کپی/انتقال به پوشهٔ دیگر") },
+                                    onClick = { onCopyMoveClick(); menuOpen = false }
+                                )
+                            }
+                            if (onNotInterestedClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text(if (track.notInterested) "برداشتن «علاقه‌ای ندارم»" else "علاقه‌ای ندارم") },
+                                    onClick = { onNotInterestedClick(); menuOpen = false }
+                                )
+                            }
+                            if (onDeleteClick != null) {
+                                DropdownMenuItem(
+                                    text = { Text("حذف از دستگاه", color = MaterialTheme.colorScheme.error) },
+                                    onClick = { onDeleteClick(); menuOpen = false }
+                                )
+                            }
                         }
                     }
                 }
+                trailingExtra?.invoke()
             }
         },
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = if (selectionMode) {
+            Modifier.clickable(onClick = { onToggleSelect?.invoke() })
+        } else {
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongPress
+            )
+        }
     )
 }
 

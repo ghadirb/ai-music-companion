@@ -1,5 +1,10 @@
 package com.ghadirb.aimusic.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +24,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -30,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ghadirb.aimusic.data.local.entity.TrackEntity
+import com.ghadirb.aimusic.ui.theme.rememberDynamicAccent
 
 /** Compact "now playing" bar shown above the bottom navigation on every screen except the player. */
 @Composable
@@ -41,7 +49,13 @@ fun MiniPlayerBar(
     onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Keep the mini player visually connected to the current artwork without
+    // changing the contrast of its title/actions. Extraction is cached and
+    // animated by rememberDynamicAccent, so this does not affect playback.
+    val accent by rememberDynamicAccent(track.albumArtUri)
     Surface(
+        color = accent.copy(alpha = 0.12f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 3.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -58,6 +72,7 @@ fun MiniPlayerBar(
                         model = track.albumArtUri,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        error = rememberVectorPainter(Icons.Filled.MusicNote),
                         modifier = Modifier.size(44.dp)
                     )
                 } else {
@@ -74,10 +89,21 @@ fun MiniPlayerBar(
                 }
             }
             IconButton(onClick = onToggle) {
-                Icon(
-                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "توقف" else "پخش"
-                )
+                // Tiny scale-swap micro-interaction instead of an instant icon flip,
+                // matching the "Play -> Pause" motion asked for in the design spec.
+                AnimatedContent(
+                    targetState = isPlaying,
+                    transitionSpec = {
+                        (scaleIn(animationSpec = spring(stiffness = 500f), initialScale = 0.6f)) togetherWith
+                            (scaleOut(animationSpec = spring(stiffness = 500f), targetScale = 0.6f))
+                    },
+                    label = "miniPlayPauseIcon"
+                ) { playing ->
+                    Icon(
+                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) "توقف" else "پخش"
+                    )
+                }
             }
             IconButton(onClick = onNext) {
                 Icon(Icons.Filled.SkipNext, contentDescription = "آهنگ بعدی")

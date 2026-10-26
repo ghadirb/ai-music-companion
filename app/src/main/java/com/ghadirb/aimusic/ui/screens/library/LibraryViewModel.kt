@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -99,35 +100,85 @@ class LibraryViewModel(
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning
+    private val _scanProgress = MutableStateFlow<com.ghadirb.aimusic.library.ScanProgress?>(null)
+    val scanProgress: StateFlow<com.ghadirb.aimusic.library.ScanProgress?> = _scanProgress
+
+    /** One-shot result of a manual scan, shown as a snackbar. */
+    private val _scanMessage = MutableStateFlow<String?>(null)
+    val scanMessage: StateFlow<String?> = _scanMessage
+    fun consumeScanMessage() { _scanMessage.value = null }
 
     private val _scanError = MutableStateFlow<String?>(null)
     val scanError: StateFlow<String?> = _scanError
+
+    // --- Multi-select (delete / copy-move to another folder) ---
+
+    private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedIds: StateFlow<Set<Long>> = _selectedIds
+    val isSelectionMode: StateFlow<Boolean> =
+        _selectedIds.map { it.isNotEmpty() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Long-press on a track: enters selection mode with just that track picked. */
+    fun startSelection(trackId: Long) { _selectedIds.value = setOf(trackId) }
+
+    fun toggleSelection(trackId: Long) {
+        _selectedIds.value = _selectedIds.value.let { current ->
+            if (trackId in current) current - trackId else current + trackId
+        }
+    }
+
+    fun clearSelection() { _selectedIds.value = emptySet() }
+
+    /** Drops the given tracks from the Library after their device files were deleted/moved (see TrackFileOps). */
+    fun removeFromLibrary(ids: Collection<Long>) {
+        viewModelScope.launch {
+            repository.removeTracksFromLibrary(ids.toList())
+            clearSelection()
+        }
+    }
 
     fun setQuery(value: String) { queryFlow.value = value }
     fun setSort(value: LibrarySort) { sortFlow.value = value }
     fun setFilter(value: LibraryFilter) { filterFlow.value = value }
     fun dismissScanError() { _scanError.value = null }
 
+    private var scanJob: kotlinx.coroutines.Job? = null
+
+    /** Stops a running manual scan. Safe: the database is only changed in one final transaction. */
+    fun cancelScan() { scanJob?.cancel() }
+
     fun scanLibrary() {
         if (_isScanning.value) return
-        viewModelScope.launch {
+        scanJob = viewModelScope.launch {
             _isScanning.value = true
             _scanError.value = null
             try {
-                repository.rescanLibrary()
+                val added = repository.rescanLibrary(deep = true) { done, total ->
+                    _scanProgress.value = com.ghadirb.aimusic.library.ScanProgress(done, total)
+                }
                 // New tracks have no energy/mood yet — kick the (unique, cancellable) analyzer.
                 onLibraryChanged()
+                _scanMessage.value = if (added.isEmpty()) "آهنگ جدیدی پیدا نشد." else "${added.size} آهنگ جدید اضافه شد."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _scanMessage.value = "اسکن لغو شد؛ هیچ تغییری در کتابخانه اعمال نشد."
+                throw e
             } catch (e: SecurityException) {
                 _scanError.value = "دسترسی به فایل‌های صوتی داده نشده است. مجوز را در تنظیمات دستگاه فعال کنید."
             } catch (e: Exception) {
                 _scanError.value = "اسکن کتابخانه کامل نشد. دوباره تلاش کنید."
             } finally {
                 _isScanning.value = false
+                _scanProgress.value = null
             }
         }
     }
 
     fun toggleFavorite(track: TrackEntity) {
         viewModelScope.launch { repository.setFavorite(track.id, !track.isFavorite) }
+    }
+
+    fun toggleNotInterested(track: TrackEntity) {
+        viewModelScope.launch { repository.setNotInterested(track.id, !track.notInterested) }
     }
 }

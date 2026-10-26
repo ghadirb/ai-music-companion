@@ -2,12 +2,15 @@ package com.ghadirb.aimusic.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ghadirb.aimusic.data.local.entity.TrackEntity
 import com.ghadirb.aimusic.data.repository.MusicRepository
 import com.ghadirb.aimusic.mix.SmartMix
 import com.ghadirb.aimusic.mix.SmartMixGenerator
 import com.ghadirb.aimusic.recommendation.Recommendation
 import com.ghadirb.aimusic.recommendation.RecommendationEngine
 import com.ghadirb.aimusic.recommendation.ScoringConfig
+import com.ghadirb.aimusic.recommendation.section.RecommendationSection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,8 +36,26 @@ class HomeViewModel(
     /** "Today's picks", each with a short reason ("because you listen to this artist a lot"). */
     val picks: StateFlow<List<Recommendation>> = _picks.asStateFlow()
 
+    private val _sections = MutableStateFlow<List<RecommendationSection>>(emptyList())
+    /**
+     * v2 Home sections ("for you", "because you like…", "tonight", "driving", "discover", "similar to recent"),
+     * each produced by its own strategy. Cached sections are shown first, then refreshed in the background.
+     * [picks] is only filled as a fallback when no section could be produced.
+     */
+    val sections: StateFlow<List<RecommendationSection>> = _sections.asStateFlow()
+
     private val _mixes = MutableStateFlow<List<SmartMix>>(emptyList())
     val mixes: StateFlow<List<SmartMix>> = _mixes.asStateFlow()
+
+    private val _favorites = MutableStateFlow<List<TrackEntity>>(emptyList())
+    /** Actual favourites, newest additions and listening history for the Home dashboard. */
+    val favorites: StateFlow<List<TrackEntity>> = _favorites.asStateFlow()
+
+    private val _recentlyPlayed = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val recentlyPlayed: StateFlow<List<TrackEntity>> = _recentlyPlayed.asStateFlow()
+
+    private val _recentlyAdded = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val recentlyAdded: StateFlow<List<TrackEntity>> = _recentlyAdded.asStateFlow()
 
     // Unknown until the first load completes — NOT "true", otherwise the screen flashes the full
     // layout and then collapses to the empty-library message.
@@ -70,12 +91,24 @@ class HomeViewModel(
             val engine = RecommendationEngine(repository, config)
             if (count == 0) {
                 _picks.value = emptyList()
+                _sections.value = emptyList()
                 _mixes.value = emptyList()
+                _favorites.value = emptyList()
+                _recentlyPlayed.value = emptyList()
+                _recentlyAdded.value = emptyList()
             } else {
                 val tracks = repository.observeTracks().first()
                 val history = repository.recentHistory(3000)
                 val now = System.currentTimeMillis()
-                _picks.value = engine.recommend(limit = 8, nowMs = now)
+                val tracksById = tracks.associateBy { it.id }
+                _favorites.value = tracks.filter { it.isFavorite }.sortedByDescending { it.dateAdded }.take(HOME_RAIL_SIZE)
+                _recentlyAdded.value = tracks.sortedByDescending { it.dateAdded }.take(HOME_RAIL_SIZE)
+                _recentlyPlayed.value = history.asSequence()
+                    .mapNotNull { tracksById[it.trackId] }
+                    .distinctBy { it.id }
+                    .take(HOME_RAIL_SIZE)
+                    .toList()
+                loadSections(engine, now)
                 _mixes.value = withContext(Dispatchers.Default) { SmartMixGenerator.generateAll(tracks, history, now, limit = 30, config = config) }
             }
         } catch (e: Exception) {
@@ -84,6 +117,27 @@ class HomeViewModel(
             _mixes.value = emptyList()
         } finally {
             _hasLibrary.value = count > 0
+        }
+    }
+
+    /**
+     * Cache-first (spec §19): a valid cache is shown immediately and nothing is recomputed; a stale one
+     * is shown right away and replaced when the light refresh finishes. All ranking runs inside the
+     * engine on Dispatchers.Default. If the v2 pipeline yields nothing, the legacy picks keep Home alive.
+     */
+    private suspend fun loadSections(engine: RecommendationEngine, now: Long) {
+        try {
+            val cached = engine.cachedSections(now)
+            if (cached.sections.isNotEmpty()) _sections.value = cached.sections
+            val sections = if (cached.sections.isNotEmpty() && cached.isFresh) cached.sections
+            else engine.refreshSections(nowMs = now)
+            _sections.value = sections
+            _picks.value = if (sections.isEmpty()) engine.recommend(limit = 8, nowMs = now) else emptyList()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _sections.value = emptyList()
+            _picks.value = try { engine.recommend(limit = 8, nowMs = now) } catch (e2: CancellationException) { throw e2 } catch (e2: Exception) { emptyList() }
         }
     }
 
@@ -101,6 +155,23 @@ class HomeViewModel(
     fun dismissMessage() { _message.value = null }
     fun showMessage(text: String) { _message.value = text }
 
+    /**
+     * Spec §18: the new-user empty state's CTA does a real library rescan (never a fake/no-op
+     * action). [hasLibrary] flips to true automatically once [refresh] observes new tracks.
+     */
+    fun scanLibraryNow() {
+        viewModelScope.launch {
+            _isReanalyzing.value = true
+            try {
+                repository.rescanLibrary(deep = true)
+            } catch (e: Exception) {
+                _message.value = "اسکن کتابخانه انجام نشد. دوباره تلاش کنید."
+            } finally {
+                _isReanalyzing.value = false
+            }
+        }
+    }
+
     fun reanalyzeLibrary() {
         viewModelScope.launch {
             _isReanalyzing.value = true
@@ -110,5 +181,9 @@ class HomeViewModel(
                 _isReanalyzing.value = false
             }
         }
+    }
+
+    private companion object {
+        const val HOME_RAIL_SIZE = 8
     }
 }

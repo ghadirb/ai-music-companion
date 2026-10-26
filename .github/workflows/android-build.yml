@@ -2,10 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: [ "master", "main", "feature/**" ]
   pull_request:
     branches: [ "master", "main" ]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      deploy_worker:
+        description: "Also deploy cloudflare-worker to Cloudflare (needs the CLOUDFLARE_API_TOKEN secret)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -50,6 +55,20 @@ jobs:
         run: |
           echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
           echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+      # Emulator smoke test runs on x86_64, but the shipped release APK is ARM-only (libVLC is large).
+      - name: Build x86_64-capable release APK for the emulator smoke test
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease -PABI_FILTERS=arm64-v8a,armeabi-v7a,x86_64 -PVERSION_CODE="$VERSION_CODE" --stacktrace 2>&1 | tee build-release-smoke.log
+          mkdir -p smoke-out/apk/release && cp app/build/outputs/apk/release/*.apk smoke-out/apk/release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-smoke
+          path: smoke-out
       - name: Build release APK + AAB (R8 enabled)
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -88,7 +107,7 @@ jobs:
           if-no-files-found: ignore
       # Plain-text report branch (latest run only) so failures can be read without downloading artifacts.
       - name: Publish CI report branch
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         run: |
           rm -rf /tmp/report && mkdir -p /tmp/report
           for f in unit-tests.log lint.log build-debug.log build-release.log apksigner.log; do [ -f "$f" ] && tail -n 400 "$f" > "/tmp/report/$f"; done
@@ -117,6 +136,28 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  # Manual only: tests must pass first. Secrets already on the Worker (JWT, Myket, signing key) are kept by wrangler.
+  deploy-worker:
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_worker
+    needs: worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare-worker/package-lock.json
+      - run: npm ci
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy
+
 
   # ---------------------------------------------------------------- Android instrumented tests (migrations, DAO, repository)
   instrumented:
@@ -153,7 +194,7 @@ jobs:
           path: app/build/outputs/androidTest-results/**
           if-no-files-found: ignore
       - name: Publish instrumented report branch
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         run: |
           rm -rf /tmp/rep && mkdir -p /tmp/rep
           find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} /tmp/rep/ \; 2>/dev/null || true
@@ -174,7 +215,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
-          name: app-release
+          name: app-release-smoke
           path: rel
       - name: Enable KVM
         run: |
@@ -190,7 +231,7 @@ jobs:
           disable-animations: true
           script: bash .github/scripts/release-smoke.sh
       - name: Publish smoke report branch
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         run: |
           rm -rf /tmp/smoke && mkdir -p /tmp/smoke
           cp screenshot-*.png /tmp/smoke/ 2>/dev/null || true
