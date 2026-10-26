@@ -404,7 +404,10 @@ fun LibraryScreen(
                 }
             }
             if (isScanning) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    TextButton(onClick = viewModel::cancelScan, modifier = Modifier.align(Alignment.End)) { Text("لغو اسکن") }
+                }
             }
         }
     }

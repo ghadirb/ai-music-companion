@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
@@ -77,6 +78,8 @@ fun VideoPlayerControls(
     onInteract: () -> Unit,
     onLock: () -> Unit = {},
     onTimer: () -> Unit = {},
+    orientationLabel: String = "",
+    onRotate: () -> Unit = {},
     timerActive: Boolean = false,
     aspectLabel: String = "",
     onAspect: () -> Unit = {},
@@ -103,6 +106,9 @@ fun VideoPlayerControls(
                 color = Color.White, style = MaterialTheme.typography.titleSmall,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = { onInteract(); onRotate() }) {
+                Icon(Icons.Filled.ScreenRotation, contentDescription = "چرخش صفحه: $orientationLabel", tint = Color.White)
+            }
             IconButton(onClick = { onInteract(); onTimer() }) {
                 Icon(
                     Icons.Filled.Timer, contentDescription = "تایمر خواب و تکرار",

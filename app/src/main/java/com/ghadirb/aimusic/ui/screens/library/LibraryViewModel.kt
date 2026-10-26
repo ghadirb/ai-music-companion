@@ -141,9 +141,14 @@ class LibraryViewModel(
     fun setFilter(value: LibraryFilter) { filterFlow.value = value }
     fun dismissScanError() { _scanError.value = null }
 
+    private var scanJob: kotlinx.coroutines.Job? = null
+
+    /** Stops a running manual scan. Safe: the database is only changed in one final transaction. */
+    fun cancelScan() { scanJob?.cancel() }
+
     fun scanLibrary() {
         if (_isScanning.value) return
-        viewModelScope.launch {
+        scanJob = viewModelScope.launch {
             _isScanning.value = true
             _scanError.value = null
             try {
@@ -151,6 +156,9 @@ class LibraryViewModel(
                 // New tracks have no energy/mood yet — kick the (unique, cancellable) analyzer.
                 onLibraryChanged()
                 _scanMessage.value = if (added.isEmpty()) "آهنگ جدیدی پیدا نشد." else "${added.size} آهنگ جدید اضافه شد."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _scanMessage.value = "اسکن لغو شد؛ هیچ تغییری در کتابخانه اعمال نشد."
+                throw e
             } catch (e: SecurityException) {
                 _scanError.value = "دسترسی به فایل‌های صوتی داده نشده است. مجوز را در تنظیمات دستگاه فعال کنید."
             } catch (e: Exception) {

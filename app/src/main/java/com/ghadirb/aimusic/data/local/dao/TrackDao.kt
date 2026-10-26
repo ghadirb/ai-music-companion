@@ -32,6 +32,9 @@ interface TrackDao {
     suspend fun insertAll(tracks: List<TrackEntity>): List<Long>
 
     /** Refreshes scanner-provided metadata without changing favorites, ids or analysis. */
+    @Query("SELECT folderPath AS folder, COUNT(*) AS count FROM tracks WHERE folderPath IS NOT NULL AND folderPath != '' GROUP BY folderPath ORDER BY folderPath")
+    suspend fun folderCounts(): List<FolderCount>
+
     @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, durationMs = :durationMs, albumArtUri = :albumArtUri, folderPath = :folderPath, dateAdded = :dateAdded WHERE path = :path")
     suspend fun updateMetadata(
         path: String,
@@ -95,3 +98,6 @@ interface TrackDao {
 
 
 }
+
+/** One music folder and how many library tracks it holds (for the excluded-folders picker). */
+data class FolderCount(val folder: String, val count: Int)

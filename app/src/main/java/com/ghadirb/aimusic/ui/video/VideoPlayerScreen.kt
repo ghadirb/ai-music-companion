@@ -94,6 +94,21 @@ fun VideoPlayerScreen(
     var loopAll by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.loadLoopAll(ctxForPrefs)) }
     var subStyle by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.load(ctxForPrefs)) }
     var showSubStyle by remember { mutableStateOf(false) }
+    var gesturesPref by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.loadGestures(ctxForPrefs)) }
+    var orientation by remember { mutableStateOf(com.ghadirb.aimusic.video.VideoOrientation.AUTO) }
+    val hostActivity = ctxForPrefs as? android.app.Activity
+    androidx.compose.runtime.DisposableEffect(orientation) {
+        val original = hostActivity?.requestedOrientation
+        // AUTO leaves whatever the app/manifest already does; only an explicit lock changes the orientation.
+        when (orientation) {
+            com.ghadirb.aimusic.video.VideoOrientation.AUTO -> Unit
+            com.ghadirb.aimusic.video.VideoOrientation.LANDSCAPE ->
+                hostActivity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            com.ghadirb.aimusic.video.VideoOrientation.PORTRAIT ->
+                hostActivity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        }
+        onDispose { if (original != null) hostActivity?.requestedOrientation = original }
+    }
     var showTimer by remember { mutableStateOf(false) }
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(loopAll, controller) { controller.setLoopAll(loopAll) }
@@ -136,7 +151,7 @@ fun VideoPlayerScreen(
 
     PlayerGestureLayer(
         onTap = { if (locked) showUnlock = true else controlsVisible = !controlsVisible },
-        gesturesEnabled = !locked,
+        gesturesEnabled = !locked && gesturesPref,
         positionMs = { state.positionMs },
         durationMs = { state.durationMs },
         onSeekTo = { ms -> controller.seekTo(ms); interactions++ },
@@ -231,6 +246,8 @@ fun VideoPlayerScreen(
                 onInteract = { interactions++ },
                 onLock = { locked = true; controlsVisible = false; showUnlock = true },
                 onTimer = { showTimer = true },
+                orientationLabel = orientation.label,
+                onRotate = { orientation = orientation.next() },
                 timerActive = sleep !is com.ghadirb.aimusic.video.SleepMode.Off || loopAll
             )
         }
@@ -374,6 +391,10 @@ fun VideoPlayerScreen(
                     }
                     SubtitleRow("خاموش کردن تایمر", selected = sleep is com.ghadirb.aimusic.video.SleepMode.Off) { sleep = com.ghadirb.aimusic.video.SleepMode.Off }
                     androidx.compose.material3.HorizontalDivider()
+                    SubtitleRow(if (gesturesPref) "ژست‌های کشیدن (جلو/عقب، نور، صدا): روشن" else "ژست‌های کشیدن (جلو/عقب، نور، صدا): خاموش", selected = gesturesPref) {
+                        gesturesPref = !gesturesPref
+                        com.ghadirb.aimusic.video.SubtitleStyleStore.saveGestures(ctxForPrefs, gesturesPref)
+                    }
                     SubtitleRow(if (loopAll) "تکرار همهٔ صف: روشن" else "تکرار همهٔ صف: خاموش", selected = loopAll) {
                         loopAll = !loopAll
                         com.ghadirb.aimusic.video.SubtitleStyleStore.saveLoopAll(ctxForPrefs, loopAll)

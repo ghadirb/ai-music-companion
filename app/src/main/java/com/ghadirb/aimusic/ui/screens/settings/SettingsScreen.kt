@@ -255,6 +255,41 @@ fun SettingsScreen(
         )
         HorizontalDivider()
 
+        val excludedStore = remember { com.ghadirb.aimusic.library.ExcludedFoldersStore(context) }
+        var excludedCount by remember { mutableStateOf(excludedStore.load().size) }
+        var excludedFolderList by remember { mutableStateOf<List<Pair<String, Int>>?>(null) }
+        val excludeScope = rememberCoroutineScope()
+        ListItem(
+            headlineContent = { Text("پوشه‌های نادیده‌گرفته‌شده") },
+            supportingContent = {
+                Column {
+                    Text("پوشه‌هایی که نمی‌خواهید موسیقی و ویدیوی آن‌ها در برنامه دیده شود (مثلاً صدای واتساپ).")
+                    Text(if (excludedCount == 0) "هیچ پوشه‌ای نادیده گرفته نشده است." else "$excludedCount پوشه نادیده گرفته می‌شود.", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = {
+                        excludeScope.launch { excludedFolderList = repository.folderCounts().map { it.folder to it.count } }
+                    }) { Text("انتخاب پوشه‌ها") }
+                }
+            }
+        )
+        excludedFolderList?.let { list ->
+            com.ghadirb.aimusic.ui.screens.settings.ExcludedFoldersDialog(
+                folders = list,
+                excluded = excludedStore.load(),
+                onDismiss = { excludedFolderList = null },
+                onSave = { chosen ->
+                    excludedStore.save(chosen)
+                    excludedCount = excludedStore.load().size
+                    excludedFolderList = null
+                    excludeScope.launch {
+                        val app = context.applicationContext as com.ghadirb.aimusic.AiMusicApp
+                        runCatching { repository.rescanLibrary() }
+                        runCatching { app.videoRepository.sync() }
+                    }
+                }
+            )
+        }
+        HorizontalDivider()
+
         val libraryWatchStore = remember { com.ghadirb.aimusic.library.LibraryWatchStore(context) }
         var libraryWatchEnabled by remember { mutableStateOf(libraryWatchStore.enabled) }
         var libraryWatchSummary by remember { mutableStateOf(libraryWatchStore.pendingSummary) }

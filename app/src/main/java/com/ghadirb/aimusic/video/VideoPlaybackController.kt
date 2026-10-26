@@ -282,6 +282,7 @@ class VideoPlaybackController(
         val mime = when {
             name.endsWith(".srt") -> MimeTypes.APPLICATION_SUBRIP
             name.endsWith(".vtt") -> MimeTypes.TEXT_VTT
+            name.endsWith(".ass") || name.endsWith(".ssa") -> MimeTypes.TEXT_SSA
             else -> return false
         }
         val item = player.currentMediaItem ?: return false

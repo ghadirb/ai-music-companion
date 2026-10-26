@@ -81,14 +81,18 @@ class MusicRepository(
             if (deep) com.ghadirb.aimusic.library.MediaRescue.scanAll(appContext)
             else com.ghadirb.aimusic.library.MediaRescue.scanAllIfStale(appContext)
         }
-        val scanned = scanner.scan()
+        val rawScanned = scanner.scan()
+        // Folders the user excluded never enter (and are removed from) the library; files stay on the phone.
+        val excluded = com.ghadirb.aimusic.library.ExcludedFoldersStore(appContext).load()
+        val scanned = if (excluded.isEmpty()) rawScanned
+        else rawScanned.filterNot { com.ghadirb.aimusic.library.ExcludedFolders.isExcluded(it.path, excluded) }
         val existingPaths = trackDao.getAllPaths().toSet()
         val scannedPaths = scanned.map { it.path }.toSet()
 
         val newTracks = scanned.filter { it.path !in existingPaths }
         val existingTracks = scanned.filter { it.path in existingPaths }
         // An empty scan is treated as a provider glitch: never wipe the library (and favourites) because of it.
-        val removedPaths = if (scanned.isEmpty()) emptyList() else existingPaths.filter { it !in scannedPaths }
+        val removedPaths = if (rawScanned.isEmpty()) emptyList() else existingPaths.filter { it !in scannedPaths }
 
         var insertedIds: List<Long> = emptyList()
         val applyChanges: suspend () -> Unit = {
@@ -130,6 +134,8 @@ class MusicRepository(
     suspend fun setNotInterested(trackId: Long, notInterested: Boolean) =
         trackDao.setNotInterested(trackId, notInterested)
 
+
+    suspend fun folderCounts() = trackDao.folderCounts()
 
     suspend fun getTrack(trackId: Long): TrackEntity? = trackDao.getById(trackId)
 

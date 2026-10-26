@@ -80,7 +80,10 @@ class VideoRepository(
             if (deep) com.ghadirb.aimusic.library.MediaRescue.scanAll(context)
             else com.ghadirb.aimusic.library.MediaRescue.scanAllIfStale(context)
         }
-        val scanned = VideoScanner.scan(context) ?: return false
+        val rawScanned = VideoScanner.scan(context) ?: return false
+        val excluded = com.ghadirb.aimusic.library.ExcludedFoldersStore(context).load()
+        val scanned = if (excluded.isEmpty()) rawScanned
+        else rawScanned.filterNot { com.ghadirb.aimusic.library.ExcludedFolders.isExcludedRelative(it.relativePath, excluded) }
         val existing = dao.getAll().associateBy { it.id }
         val merged = scanned.map { fresh ->
             val old = existing[fresh.id]
