@@ -3,7 +3,7 @@
 ## 1. Release signing — done
 A 4096-bit RSA PKCS12 keystore (alias `aimusic`) was generated and stored in `Documents\AIMusicCompanion-secrets\` together with `release-signing-info.txt` (passwords). **Back this folder up now** (USB/cloud): losing the keystore means you can never publish updates of the same app.
 GitHub Actions secrets `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD` are set, so CI produces a **signed** `app-release.apk` / `.aab` (artifact `app-release`, R8 enabled, `mapping.txt` included). Never commit the keystore.
-Version: `versionCode` = CI run number, `versionName` = `-PVERSION_NAME` (default `1.0.0-rc1`).
+Version: `versionCode` = CI run number, `versionName` = `-PVERSION_NAME` (default `1.3.0`).
 
 ## 2. Gateway Worker (Cloudflare) — deployed
 Worker `ai-music-companion-embedding` is deployed (`npx wrangler deploy` from `cloudflare-worker/`) with the KV binding and the `QuotaCounter` Durable Object.
