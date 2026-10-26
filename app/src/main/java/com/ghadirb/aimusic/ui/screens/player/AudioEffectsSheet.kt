@@ -126,6 +126,17 @@ fun AudioEffectsSheet(
                 Switch(checked = s.skipSilence, onCheckedChange = { on -> AudioEffectsController.update { it.copy(skipSilence = on) } })
             }
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("یکسان‌سازی بلندی صدا (ReplayGain)")
+                    Text(
+                        "فقط برای آهنگ‌هایی که این تگ را دارند و فقط با کاهش بلندی (بدون خطر اعوجاج)",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = s.replayGain, onCheckedChange = { on -> AudioEffectsController.update { it.copy(replayGain = on) } })
+            }
+
             SectionTitle("تکرار قسمتی از آهنگ (A-B)")
             val loop = ui.abLoop
             Text(

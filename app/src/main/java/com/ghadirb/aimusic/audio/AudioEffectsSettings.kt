@@ -53,7 +53,9 @@ data class AudioEffectsSettings(
     val virtualizerStrength: Int = 0,
     /** extra volume in millibel, 0..MAX_LOUDNESS_MB */
     val loudnessMb: Int = 0,
-    val skipSilence: Boolean = false
+    val skipSilence: Boolean = false,
+    /** Level loudness with the file's own ReplayGain tag (only lowers volume). */
+    val replayGain: Boolean = false
 ) {
     fun sanitized() = copy(
         bassStrength = bassStrength.coerceIn(0, 1000),
@@ -68,7 +70,8 @@ data class AudioEffectsSettings(
     }
 
     fun encode(): String = listOf(
-        if (enabled) 1 else 0, preset, bandGainsMb.joinToString(","), bassStrength, virtualizerStrength, loudnessMb, if (skipSilence) 1 else 0
+        if (enabled) 1 else 0, preset, bandGainsMb.joinToString(","), bassStrength, virtualizerStrength, loudnessMb, if (skipSilence) 1 else 0,
+        if (replayGain) 1 else 0
     ).joinToString(";")
 
     companion object {
@@ -76,7 +79,7 @@ data class AudioEffectsSettings(
 
         fun decode(text: String?): AudioEffectsSettings {
             val f = text?.split(';') ?: return AudioEffectsSettings()
-            if (f.size != 7) return AudioEffectsSettings()
+            if (f.size != 7 && f.size != 8) return AudioEffectsSettings()   // 7 = saved before ReplayGain existed
             return runCatching {
                 AudioEffectsSettings(
                     enabled = f[0] == "1",
@@ -85,7 +88,8 @@ data class AudioEffectsSettings(
                     bassStrength = f[3].toInt(),
                     virtualizerStrength = f[4].toInt(),
                     loudnessMb = f[5].toInt(),
-                    skipSilence = f[6] == "1"
+                    skipSilence = f[6] == "1",
+                    replayGain = f.getOrNull(7) == "1"
                 ).sanitized()
             }.getOrDefault(AudioEffectsSettings())
         }

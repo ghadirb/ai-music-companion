@@ -92,4 +92,37 @@ class AudioEffectsSettingsTest {
         assertEquals(1000L, AbLoopLogic.seekTarget(loop, 4500))
         assertNull(AbLoopLogic.seekTarget(AbLoop(), 99999))
     }
+
+    // ---- ReplayGain ----
+    @Test fun replayGainRoundTripAndOldFormat() {
+        val s = AudioEffectsSettings(enabled = true, replayGain = true)
+        assertEquals(s, AudioEffectsSettings.decode(s.encode()))
+        // 7-field string saved by the previous version still loads, with ReplayGain off
+        val old = AudioEffectsSettings.decode("1;4;100,200;400;250;700;1")
+        assertEquals(true, old.enabled); assertFalse(old.replayGain); assertEquals(4, old.preset)
+    }
+    @Test fun gainParsing() {
+        assertEquals(-6.5f, ReplayGain.parseGainDb("-6.50 dB")!!, 0.001f)
+        assertEquals(3.2f, ReplayGain.parseGainDb("+3.2dB")!!, 0.001f)
+        assertEquals(-6.5f, ReplayGain.parseGainDb("-6,5 dB")!!, 0.001f)
+        assertEquals(-2f, ReplayGain.parseGainDb("−2 DB")!!, 0.001f)
+        assertNull(ReplayGain.parseGainDb("loud"))
+        assertNull(ReplayGain.parseGainDb(""))
+        assertNull(ReplayGain.parseGainDb(null))
+        assertNull(ReplayGain.parseGainDb("999 dB"))
+    }
+    @Test fun trackGainWinsOverAlbumGain() {
+        val tags = listOf("REPLAYGAIN_ALBUM_GAIN" to "-3.0 dB", "replaygain_track_gain" to "-7.0 dB")
+        assertEquals(-7f, ReplayGain.pickGainDb(tags)!!, 0.001f)
+        assertEquals(-3f, ReplayGain.pickGainDb(listOf("ReplayGain_Album_Gain" to "-3.0 dB"))!!, 0.001f)
+        assertNull(ReplayGain.pickGainDb(listOf("ARTIST" to "x")))
+        assertNull(ReplayGain.pickGainDb(listOf("replaygain_track_gain" to "garbage")))
+    }
+    @Test fun volumeOnlyEverLowers() {
+        assertEquals(1f, ReplayGain.volumeFor(null), 0f)
+        assertEquals(1f, ReplayGain.volumeFor(4f), 0f)                 // positive gain is ignored (no clipping risk)
+        assertEquals(0.5012f, ReplayGain.volumeFor(-6f), 0.001f)       // -6 dB ~ half amplitude
+        assertEquals(1f, ReplayGain.volumeFor(-3f, preampDb = 5f), 0f) // preamp can not push above the original
+        assertEquals(ReplayGain.MIN_VOLUME, ReplayGain.volumeFor(-60f), 0f)
+    }
 }

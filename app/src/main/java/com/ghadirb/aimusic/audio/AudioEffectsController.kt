@@ -11,6 +11,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.MetadataRetriever
+import androidx.media3.extractor.metadata.id3.InternalFrame
+import androidx.media3.extractor.metadata.id3.TextInformationFrame
+import androidx.media3.extractor.metadata.vorbis.VorbisComment
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,7 +60,11 @@ object AudioEffectsController {
 
     private val sessionListener = object : Player.Listener {
         override fun onAudioSessionIdChanged(audioSessionId: Int) = rebuild()
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { clearAbLoop() }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // A-B points belong to one song, and every song has its own ReplayGain tag.
+            if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) clearAbLoop()
+            applyReplayGain(mediaItem)
+        }
     }
 
     private val abTick = object : Runnable {
@@ -78,11 +87,14 @@ object AudioEffectsController {
         player.addListener(sessionListener)
         player.skipSilenceEnabled = saved.skipSilence
         rebuild()
+        applyReplayGain(player.currentMediaItem)
     }
 
     fun detach() {
         handler.removeCallbacks(abTick)
         player?.removeListener(sessionListener)
+        player?.volume = 1f
+        gainCache.clear()
         releaseEffects()
         player = null
         appContext = null
@@ -97,6 +109,7 @@ object AudioEffectsController {
         appContext?.getSharedPreferences(FILE, Context.MODE_PRIVATE)?.edit()?.putString("settings", next.encode())?.apply()
         player?.skipSilenceEnabled = next.skipSilence
         applySettings()
+        applyReplayGain(player?.currentMediaItem)
     }
 
     fun setEnabled(on: Boolean) = update { it.copy(enabled = on) }
@@ -117,6 +130,49 @@ object AudioEffectsController {
     }
 
     fun resetAll() = update { AudioEffectsSettings(enabled = it.enabled, skipSilence = it.skipSilence) }
+
+    // ---- ReplayGain ----
+
+    /** mediaId -> gain in dB read from the file (null = file has no tag). Avoids re-reading tags on every play. */
+    private val gainCache = HashMap<String, Float?>()
+    private var gainRequestFor: String? = null
+
+    /** Sets the player volume from the file's ReplayGain tag (or back to 1.0). Safe to call often. */
+    private fun applyReplayGain(item: MediaItem?) {
+        val p = player ?: return
+        val ctx = appContext ?: return
+        if (!_state.value.settings.replayGain || item == null) { p.volume = 1f; gainRequestFor = null; return }
+        val key = item.mediaId
+        if (gainCache.containsKey(key)) { p.volume = ReplayGain.volumeFor(gainCache[key]); return }
+        p.volume = 1f
+        gainRequestFor = key
+        runCatching {
+            val future = MetadataRetriever.retrieveMetadata(ctx, item)
+            future.addListener({
+                val gain = runCatching {
+                    val groups = future.get()
+                    val tags = ArrayList<Pair<String, String>>()
+                    for (i in 0 until groups.length) {
+                        val metadata = groups[i].getFormat(0).metadata ?: continue
+                        for (j in 0 until metadata.length()) {
+                            when (val e = metadata[j]) {
+                                is VorbisComment -> tags += e.key to e.value
+                                is TextInformationFrame -> if (e.id == "TXXX") tags += (e.description ?: "") to (e.values.firstOrNull() ?: "")
+                                is InternalFrame -> tags += e.description to e.text
+                                else -> Unit
+                            }
+                        }
+                    }
+                    ReplayGain.pickGainDb(tags)
+                }.getOrNull()
+                gainCache[key] = gain
+                // Only apply if this song is still the one playing and the option is still on.
+                if (player?.currentMediaItem?.mediaId == key && _state.value.settings.replayGain) {
+                    player?.volume = ReplayGain.volumeFor(gain)
+                }
+            }, ContextCompat.getMainExecutor(ctx))
+        }
+    }
 
     // ---- A-B repeat ----
 
