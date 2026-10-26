@@ -32,6 +32,12 @@ interface VideoController {
     /** Repeat the whole queue (last video is followed by the first). */
     fun setLoopAll(enabled: Boolean) {}
 
+    /**
+     * Subtitle timing offset (positive = later). Returns false when this engine cannot apply it to the current
+     * subtitle (Media3 can only shift subtitle FILES the user added, not tracks embedded in the video).
+     */
+    fun setSubtitleDelay(delayMs: Long): Boolean = false
+
     fun selectSubtitle(index: Int)
     fun disableSubtitles()
     /** Adds an external subtitle chosen through the system picker; false when the format is unsupported. */

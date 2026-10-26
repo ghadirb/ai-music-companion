@@ -226,6 +226,9 @@ class VlcPlaybackController(
         }.getOrDefault(false)
     }
 
+    /** libVLC delays any subtitle (embedded or file) itself; its unit is microseconds. */
+    override fun setSubtitleDelay(delayMs: Long): Boolean = runCatching { mp.setSpuDelay(delayMs * 1000L) }.getOrDefault(false)
+
     private fun subtitleTracks() = mp.getSpuTracks()?.filter { it.id >= 0 }.orEmpty()
     private fun audioTrackList() = mp.getAudioTracks()?.filter { it.id >= 0 }.orEmpty()
 

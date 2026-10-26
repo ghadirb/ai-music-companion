@@ -94,6 +94,10 @@ fun VideoPlayerScreen(
     var loopAll by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.loadLoopAll(ctxForPrefs)) }
     var subStyle by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.load(ctxForPrefs)) }
     var showSubStyle by remember { mutableStateOf(false) }
+    var showSubDelay by remember { mutableStateOf(false) }
+    var subDelayMs by remember { mutableStateOf(0L) }
+    var subDelayNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.index) { subDelayMs = 0L; subDelayNote = null }
     var gesturesPref by remember { mutableStateOf(com.ghadirb.aimusic.video.SubtitleStyleStore.loadGestures(ctxForPrefs)) }
     var orientation by remember { mutableStateOf(com.ghadirb.aimusic.video.VideoOrientation.AUTO) }
     val hostActivity = ctxForPrefs as? android.app.Activity
@@ -303,9 +307,39 @@ fun VideoPlayerScreen(
                     }
                     SubtitleRow("افزودن زیرنویس از فایل…", selected = false) { showSubtitles = false; onPickSubtitleFile() }
                     SubtitleRow("ظاهر زیرنویس (اندازه، رنگ، پس‌زمینه)…", selected = false) { showSubtitles = false; showSubStyle = true }
+                    SubtitleRow("همگام‌سازی زمانی زیرنویس…", selected = subDelayMs != 0L) { showSubtitles = false; showSubDelay = true }
                 }
             },
             confirmButton = { TextButton(onClick = { showSubtitles = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showSubDelay) {
+        fun change(newDelay: Long) {
+            val clamped = newDelay.coerceIn(-60_000L, 60_000L)
+            if (controller.setSubtitleDelay(clamped)) { subDelayMs = clamped; subDelayNote = null }
+            else subDelayNote = "تأخیر فقط برای فایل زیرنویسی که خودتان اضافه کرده‌اید (یا در موتور VLC برای هر زیرنویس) ممکن است. زیرنویسِ داخلی ویدیو در این موتور قابل جابه‌جایی نیست."
+        }
+        AlertDialog(
+            onDismissRequest = { showSubDelay = false },
+            title = { Text("همگام‌سازی زیرنویس") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        (if (subDelayMs >= 0) "+" else "−") + "%.1f ثانیه".format(Math.abs(subDelayMs) / 1000f),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text("اگر زیرنویس دیرتر از صدا می‌آید عدد را منفی کنید؛ اگر زودتر می‌آید مثبت.", style = MaterialTheme.typography.bodySmall)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(-1000L to "−۱ ثانیه", -100L to "−۰٫۱", 100L to "+۰٫۱", 1000L to "+۱ ثانیه").forEach { (step, label) ->
+                            androidx.compose.material3.OutlinedButton(onClick = { change(subDelayMs + step) }) { Text(label) }
+                        }
+                    }
+                    subDelayNote?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSubDelay = false }) { Text("تمام") } },
+            dismissButton = { TextButton(onClick = { change(0L) }) { Text("ریست") } }
         )
     }
 

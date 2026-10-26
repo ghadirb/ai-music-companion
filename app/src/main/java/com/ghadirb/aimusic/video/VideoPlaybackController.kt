@@ -46,6 +46,8 @@ class VideoPlaybackController(
     private val repository: VideoRepository,
     private val uiScope: CoroutineScope
 ) : VideoController {
+    private val appContext = context.applicationContext
+
     data class SubtitleOption(val index: Int, val label: String, val selected: Boolean)
 
     data class State(
@@ -118,6 +120,9 @@ class VideoPlaybackController(
             val id = mediaItem?.mediaId?.toLongOrNull() ?: return
             _state.value = _state.value.copy(error = null)
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                // A subtitle file the user added belonged to the previous video only.
+                externalSub = null
+                externalDelayMs = 0L
                 // Next/previous/auto-advance: continue that video from where it was left.
                 val v = _state.value.queue.firstOrNull { it.id == id }
                 val start = VideoResume.startPosition(positions[id] ?: v?.lastPositionMs ?: 0L, v?.durationMs ?: 0L)
@@ -277,22 +282,58 @@ class VideoPlaybackController(
      * uri the system gave us is used (no raw file paths). Returns false for other formats.
      * Subtitles are read as UTF-8 (Persian UTF-8 files render correctly; legacy 8-bit encodings do not).
      */
+    /** The subtitle file the user added (original uri + name), kept so its timing can be re-shifted later. */
+    private var externalSub: Pair<Uri, String>? = null
+    private var externalDelayMs = 0L
+
     override fun addExternalSubtitle(uri: Uri, displayName: String?): Boolean {
-        val name = displayName.orEmpty().lowercase(Locale.ROOT)
-        val mime = when {
-            name.endsWith(".srt") -> MimeTypes.APPLICATION_SUBRIP
-            name.endsWith(".vtt") -> MimeTypes.TEXT_VTT
-            name.endsWith(".ass") || name.endsWith(".ssa") -> MimeTypes.TEXT_SSA
-            else -> return false
+        val name = displayName.orEmpty()
+        if (mimeFor(name) == null) return false
+        externalSub = uri to name
+        externalDelayMs = 0L
+        return applyExternal(0L)
+    }
+
+    private fun mimeFor(name: String): String? {
+        val n = name.lowercase(Locale.ROOT)
+        return when {
+            n.endsWith(".srt") -> MimeTypes.APPLICATION_SUBRIP
+            n.endsWith(".vtt") -> MimeTypes.TEXT_VTT
+            n.endsWith(".ass") || n.endsWith(".ssa") -> MimeTypes.TEXT_SSA
+            else -> null
         }
+    }
+
+    override fun setSubtitleDelay(delayMs: Long): Boolean {
+        if (externalSub == null) return false
+        externalDelayMs = delayMs
+        return applyExternal(delayMs)
+    }
+
+    /** (Re)attaches the user's subtitle file, shifted by [delayMs] through a cache copy when it is not 0. */
+    private fun applyExternal(delayMs: Long): Boolean {
+        val (original, name) = externalSub ?: return false
+        val mime = mimeFor(name) ?: return false
         val item = player.currentMediaItem ?: return false
+        val source: Uri = if (delayMs == 0L) original else {
+            val ext = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+            val shifted = runCatching {
+                val raw = appContext.contentResolver.openInputStream(original)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                    ?: return false
+                SubtitleShift.shift(raw, ext, delayMs) ?: return false
+            }.getOrElse { return false }
+            val out = java.io.File(appContext.cacheDir, "sub_shift_${System.nanoTime()}.$ext")
+            runCatching { out.writeText(shifted, Charsets.UTF_8) }.getOrElse { return false }
+            Uri.fromFile(out)
+        }
         val index = player.currentMediaItemIndex
-        val sub = MediaItem.SubtitleConfiguration.Builder(uri)
+        val sub = MediaItem.SubtitleConfiguration.Builder(source)
+            .setId(USER_SUBTITLE_ID)
             .setMimeType(mime)
-            .setLabel(displayName)
+            .setLabel(name)
             .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
             .build()
-        val existing = item.localConfiguration?.subtitleConfigurations.orEmpty()
+        val existing = item.localConfiguration?.subtitleConfigurations.orEmpty().filter { it.id != USER_SUBTITLE_ID }
         val updated = item.buildUpon().setSubtitleConfigurations(existing + sub).build()
         val position = player.currentPosition
         player.replaceMediaItem(index, updated)
@@ -386,3 +427,5 @@ class VideoPlaybackController(
         else -> "پخش این ویدئو ممکن نشد."
     }
 }
+
+private const val USER_SUBTITLE_ID = "user_subtitle"
