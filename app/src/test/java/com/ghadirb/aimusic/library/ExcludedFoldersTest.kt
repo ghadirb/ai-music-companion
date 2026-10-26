@@ -48,4 +48,15 @@ class ExcludedFoldersTest {
         assertEquals(VideoOrientation.PORTRAIT, VideoOrientation.suggestedFor(720, 1280))
         assertEquals(VideoOrientation.AUTO, VideoOrientation.suggestedFor(0, 0))
     }
+
+    @Test fun persianFolderNamesMatchAcrossArabicLettersAndInvisibleCharacters() {
+        // saved with Persian ی/ک, reported by the phone with Arabic ي/ك (and a stray ZWNJ / direction mark)
+        val excluded = setOf("/storage/emulated/0/Music/\u0645\u0648\u0633\u06CC\u0642\u06CC \u06A9\u0648\u062F\u06A9")
+        val arabicForm = "/storage/emulated/0/Music/\u0645\u0648\u0633\u064A\u0642\u064A \u0643\u0648\u062F\u0643/a.mp3"
+        assertTrue(ExcludedFolders.isExcluded(arabicForm, excluded))
+        val withInvisible = "/storage/emulated/0/Music/\u0645\u0648\u0633\u06CC\u0642\u06CC\u200C \u06A9\u0648\u062F\u06A9\u200F/a.mp3"
+        assertTrue(ExcludedFolders.isExcluded(withInvisible, excluded))
+        // a different folder with a similar name is still not excluded
+        assertFalse(ExcludedFolders.isExcluded("/storage/emulated/0/Music/\u0645\u0648\u0633\u06CC\u0642\u06CC/a.mp3", excluded))
+    }
 }

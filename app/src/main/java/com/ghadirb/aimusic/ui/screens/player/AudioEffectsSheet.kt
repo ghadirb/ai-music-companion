@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import com.ghadirb.aimusic.audio.AbLoopLogic
 import com.ghadirb.aimusic.audio.AudioEffectsController
+import com.ghadirb.aimusic.audio.FadeLogic
 import com.ghadirb.aimusic.audio.AudioEffectsSettings
 import com.ghadirb.aimusic.audio.EqPresets
 
@@ -125,6 +126,15 @@ fun AudioEffectsSheet(
                 }
                 Switch(checked = s.skipSilence, onCheckedChange = { on -> AudioEffectsController.update { it.copy(skipSilence = on) } })
             }
+
+            SliderRow(
+                "محو شدن بین آهنگ‌ها", s.fadeSeconds.toFloat(), 0f..FadeLogic.MAX_SECONDS.toFloat(),
+                if (s.fadeSeconds == 0) "خاموش" else "${s.fadeSeconds} ثانیه"
+            ) { v -> AudioEffectsController.update { it.copy(fadeSeconds = v.toInt()) } }
+            Text(
+                "پایان آهنگ آرام کم و آهنگ بعدی آرام زیاد می‌شود (روی هم‌افتادن آهنگ‌ها نیست؛ پخش بدون وقفه حفظ می‌شود)",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

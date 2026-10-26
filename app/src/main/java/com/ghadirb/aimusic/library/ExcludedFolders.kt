@@ -8,7 +8,22 @@ import android.content.Context
  */
 object ExcludedFolders {
 
-    fun normalize(path: String): String = path.replace('\\', '/').trim().trimEnd('/').lowercase()
+    /**
+     * Same folder, same key: Arabic ي/ك equal Persian ی/ک, and invisible characters (ZWNJ, ZWJ, direction marks,
+     * BOM) are ignored, so a Persian folder name matches however the phone or the keyboard wrote it.
+     */
+    fun normalize(path: String): String {
+        val sb = StringBuilder(path.length)
+        for (ch in path.replace('\\', '/').trim()) {
+            when (ch) {
+                '\u200C', '\u200D', '\u200E', '\u200F', '\uFEFF', '\u202A', '\u202B', '\u202C' -> Unit
+                '\u064A', '\u0649' -> sb.append('\u06CC')
+                '\u0643' -> sb.append('\u06A9')
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString().trimEnd('/').lowercase()
+    }
 
     /** "/storage/emulated/0/Music/Podcasts" -> "music/podcasts" (also /sdcard/ and SD-card volumes). */
     fun stripVolume(path: String): String {

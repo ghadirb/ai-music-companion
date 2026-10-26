@@ -47,6 +47,7 @@ object AudioEffectsController {
     )
 
     private const val FILE = "audio_effects"
+    private const val FADE_TICK_MS = 100L
     private val handler = Handler(Looper.getMainLooper())
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -60,11 +61,36 @@ object AudioEffectsController {
 
     private val sessionListener = object : Player.Listener {
         override fun onAudioSessionIdChanged(audioSessionId: Int) = rebuild()
+        override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) refreshFade() }
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) = refreshFade()
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             // A-B points belong to one song, and every song has its own ReplayGain tag.
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) clearAbLoop()
             applyReplayGain(mediaItem)
         }
+    }
+
+    // Player volume = ReplayGain level (baseVolume) x fade factor. Every volume change goes through applyVolume().
+    private var baseVolume = 1f
+    private var fadeFactor = 1f
+
+    private fun applyVolume() { player?.volume = (baseVolume * fadeFactor).coerceIn(0f, 1f) }
+
+    private fun setBaseVolume(v: Float) { baseVolume = v; applyVolume() }
+
+    private val fadeTick = object : Runnable {
+        override fun run() {
+            val p = player ?: return
+            val seconds = _state.value.settings.fadeSeconds
+            fadeFactor = if (seconds > 0) FadeLogic.factor(p.currentPosition, p.duration.takeIf { it > 0 } ?: 0L, seconds) else 1f
+            applyVolume()
+            if (seconds > 0 && p.isPlaying) handler.postDelayed(this, FADE_TICK_MS)
+        }
+    }
+
+    private fun refreshFade() {
+        handler.removeCallbacks(fadeTick)
+        if (_state.value.settings.fadeSeconds > 0) fadeTick.run() else { fadeFactor = 1f; applyVolume() }
     }
 
     private val abTick = object : Runnable {
@@ -88,11 +114,14 @@ object AudioEffectsController {
         player.skipSilenceEnabled = saved.skipSilence
         rebuild()
         applyReplayGain(player.currentMediaItem)
+        refreshFade()
     }
 
     fun detach() {
         handler.removeCallbacks(abTick)
         player?.removeListener(sessionListener)
+        handler.removeCallbacks(fadeTick)
+        baseVolume = 1f; fadeFactor = 1f
         player?.volume = 1f
         gainCache.clear()
         releaseEffects()
@@ -110,6 +139,7 @@ object AudioEffectsController {
         player?.skipSilenceEnabled = next.skipSilence
         applySettings()
         applyReplayGain(player?.currentMediaItem)
+        refreshFade()
     }
 
     fun setEnabled(on: Boolean) = update { it.copy(enabled = on) }
@@ -141,10 +171,10 @@ object AudioEffectsController {
     private fun applyReplayGain(item: MediaItem?) {
         val p = player ?: return
         val ctx = appContext ?: return
-        if (!_state.value.settings.replayGain || item == null) { p.volume = 1f; gainRequestFor = null; return }
+        if (!_state.value.settings.replayGain || item == null) { setBaseVolume(1f); gainRequestFor = null; return }
         val key = item.mediaId
-        if (gainCache.containsKey(key)) { p.volume = ReplayGain.volumeFor(gainCache[key]); return }
-        p.volume = 1f
+        if (gainCache.containsKey(key)) { setBaseVolume(ReplayGain.volumeFor(gainCache[key])); return }
+        setBaseVolume(1f)
         gainRequestFor = key
         runCatching {
             val future = MetadataRetriever.retrieveMetadata(ctx, item)
@@ -168,7 +198,7 @@ object AudioEffectsController {
                 gainCache[key] = gain
                 // Only apply if this song is still the one playing and the option is still on.
                 if (player?.currentMediaItem?.mediaId == key && _state.value.settings.replayGain) {
-                    player?.volume = ReplayGain.volumeFor(gain)
+                    setBaseVolume(ReplayGain.volumeFor(gain))
                 }
             }, ContextCompat.getMainExecutor(ctx))
         }

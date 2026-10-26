@@ -55,12 +55,15 @@ data class AudioEffectsSettings(
     val loudnessMb: Int = 0,
     val skipSilence: Boolean = false,
     /** Level loudness with the file's own ReplayGain tag (only lowers volume). */
-    val replayGain: Boolean = false
+    val replayGain: Boolean = false,
+    /** Fade out/in between songs, seconds (0 = off, up to FadeLogic.MAX_SECONDS). */
+    val fadeSeconds: Int = 0
 ) {
     fun sanitized() = copy(
         bassStrength = bassStrength.coerceIn(0, 1000),
         virtualizerStrength = virtualizerStrength.coerceIn(0, 1000),
-        loudnessMb = loudnessMb.coerceIn(0, MAX_LOUDNESS_MB)
+        loudnessMb = loudnessMb.coerceIn(0, MAX_LOUDNESS_MB),
+        fadeSeconds = fadeSeconds.coerceIn(0, FadeLogic.MAX_SECONDS)
     )
 
     /** Band gains to apply on a device with [bands] bands: the saved ones, or the preset's, or flat. */
@@ -71,7 +74,7 @@ data class AudioEffectsSettings(
 
     fun encode(): String = listOf(
         if (enabled) 1 else 0, preset, bandGainsMb.joinToString(","), bassStrength, virtualizerStrength, loudnessMb, if (skipSilence) 1 else 0,
-        if (replayGain) 1 else 0
+        if (replayGain) 1 else 0, fadeSeconds
     ).joinToString(";")
 
     companion object {
@@ -79,7 +82,7 @@ data class AudioEffectsSettings(
 
         fun decode(text: String?): AudioEffectsSettings {
             val f = text?.split(';') ?: return AudioEffectsSettings()
-            if (f.size != 7 && f.size != 8) return AudioEffectsSettings()   // 7 = saved before ReplayGain existed
+            if (f.size !in 7..9) return AudioEffectsSettings()   // 7 = before ReplayGain, 8 = before fade
             return runCatching {
                 AudioEffectsSettings(
                     enabled = f[0] == "1",
@@ -89,7 +92,8 @@ data class AudioEffectsSettings(
                     virtualizerStrength = f[4].toInt(),
                     loudnessMb = f[5].toInt(),
                     skipSilence = f[6] == "1",
-                    replayGain = f.getOrNull(7) == "1"
+                    replayGain = f.getOrNull(7) == "1",
+                    fadeSeconds = f.getOrNull(8)?.toInt() ?: 0
                 ).sanitized()
             }.getOrDefault(AudioEffectsSettings())
         }
